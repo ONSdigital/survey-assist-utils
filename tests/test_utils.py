@@ -109,8 +109,10 @@ def test_check_and_refresh_token(mock_generate_jwt, mock_current_utc_time):
     # Test case 2: Token exists but needs refreshing
     mock_generate_jwt.reset_mock()
     token_start_time = int(
-        (mock_time - timedelta(seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD + 1)).timestamp()
-        )
+        (
+            mock_time - timedelta(seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD + 1)
+        ).timestamp()
+    )
     current_token = "old_jwt_token"  # noqa: S105
 
     token_start_time, current_token = check_and_refresh_token(
@@ -129,9 +131,9 @@ def test_check_and_refresh_token(mock_generate_jwt, mock_current_utc_time):
     # Test case 3: Token exists and does not need refreshing
     mock_generate_jwt.reset_mock()
     token_start_time = int(
-        (mock_time - timedelta(
-        seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD - 1
-    )).timestamp()
+        (
+            mock_time - timedelta(seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD - 1)
+        ).timestamp()
     )
     current_token = "valid_jwt_token"  # noqa: S105
 
@@ -140,12 +142,13 @@ def test_check_and_refresh_token(mock_generate_jwt, mock_current_utc_time):
     )
 
     assert token_start_time == int(
-        (mock_time - timedelta(
-        seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD - 1
-    )).timestamp()
+        (
+            mock_time - timedelta(seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD - 1)
+        ).timestamp()
     )
     assert current_token == "valid_jwt_token"  # noqa: S105
     mock_generate_jwt.assert_not_called()
+
 
 @patch("utils.api_token.jwt_utils.generate_jwt")
 @patch("utils.api_token.jwt_utils.os.getenv")
@@ -153,11 +156,11 @@ def test_check_and_refresh_token(mock_generate_jwt, mock_current_utc_time):
 def test_generate_api_token(mock_getenv, mock_generate_jwt, capsys):
     """Test the generate_api_token function."""
     # Mock environment variables
-    mock_getenv.side_effect = lambda var: {
+    mock_getenv.side_effect = {
         "API_GATEWAY": "mock-api-gateway",
         "SA_EMAIL": "mock-account@project.iam.gserviceaccount.com",
         "JWT_SECRET": "/path/to/mock/keyfile.json",
-    }.get(var)
+    }.get
 
     # Mock JWT generation
     mock_generate_jwt.return_value = "mock_jwt_token"

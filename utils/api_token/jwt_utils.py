@@ -106,7 +106,8 @@ def check_and_refresh_token(
         )
 
     elapsed_time = (
-        current_utc_time().replace(tzinfo=None) - datetime.fromtimestamp(token_start_time)
+        current_utc_time().replace(tzinfo=None)
+        - datetime.fromtimestamp(token_start_time)
     ).total_seconds()
     remaining_time = TOKEN_EXPIRY - elapsed_time
 
