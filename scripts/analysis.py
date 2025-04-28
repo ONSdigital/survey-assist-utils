@@ -1,4 +1,9 @@
 # Read the response JSON
+
+# Example response line in the output json file:
+# {"unique_id": "EV000012", "job_title_sent": "COMMUNITY LEARNING OFFICER", "job_description_sent": "ENVIRONMENTAL EDUCATION FOR FAMILIES  GROUPS   SCHOOLS FOR A LOCAL CHARITY  WORKING WITH VOLUNTEERS TO MAINTAIN A WILDLIFE GARDEN", "industry_descr_sent": "A CHARITY WHICH AIMS TO MAINTAIN WILDLIFE HABITATS  ENGAGE THE PUBLIC TO LEARN ABOUT LOCAL WILDLIFE  CAMPAIGNING AND POLICY WORK ABOUT LONDON S WILDLIFE", "classified": false, "followup": "Does the charity primarily focus on environmental education, or are other community activities a significant part of its work?", "sic_code": "94990", "sic_description": "Activities of other membership organisations nec", "sic_candidates": [{"sic_code": "94990", "sic_descriptive": "Activities of other membership organisations nec", "likelihood": 0.6}, {"sic_code": "85600", "sic_descriptive": "Educational support activities", "likelihood": 0.4}, {"sic_code": "91040", "sic_descriptive": "Botanical and zoological gardens and nature reserve activities", "likelihood": 0.3}], "reasoning": "The job description mentions working with volunteers to maintain a wildlife garden and delivering environmental education to families, groups, and schools for a local charity.  This points towards 'Activities of other membership organisations nec' (94990) as the charity likely falls under this category.  'Educational support activities' (85600) is also plausible given the educational aspect, but the community and volunteer work suggest 94990 is more likely. 'Botanical and zoological gardens and nature reserve activities' (91040) is a possibility due to the wildlife garden, but the educational component makes it less likely than the other two."}
+
+
 file_path = '../data/output_responses.txt'
 
 # store the JSON objects
