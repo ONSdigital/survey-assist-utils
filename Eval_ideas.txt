@@ -1,0 +1,57 @@
+Eval ideas
+First pass at creating an outline for the evaluation plan:
+High level description of approach, fine to have just placeholders for the metrics that require more exploration
+Preprocessing of the manually labelled set:
+What cleaning/ wrangling/ recoding/ preprocessing is required?
+Components of a MVP evaluation module:
+Config with params (yaml)
+Data loaders (utils)
+Accuracy class (and corresponding tests):
+init and load datasets
+top result
+top N result
+overlap
+confusion matrix
+confidence vs accuracy
+Script that illustrates usage of the Accuracy class
+
+Overview
+This is a short document outlining the plan for evaluating suitability of Survey Assist. 
+Here, we describe metrics and methods for assessing Survey Assist from several dimensions:
+•	User experience: assess gains/losses in performance and efficiency for clerical coders.
+•	Impact on outputs: understand and assess possible data discontinuities resulting from switching from G-Code to Survey Assist.
+•	Compare quality of coding: assess Survey Assist accuracy.
+Comparability: the version of Survey Assist used in parallel run will be comparable to Gold Standard as much as possible. Specifically, Survey Assist app will take and output the same file formats, perform autocoding and use the same knowledge bases as Gold Standard.
+Approach
+User experience
+To evaluate potential gains/losses in performance and efficiency, we will assess Survey Assist usability by BDOD clerical coders. 
+Clerical coders will run the same representative ASHE files through interactive coding with Survey Assist and Gold Standard. 
+In consultation with clerical coders, we propose to allocate 1-2 days and 6 clerical coders to perform parallel testing. 
+We will collect feedback from the coders in a structured (MS form) and an unstructured (group debrief) format. 
+Coders will also record how long it took them to code the same files using Survey Assist and Gold Standard.
+Impact on outputs
+We will perform a large-scale parallel run on data to understand possible discontinuities arising from switching from Gold Standard to Survey Assist. 
+Changes in outputs will be primarily driven by responses that were previously automatically coded by Gold Standard.
+Steps for evaluating impact on outputs:
+1.	Run available 429 output files from previous
+2.	For entries previously coded with Gold Standard (33 thousand responses):
+a.	Programmatically compare Gold Standard SIC allocation with top answer from Survey Assist.
+b.	Produce statics on agreement at each level of SIC hierarchy .
+c.	Separately investigate instances where Gold Standard and Survey Assist results disagree at 4-digit SIC level to assign one of the following options:
+i.	Survey Assist SIC is correct
+ii.	Gold Standard SIC is correct
+iii.	Survey Assist or Gold Standard are partially correct
+iv.	Both Survey Assist and Gold Standard are plausible
+v.	Neither Survey Assist or Gold Standard SIC is correct
+3.	For entries previously coded manually (25 thousand responses):
+a.	Calculate mean rank of the correct answer in Survey Assist output. This is to check whether clerical coders would see the code they assigned in the top n 
+options provided by Survey Assist.
+b.	Calculate the proportion of clerically assigned codes that appear in the top n Survey Assist options.
+
+Compare quality of coding
+We will assess Survey Assist accuracy and compare it to Gold Standard where applicable.
+We will measure Survey Assist accuracy on a labelled sample. Separately we will use a comparable evaluation set of manually labelled online job adverts. 
+When evaluating accuracy we will define “correct” answer as one or two SIC codes that were assigned through manual labelling. We allow up to two SIC codes to 
+address instances where job title is ambiguous and may fit under more than one SIC code (e.g. “accountant”).
+
+

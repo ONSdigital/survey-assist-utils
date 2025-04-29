@@ -1,0 +1,7 @@
+input_files:
+# sic
+  labelled_set: "../data/evaluation_data/coding_df_with_validated.csv"
+  gold_results_json: "../data/evaluation_data/response_1734536101812.json"
+# soc
+  # labelled_set: "../data/evaluation_data/validated_ashe.csv"
+  # classifai_results_json: "../data/evaluation_data/ashe_results.json"
