@@ -166,6 +166,8 @@ def subset_data(file_path):
 
     # Filter rows containing only 5-digit codes using the pattern
     five_digit_pattern = re.compile(r"^[0-9]{5}$")
+
+    sic_data["sic_ind1"] = sic_data["sic_ind1"].fillna("")
     df_five_digits = sic_data[sic_data["sic_ind1"].str.match(five_digit_pattern)].copy()
     matched_five_list = sorted(df_five_digits["sic_ind1"].unique())
     print(f"Shape of DataFrame with 5-digit codes: {df_five_digits.shape}")
@@ -296,8 +298,12 @@ if __name__ == "__main__":
     CURRENT_TOKEN = ""
 
     api_gateway = os.getenv("API_GATEWAY", "")
+    # debug:
+    print("api_gateway ", api_gateway)
     sa_email = os.getenv("SA_EMAIL", "")
+    print("sa_email", sa_email)
     jwt_secret_path = os.getenv("JWT_SECRET", "")
+    print("jwt_secret_path ", jwt_secret_path)
 
     TOKEN_START_TIME, CURRENT_TOKEN = check_and_refresh_token(
         TOKEN_START_TIME, CURRENT_TOKEN, jwt_secret_path, api_gateway, sa_email
