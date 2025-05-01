@@ -43,7 +43,6 @@ Functions:
 
 """
 
-
 import json
 import logging
 import os
@@ -256,7 +255,7 @@ def process_row(row, secret_code):
         response.raise_for_status()
         response_json = response.json()
     except requests.exceptions.RequestException as e:
-        logging.error(f"Request failed for unique_id {unique_id}: {e}")
+        logging.error("Request failed for unique_id %s: %s", unique_id, e)
         response_json = {
             "unique_id": unique_id,
             "job_title": job_title,
