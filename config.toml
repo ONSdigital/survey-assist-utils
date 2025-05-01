@@ -1,0 +1,42 @@
+# Configuration for the SIC Evaluation Script
+
+[paths]
+# Input path for the expert-coded gold standard data (relative to project root)
+gold_standard_csv = "data/evaluation_data/coding_df_with_validated.csv"
+
+# Output directory for analysis results (relative to project root)
+output_dir = "data/analysis_outputs"
+
+# Will change this in a later PR to append date and time, ets, but for now this:
+output_filepath = "data/analysis_outputs/output.csv"
+
+
+[parameters]
+test_mode = True
+test_num = 3
+
+[column_names]
+# --- Key columns in the gold standard input file ---
+unique_id = "unique_id"
+gold_sic = "sic_ind_occ1"         # Gold standard SIC code column
+gold_flag = "sic_ind_code_flag"   # Gold standard KB/CC/MC flag
+
+# --- Expected key columns/fields in the LLM response data ---
+response_candidates = "sic_candidates"  # Field in response JSON with candidates list
+response_top_sic = "sic_code"         # Top-level sic_code in response JSON (if available)
+
+# --- Column names for extracted LLM data in analysis dataframes ---
+llm_top_sic = "llm_sic_code_1"        # Renamed for clarity after extraction
+llm_top_likelihood = "llm_likelihood_1" # Renamed for clarity after extraction
+
+[logging]
+# Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+level = "INFO"
+# Optional: Log file path (relative to project root). If commented out, logs to console.
+file = "logs/evaluation.log"
+format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+
+# Add other parameters here as needed, e.g., for sampling, thresholds, etc.
+# [analysis_params]
+# top_n = 5
+# min_sic_frequency = 11
