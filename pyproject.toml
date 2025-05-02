@@ -17,6 +17,13 @@ generate-api-token = "utils.api_token.jwt_utils:generate_api_token"
 [tool.poetry.dependencies]
 python = "^3.12"
 google-auth = "^2.36.0"
+pandas = "^2.2.3"
+matplotlib = "^3.10.1"
+dotenv = "^0.9.9"
+python-dotenv = "^1.1.0"
+seaborn = "^0.13.2"
+pre-commit = "^4.2.0"
+toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.6.7"
@@ -28,6 +35,9 @@ mypy = "^1.15.0"
 isort = "^6.0.1"
 bandit = "^1.8.3"
 pytest = "^8.3.5"
+ipykernel = "^6.29.5"
+pre-commit = "^4.2.0"
+types-toml = "^0.10.8.20240310"
 
 [tool.isort]
 profile = "black"
