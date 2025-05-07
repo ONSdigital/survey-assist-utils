@@ -1,7 +1,16 @@
-"""Batch Processing Script.
-This script processes data based on configurations specified in a .toml file
-    and environment variables.
-It requires the following environment variables to be exported:
+"""This script processes SIC code batch data through Survey Assist API. 
+It is based on configurations specified in a .toml file.
+Prior to invocation, ensure to run the following CLI commands:
+> gcloud config set project "valid-priject-name"
+> gcloud auth application-default login
+By defalut the output file is appended to, not overwritten.
+Delete it before running, or change the name if this is not want you want.
+
+Run from the root of the project as follows:
+
+path/to/python /home/user/survey-assist-utils/scripts/batch.py
+
+It also requires the following environment variables to be exported:
 - API_GATEWAY: The API gateway URL.
 - SA_EMAIL: The service account email.
 - JWT_SECRET: The path to the JWT secret.
@@ -15,8 +24,9 @@ The script performs the following steps:
 1. Loads the configuration from the .toml file.
 2. Retrieves the necessary environment variables.
 3. Obtains a secret token using the `check_and_refresh_token` function.
-4. Loads and filters the gold standard data.
+4. Loads the gold standard data.
 5. Processes the data either in test mode (processing a subset) or for all items.
+6. Writes (appends) the results to the file specified in config.toml
 
 Usage:
     poetry run python scripts/batch.py
@@ -34,9 +44,6 @@ Functions:
     load_config(config_path: str) -> dict
         Loads the configuration from the specified .toml file.
 
-    subset_data(file_path: str) -> pd.DataFrame
-        Loads and filters the data from the specified file path.
-
     process_test_set(secret_code: str, csv_filepath: str, output_filepath: str,
             test_mode: bool, test_limit: int) -> None
         Processes the data and writes the output to the specified file path.
@@ -46,7 +53,6 @@ Functions:
 import json
 import logging
 import os
-import re
 import time
 
 import pandas as pd
@@ -108,116 +114,9 @@ def read_sic_data(file_path):
     ]
 
     # Read the CSV file with the specified delimiter and column names
-    sic_data = pd.read_csv(file_path, delimiter="\t", names=column_names, dtype=str)
+    sic_data = pd.read_csv(file_path, delimiter=",", names=column_names, dtype=str)
 
     return sic_data
-
-
-def subset_data(file_path):
-    """Subsets the data based on specified criteria.
-
-    Parameters:
-    file_path (str): The path to the CSV file.
-
-    Returns:
-    pd.DataFrame: A DataFrame containing the subsetted data.
-    """
-    column_names = [
-        "unique_id",
-        "sic_section",
-        "sic2007_employee",
-        "sic2007_self_employed",
-        "sic_ind1",
-        "sic_ind2",
-        "sic_ind3",
-        "sic_ind_code_flag",
-        "soc2020_job_title",
-        "soc2020_job_description",
-        "sic_ind_occ1",
-        "sic_ind_occ2",
-        "sic_ind_occ3",
-        "sic_ind_occ_flag",
-    ]
-
-    # Read the CSV file with the specified delimiter and column names
-    sic_data = pd.read_csv(file_path, delimiter="\t", names=column_names, dtype=str)
-
-    # Define the columns to check for specific values
-    prompt_columns = [
-        "soc2020_job_title",
-        "soc2020_job_description",
-        "sic2007_employee",
-    ]
-
-    # Count rows with value '-9' or '-8' in specified columns
-    count_rows = (
-        sic_data[prompt_columns]
-        .apply(lambda row: row.isin(["-9", "-8"]).any(), axis=1)
-        .sum()
-    )
-    print(f"Number of rows with '-9' or '-8' in specified columns: {count_rows}")
-
-    # Drop rows with value '-9' or '-8' in specified columns
-    sic_data = sic_data[
-        ~sic_data[prompt_columns].apply(
-            lambda row: row.isin(["-9", "-8"]).any(), axis=1
-        )
-    ]
-
-    # Filter rows containing only 5-digit codes using the pattern
-    five_digit_pattern = re.compile(r"^[0-9]{5}$")
-
-    sic_data["sic_ind1"] = sic_data["sic_ind1"].fillna("")
-    df_five_digits = sic_data[sic_data["sic_ind1"].str.match(five_digit_pattern)].copy()
-    matched_five_list = sorted(df_five_digits["sic_ind1"].unique())
-    print(f"Shape of DataFrame with 5-digit codes: {df_five_digits.shape}")
-    print(f"Unique 5-digit codes: {matched_five_list}")
-
-    # Get frequency of 5-digit codes
-    freq_five_digits = df_five_digits["sic_ind1"].value_counts()
-    print(f"Frequency of 5-digit codes:\n{freq_five_digits}")
-
-    # Filter data based on frequency of 5-digit codes
-    # we use THRESHOLD_VALUE to only keep those with more than ten instances in the database
-    value_counts = df_five_digits["sic_ind1"].value_counts()
-    filtered_indexes = value_counts[value_counts > THRESHOLD_VALUE].index.tolist()
-    sic_data = sic_data[sic_data["sic_ind1"].isin(filtered_indexes)]
-    print(f"Shape of filtered DataFrame: {sic_data.shape}")
-
-    return sic_data
-
-
-def process_test_set(
-    secret_code, csv_filepath, output_filepath, test_mode=False, test_limit=2
-):
-    """Process the test set CSV file, make API requests, and save the responses to an output file.
-
-    Parameters:
-    secret_code (str): The secret code for API authorization.
-    csv_filepath (str): The file path to the test set CSV file.
-    output_filepath (str): The file path for the output responses.
-    test_mode (bool): If True, process only a limited number of rows for testing.
-    test_limit (int): The number of rows to process in test mode.
-    """
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-
-    # Read the CSV file into a DataFrame
-    gold_df = pd.read_csv(csv_filepath, delimiter=",", dtype=str)
-
-    # Determine the subset of data to process
-    if test_mode:
-        gold_df = gold_df.head(test_limit)
-        logging.info("Test mode enabled. Processing first %s rows.", test_limit)
-
-    # Process each row in the DataFrame
-    with open(output_filepath, "a", encoding="utf-8") as file:
-        for _index, row in gold_df.iterrows():
-            response_json = process_row(row, secret_code)
-            file.write(json.dumps(response_json) + "\n")
-            time.sleep(10)  # Wait between requests to avoid rate limiting
 
 
 def process_row(row, secret_code):
@@ -264,16 +163,43 @@ def process_row(row, secret_code):
             "error": str(e),
         }
 
-    response_json.update(
-        {
-            "unique_id": unique_id,
-            "job_title": job_title,
-            "job_description": job_description,
-            "industry_descr": industry_descr,
-        }
-    )
+    # Add metadata and payload to the response
+    response_json.update({"unique_id": unique_id, "request_payload": payload})
 
     return response_json
+
+
+def process_test_set(
+    secret_code, csv_filepath, output_filepath, test_mode=False, test_limit=2
+):
+    """Process the test set CSV file, make API requests, and save the responses to an output file.
+
+    Parameters:
+    secret_code (str): The secret code for API authorization.
+    csv_filepath (str): The file path to the test set CSV file.
+    output_filepath (str): The file path for the output responses.
+    test_mode (bool): If True, process only a limited number of rows for testing.
+    test_limit (int): The number of rows to process in test mode.
+    """
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    # Read the CSV file into a DataFrame
+    gold_df = pd.read_csv(csv_filepath, delimiter=",", dtype=str)
+
+    # Determine the subset of data to process
+    if test_mode:
+        gold_df = gold_df.head(test_limit)
+        logging.info("Test mode enabled. Processing first %s rows.", test_limit)
+
+    # Process each row in the DataFrame
+    with open(output_filepath, "a", encoding="utf-8") as file:
+        for _index, row in gold_df.iterrows():
+            response_json = process_row(row, secret_code)
+            file.write(json.dumps(response_json) + "\n")
+            time.sleep(10)  # Wait between requests to avoid rate limiting
 
 
 if __name__ == "__main__":
@@ -298,25 +224,22 @@ if __name__ == "__main__":
     CURRENT_TOKEN = ""
 
     api_gateway = os.getenv("API_GATEWAY", "")
-    # debug:
-    print("api_gateway ", api_gateway)
     sa_email = os.getenv("SA_EMAIL", "")
-    print("sa_email", sa_email)
     jwt_secret_path = os.getenv("JWT_SECRET", "")
-    print("jwt_secret_path ", jwt_secret_path)
 
-    TOKEN_START_TIME, CURRENT_TOKEN = check_and_refresh_token(
-        TOKEN_START_TIME, CURRENT_TOKEN, jwt_secret_path, api_gateway, sa_email
-    )
-
-    # load the data and filter it
-    subsetted_data = subset_data(gold_standard_csv)
+    # Load the data
+    batch_data = pd.read_csv(gold_standard_csv, delimiter=",", dtype=str)
 
     # for test, select a small sample:
     test_num = config["parameters"]["test_num"]
     test_mode_option = config["parameters"]["test_mode"]
 
-    print(subsetted_data.head(test_num))
+    print(batch_data.head(test_num))
+
+    # Get token:
+    TOKEN_START_TIME, CURRENT_TOKEN = check_and_refresh_token(
+        TOKEN_START_TIME, CURRENT_TOKEN, jwt_secret_path, api_gateway, sa_email
+    )
 
     # process file:
     process_test_set(
