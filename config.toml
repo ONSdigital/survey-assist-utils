@@ -2,17 +2,14 @@
 
 [paths]
 # Input path for the expert-coded gold standard data (relative to project root)
-gold_standard_csv = "data/evaluation_data/coding_df_with_validated.csv"
-
-# Output directory for analysis results (relative to project root)
-output_dir = "data/analysis_outputs"
+batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
 
 # Output file for batch processing results
 output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
 
 [parameters]
 test_mode = true
-test_num = 3
+test_num = 4
 
 [column_names]
 # --- Column names from the input CSV to be used for API payload ---
@@ -20,18 +17,6 @@ payload_unique_id = "unique_id"
 payload_job_title = "soc2020_job_title"
 payload_job_description = "soc2020_job_description"
 payload_industry_description = "sic2007_employee"
-
-# --- Gold standard columns for evaluation ---
-gold_sic = "sic_ind_occ1"         # Gold standard SIC code column
-gold_flag = "sic_ind_code_flag"  # Gold standard KB/CC/MC flag
-
-# --- Expected key columns/fields in the LLM response data ---
-response_candidates = "sic_candidates" # Field in response JSON with candidates list
-response_top_sic = "sic_code"        # Top-level sic_code in response JSON (if available)
-
-# --- Column names for extracted LLM data in analysis dataframes ---
-llm_top_sic = "llm_sic_code_1"       # Renamed for clarity after extraction
-llm_top_likelihood = "llm_likelihood_1" # Renamed for clarity after extraction
 
 [api_settings]
 base_url = "https://example-api-gateway-d90b4xu9.nw.gateway.dev/survey-assist/classify"
