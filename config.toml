@@ -7,36 +7,49 @@ gold_standard_csv = "data/evaluation_data/coding_df_with_validated.csv"
 # Output directory for analysis results (relative to project root)
 output_dir = "data/analysis_outputs"
 
-# Will change this in a later PR to append date and time, ets, but for now this:
-output_filepath = "data/analysis_outputs/output.csv"
-
+# Output file for batch processing results
+output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
 
 [parameters]
 test_mode = true
 test_num = 3
 
 [column_names]
-# --- Key columns in the gold standard input file ---
-unique_id = "unique_id"
+# --- Key columns in the gold standard input file (for reading the CSV) ---
+# These are the names assigned if the CSV has no header or if you want to override
+input_csv_columns = [
+    "unique_id", "sic_section", "sic2007_employee", "sic2007_self_employed",
+    "sic_ind1", "sic_ind2", "sic_ind3", "sic_ind_code_flag",
+    "soc2020_job_title", "soc2020_job_description", "sic_ind_occ1",
+    "sic_ind_occ2", "sic_ind_occ3", "sic_ind_occ_flag"
+]
+
+# --- Column names from the input CSV to be used for API payload ---
+payload_unique_id = "unique_id"
+payload_job_title = "soc2020_job_title"
+payload_job_description = "soc2020_job_description"
+payload_industry_description = "sic2007_employee"
+
+# --- Gold standard columns for evaluation ---
 gold_sic = "sic_ind_occ1"         # Gold standard SIC code column
-gold_flag = "sic_ind_code_flag"   # Gold standard KB/CC/MC flag
+gold_flag = "sic_ind_code_flag"  # Gold standard KB/CC/MC flag
 
 # --- Expected key columns/fields in the LLM response data ---
-response_candidates = "sic_candidates"  # Field in response JSON with candidates list
-response_top_sic = "sic_code"         # Top-level sic_code in response JSON (if available)
+response_candidates = "sic_candidates" # Field in response JSON with candidates list
+response_top_sic = "sic_code"        # Top-level sic_code in response JSON (if available)
 
 # --- Column names for extracted LLM data in analysis dataframes ---
-llm_top_sic = "llm_sic_code_1"        # Renamed for clarity after extraction
+llm_top_sic = "llm_sic_code_1"       # Renamed for clarity after extraction
 llm_top_likelihood = "llm_likelihood_1" # Renamed for clarity after extraction
+
+[api_settings]
+base_url = "https://example-api-gateway-d90b4xu9.nw.gateway.dev/survey-assist/classify"
+# llm_model = "gemini" # Example if you want to configure this too
+# request_type = "sic" # Example
 
 [logging]
 # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 level = "INFO"
 # Optional: Log file path (relative to project root). If commented out, logs to console.
-file = "logs/evaluation.log"
+# file = "logs/evaluation.log" # Corrected path example
 format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-
-# Add other parameters here as needed, e.g., for sampling, thresholds, etc.
-# [analysis_params]
-# top_n = 5
-# min_sic_frequency = 11
