@@ -1,4 +1,4 @@
-"""This script processes SIC code batch data through Survey Assist API. 
+"""This script processes SIC code batch data through Survey Assist API.
 It is based on configurations specified in a .toml file.
 Prior to invocation, ensure to run the following CLI commands:
 > gcloud config set project "valid-priject-name"
