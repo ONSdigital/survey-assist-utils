@@ -15,15 +15,6 @@ test_mode = true
 test_num = 3
 
 [column_names]
-# --- Key columns in the gold standard input file (for reading the CSV) ---
-# These are the names assigned if the CSV has no header or if you want to override
-input_csv_columns = [
-    "unique_id", "sic_section", "sic2007_employee", "sic2007_self_employed",
-    "sic_ind1", "sic_ind2", "sic_ind3", "sic_ind_code_flag",
-    "soc2020_job_title", "soc2020_job_description", "sic_ind_occ1",
-    "sic_ind_occ2", "sic_ind_occ3", "sic_ind_occ_flag"
-]
-
 # --- Column names from the input CSV to be used for API payload ---
 payload_unique_id = "unique_id"
 payload_job_title = "soc2020_job_title"
