@@ -10,7 +10,7 @@ Run from the root of the project as follows:
 poetry run python scripts/batch.py
 
 It also requires the following environment variables to be exported:
-- API_GATEWAY: The base API gateway URL. This is used to get and refresh 
+- API_GATEWAY: The base API gateway URL. This is used to get and refresh
     the token and is different to the API destination in the config.toml.
 - SA_EMAIL: The service account email.
 - JWT_SECRET: The path to the JWT secret.
