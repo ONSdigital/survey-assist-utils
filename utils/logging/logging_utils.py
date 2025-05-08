@@ -82,11 +82,11 @@ class SurveyAssistLogger:
             )
         return level
 
-    def _setup_logger(self) -> Union[logging.Logger, "gcp_logging.Logger"]:
+    def _setup_logger(self) -> Union[logging.Logger, Any]:
         """Set up the appropriate logger based on the environment.
 
         Returns:
-            Union[logging.Logger, gcp_logging.Logger]: The configured logger
+            Union[logging.Logger, Any]: The configured logger
         """
         if os.environ.get("K_SERVICE") and GCP_LOGGING_AVAILABLE:
             return self._setup_gcp_logger()
@@ -111,11 +111,11 @@ class SurveyAssistLogger:
 
         return logger
 
-    def _setup_gcp_logger(self) -> "gcp_logging.Logger":
+    def _setup_gcp_logger(self) -> Any:
         """Set up a GCP logger.
 
         Returns:
-            gcp_logging.Logger: The configured GCP logger
+            Any: The configured GCP logger
         """
         client = gcp_logging.Client()
         logger = client.logger(self.name)
