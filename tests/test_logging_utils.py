@@ -2,14 +2,11 @@
 
 # pylint: disable=redefined-outer-name,unused-argument
 
-import json
 from unittest.mock import MagicMock, patch
-import os
 
 import pytest
 
 from utils.logging.logging_utils import (
-    VALID_LOG_LEVELS,
     get_logger,
 )
 
@@ -17,7 +14,7 @@ from utils.logging.logging_utils import (
 @pytest.fixture
 def mock_gcp_logging():
     """Mock GCP logging module."""
-    with patch('google.cloud.logging.Client') as mock_client:
+    with patch("google.cloud.logging.Client") as mock_client:
         mock_logger = MagicMock()
         mock_client.return_value.logger.return_value = mock_logger
         yield mock_logger
@@ -26,7 +23,7 @@ def mock_gcp_logging():
 @pytest.fixture
 def mock_google_auth():
     """Mock Google auth."""
-    with patch('google.auth.default') as mock_auth:
+    with patch("google.auth.default") as mock_auth:
         mock_credentials = MagicMock()
         mock_auth.return_value = (mock_credentials, "test-project")
         yield mock_auth
@@ -103,13 +100,13 @@ def test_environment_detection():
         assert not hasattr(logger.logger, "log_text")  # Should be a local logger
 
     # Test GCP environment
-    with patch("os.environ.get", return_value="test-service"), \
-         patch('google.auth.default') as mock_auth, \
-         patch('google.cloud.logging.Client') as mock_client:
+    with patch("os.environ.get", return_value="test-service"), patch(
+        "google.auth.default"
+    ) as mock_auth, patch("google.cloud.logging.Client") as mock_client:
         mock_credentials = MagicMock()
         mock_auth.return_value = (mock_credentials, "test-project")
         mock_logger = MagicMock()
         mock_client.return_value.logger.return_value = mock_logger
-        
+
         logger = get_logger("test_module")
         assert hasattr(logger.logger, "log_text")  # Should be a GCP logger
