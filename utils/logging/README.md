@@ -10,6 +10,7 @@ A unified logging interface for Survey Assist applications that works seamlessly
 - Configurable log levels
 - Module name truncation for cleaner logs
 - Additional context support for all log messages
+- Graceful fallback to local logging when GCP dependencies are unavailable
 
 ## Installation
 
@@ -53,8 +54,9 @@ logger = get_logger(__name__, level='DEBUG')
 ## Environment Detection
 
 The logger automatically detects the environment:
-- In GCP: Uses `google-cloud-logging` when `K_SERVICE` environment variable is set
+- In GCP Cloud Run: Uses `google-cloud-logging` when `K_SERVICE` environment variable is set
 - Local: Falls back to standard Python logging with console output
+- Graceful fallback: If GCP dependencies are unavailable, automatically uses local logging
 
 ## Log Format
 
@@ -69,6 +71,7 @@ The logger automatically detects the environment:
     "message": "Log message",
     "timestamp": "2024-03-14T10:30:45.123Z",
     "module": "module_name",
+    "function": "function_name",
     "user_id": 123,
     "action": "login"
 }
@@ -84,6 +87,7 @@ The logger automatically detects the environment:
    - WARNING: Unexpected but handled situations
    - ERROR: Errors that need attention
    - CRITICAL: System-level errors
+4. The logger will automatically handle environment detection and logging format
 
 ## Contributing
 
