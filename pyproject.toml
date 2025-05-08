@@ -19,7 +19,6 @@ generate-api-token = "utils.api_token.jwt_utils:generate_api_token"
 python = "^3.12"
 google-auth = "^2.36.0"
 google-cloud-logging = "^3.9.0"
-types-google-cloud-logging = "^3.9.0"
 pandas = "^2.2.3"
 matplotlib = "^3.10.1"
 dotenv = "^0.9.9"
@@ -99,6 +98,8 @@ convention = "google"
 quote-style = "double"
 indent-style = "space"
 
+[tool.mypy]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["poetry-core"]
