@@ -11,10 +11,16 @@ from datetime import UTC, datetime
 from typing import Any, Union
 
 # Import cloud logging at module level
+GCP_LOGGING_AVAILABLE = False
+gcp_logging: Any = None
+
 try:
-    from google.cloud import logging as gcp_logging  # type: ignore
+    from google.cloud import logging as _gcp_logging  # type: ignore
+
+    gcp_logging = _gcp_logging
+    GCP_LOGGING_AVAILABLE = True
 except ImportError:
-    gcp_logging = None
+    pass
 
 # Constants
 MAX_MODULE_NAME_LENGTH = 20
@@ -54,7 +60,7 @@ class SurveyAssistLogger:
             str: The formatted module name
         """
         if len(name) > MAX_MODULE_NAME_LENGTH:
-            return f"{name[:14]}..."  # Changed from 15 to 14 to match test expectation
+            return f"{name[:15]}..."
         return name
 
     def _validate_log_level(self, level: str) -> str:
@@ -76,16 +82,14 @@ class SurveyAssistLogger:
             )
         return level
 
-    def _setup_logger(self) -> Union[logging.Logger, Any]:
+    def _setup_logger(self) -> Union[logging.Logger, "gcp_logging.Logger"]:
         """Set up the appropriate logger based on the environment.
 
         Returns:
-            Union[logging.Logger, Any]: The configured logger
+            Union[logging.Logger, gcp_logging.Logger]: The configured logger
         """
-        if os.environ.get("K_SERVICE"):
-            cloud_logging = _get_cloud_logging()
-            if cloud_logging:
-                return self._setup_gcp_logger(cloud_logging)
+        if os.environ.get("K_SERVICE") and GCP_LOGGING_AVAILABLE:
+            return self._setup_gcp_logger()
         return self._setup_local_logger()
 
     def _setup_local_logger(self) -> logging.Logger:
@@ -107,16 +111,13 @@ class SurveyAssistLogger:
 
         return logger
 
-    def _setup_gcp_logger(self, cloud_logging: Any) -> Any:
+    def _setup_gcp_logger(self) -> "gcp_logging.Logger":
         """Set up a GCP logger.
 
-        Args:
-            cloud_logging: The cloud logging module
-
         Returns:
-            Any: The configured GCP logger
+            gcp_logging.Logger: The configured GCP logger
         """
-        client = cloud_logging.Client()
+        client = gcp_logging.Client()
         logger = client.logger(self.name)
         return logger
 
