@@ -7,19 +7,21 @@ This module provides a unified logging interface that works both locally and in 
 import os
 import logging
 import json
-from typing import Optional, List, Union
-from datetime import datetime
-
-try:
-    from google.cloud import logging as cloud_logging
-    GCP_LOGGING_AVAILABLE = True
-except ImportError:
-    GCP_LOGGING_AVAILABLE = False
+from typing import Optional, List, Union, Any
+from datetime import datetime, UTC
 
 # Constants
 MAX_MODULE_NAME_LENGTH = 20
 DEFAULT_LOG_LEVEL = 'INFO'
 VALID_LOG_LEVELS = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
+
+def _get_cloud_logging():
+    """Get the cloud logging module if available."""
+    try:
+        from google.cloud import logging as cloud_logging
+        return cloud_logging
+    except ImportError:
+        return None
 
 class SurveyAssistLogger:
     """A custom logger class that handles both local and GCP logging."""
@@ -47,7 +49,7 @@ class SurveyAssistLogger:
             str: The formatted module name
         """
         if len(name) > MAX_MODULE_NAME_LENGTH:
-            return f"{name[:15]}..."
+            return f"{name[:14]}..."  # Changed from 15 to 14 to match test expectation
         return name
 
     def _validate_log_level(self, level: str) -> str:
@@ -68,15 +70,17 @@ class SurveyAssistLogger:
             raise ValueError(f"Invalid log level: {level}. Must be one of {VALID_LOG_LEVELS}")
         return level
 
-    def _setup_logger(self) -> Union[logging.Logger, cloud_logging.Logger]:
+    def _setup_logger(self) -> Union[logging.Logger, Any]:
         """
         Set up the appropriate logger based on the environment.
 
         Returns:
-            Union[logging.Logger, cloud_logging.Logger]: The configured logger
+            Union[logging.Logger, Any]: The configured logger
         """
-        if os.environ.get("K_SERVICE") and GCP_LOGGING_AVAILABLE:
-            return self._setup_gcp_logger()
+        if os.environ.get("K_SERVICE"):
+            cloud_logging = _get_cloud_logging()
+            if cloud_logging:
+                return self._setup_gcp_logger(cloud_logging)
         return self._setup_local_logger()
 
     def _setup_local_logger(self) -> logging.Logger:
@@ -99,12 +103,15 @@ class SurveyAssistLogger:
 
         return logger
 
-    def _setup_gcp_logger(self) -> cloud_logging.Logger:
+    def _setup_gcp_logger(self, cloud_logging: Any) -> Any:
         """
         Set up a GCP logger.
 
+        Args:
+            cloud_logging: The cloud logging module
+
         Returns:
-            cloud_logging.Logger: The configured GCP logger
+            Any: The configured GCP logger
         """
         client = cloud_logging.Client()
         logger = client.logger(self.name)
@@ -126,7 +133,7 @@ class SurveyAssistLogger:
 
         context = {
             'message': message,
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(UTC).isoformat(),
             'module': self.name,
             **kwargs
         }
@@ -135,7 +142,7 @@ class SurveyAssistLogger:
     def debug(self, message: str, **kwargs) -> None:
         """Log a debug message."""
         formatted_message = self._format_message(message, **kwargs)
-        if isinstance(self.logger, cloud_logging.Logger):
+        if hasattr(self.logger, 'log_text'):  # GCP logger
             self.logger.log_text(formatted_message, severity='DEBUG')
         else:
             self.logger.debug(formatted_message)
@@ -143,7 +150,7 @@ class SurveyAssistLogger:
     def info(self, message: str, **kwargs) -> None:
         """Log an info message."""
         formatted_message = self._format_message(message, **kwargs)
-        if isinstance(self.logger, cloud_logging.Logger):
+        if hasattr(self.logger, 'log_text'):  # GCP logger
             self.logger.log_text(formatted_message, severity='INFO')
         else:
             self.logger.info(formatted_message)
@@ -151,7 +158,7 @@ class SurveyAssistLogger:
     def warning(self, message: str, **kwargs) -> None:
         """Log a warning message."""
         formatted_message = self._format_message(message, **kwargs)
-        if isinstance(self.logger, cloud_logging.Logger):
+        if hasattr(self.logger, 'log_text'):  # GCP logger
             self.logger.log_text(formatted_message, severity='WARNING')
         else:
             self.logger.warning(formatted_message)
@@ -159,7 +166,7 @@ class SurveyAssistLogger:
     def error(self, message: str, **kwargs) -> None:
         """Log an error message."""
         formatted_message = self._format_message(message, **kwargs)
-        if isinstance(self.logger, cloud_logging.Logger):
+        if hasattr(self.logger, 'log_text'):  # GCP logger
             self.logger.log_text(formatted_message, severity='ERROR')
         else:
             self.logger.error(formatted_message)
@@ -167,7 +174,7 @@ class SurveyAssistLogger:
     def critical(self, message: str, **kwargs) -> None:
         """Log a critical message."""
         formatted_message = self._format_message(message, **kwargs)
-        if isinstance(self.logger, cloud_logging.Logger):
+        if hasattr(self.logger, 'log_text'):  # GCP logger
             self.logger.log_text(formatted_message, severity='CRITICAL')
         else:
             self.logger.critical(formatted_message)
