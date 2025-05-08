@@ -1,3 +1,11 @@
+# ignore data files
+*.csv
+*.xlsx
+*.json
+/data/evaluation_data/
+/data/analysis_output/
+/data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
