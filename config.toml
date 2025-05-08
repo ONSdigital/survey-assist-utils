@@ -1,14 +1,19 @@
-# Configuration for the SIC Evaluation Script
+# Configuration for SIC Evaluation 
+
 
 [paths]
 # Input path for the expert-coded gold standard data (relative to project root)
-gold_standard_csv = "data/evaluation_data/coding_df_with_validated.csv"
+batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
+
+# Output file for batch processing results
+output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
 
 # Output directory for analysis results (relative to project root)
 output_dir = "data/analysis_outputs"
 
-# Will change this in a later PR to append date and time, ets, but for now this:
-output_filepath = "data/analysis_outputs/output.csv"
+[parameters]
+test_mode = true
+test_num = 4
 
 
 [parameters]
@@ -16,6 +21,19 @@ test_mode = true
 test_num = 3
 
 [column_names]
+
+# --- Column names from the input CSV to be used for API payload ---
+payload_unique_id = "unique_id"
+payload_job_title = "soc2020_job_title"
+payload_job_description = "soc2020_job_description"
+payload_industry_description = "sic2007_employee"
+
+[api_settings]
+base_url = "https://example-api-gateway-d90b4xu9.nw.gateway.dev/survey-assist/classify"
+# llm_model = "gemini" # Example if you want to configure this too
+# request_type = "sic" # Example
+
+
 # --- Key columns in the gold standard input file ---
 unique_id = "unique_id"
 gold_sic = "sic_ind_occ1"         # Gold standard SIC code column
