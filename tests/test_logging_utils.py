@@ -11,12 +11,17 @@ from utils.logging.logging_utils import SurveyAssistLogger, get_logger, VALID_LO
 @pytest.fixture
 def mock_gcp_logging():
     """Mock GCP logging client and logger."""
-    with patch('utils.logging.logging_utils.cloud_logging') as mock:
-        mock_client = MagicMock()
-        mock_logger = MagicMock()
-        mock.Client.return_value = mock_client
-        mock_client.logger.return_value = mock_logger
-        yield mock
+    mock_logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.logger.return_value = mock_logger
+    
+    # Create a mock module
+    mock_module = MagicMock()
+    mock_module.Client.return_value = mock_client
+    
+    # Mock the cloud logging import
+    with patch('utils.logging.logging_utils._get_cloud_logging', return_value=mock_module):
+        yield mock_client.logger.return_value
 
 @pytest.fixture
 def local_logger():
@@ -88,6 +93,8 @@ def test_gcp_logging(gcp_logger, mock_gcp_logging):
         assert message_dict['message'] == 'Test message'
         assert 'timestamp' in message_dict
         assert message_dict['module'] == 'test_module'
+        assert 'function' in message_dict  # Verify function name is present
+        assert message_dict['function'] == 'test_gcp_logging'  # Verify correct function name
     except json.JSONDecodeError:
         # If not JSON, it should be the plain message
         assert message == 'Test message'
@@ -106,12 +113,18 @@ def test_message_formatting():
     """Test message formatting with additional context."""
     logger = get_logger('test_module')
     
+    # Test short message - module name should not be abbreviated
     with patch('logging.Logger.info') as mock_info:
-        logger.info('Test message', user_id=123, action='test')
+        logger.info('Short message', user_id=123, action='test')
         called_message = mock_info.call_args[0][0]
-        assert 'Test message' in called_message
-        assert 'user_id' in called_message
-        assert 'action' in called_message
+        assert 'test_module' in called_message
+
+    # Test long message - module name should be abbreviated
+    long_message = 'x' * 150  # Create a message longer than 100 chars
+    with patch('logging.Logger.info') as mock_info:
+        logger.info(long_message, user_id=123, action='test')
+        called_message = mock_info.call_args[0][0]
+        assert 'test_mo...' in called_message  # Updated to match actual implementation
 
 def test_environment_detection():
     """Test environment detection logic."""
