@@ -7,6 +7,7 @@ This module provides a unified logging interface that works both locally and in 
 import os
 import logging
 import json
+import inspect
 from typing import Optional, List, Union, Any
 from datetime import datetime, UTC
 
@@ -131,10 +132,23 @@ class SurveyAssistLogger:
         if not kwargs:
             return message
 
+        # Get the calling function's name
+        frame = inspect.currentframe()
+        if frame and frame.f_back:
+            func_name = frame.f_back.f_code.co_name
+        else:
+            func_name = "unknown"
+
+        # Abbreviate module name if message is long (more than 100 chars)
+        module_name = self.name
+        if len(message) > 100 and len(module_name) > 10:
+            module_name = f"{module_name[:7]}..."
+
         context = {
             'message': message,
             'timestamp': datetime.now(UTC).isoformat(),
-            'module': self.name,
+            'module': module_name,
+            'function': func_name,
             **kwargs
         }
         return json.dumps(context)
