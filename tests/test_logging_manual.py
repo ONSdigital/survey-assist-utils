@@ -3,6 +3,8 @@
 import os
 import time
 from datetime import datetime
+import pytest
+from unittest.mock import patch, MagicMock
 
 from utils.logging import get_logger
 
@@ -32,28 +34,29 @@ def test_local_logging():
     long_name_logger.info("Testing long module name")
 
 
-def test_gcp_logging():
+@patch('google.cloud.logging.Client')
+def test_gcp_logging(mock_client):
     """Test GCP logging functionality."""
+    # Set up mock
+    mock_logger = MagicMock()
+    mock_client.return_value.logger.return_value = mock_logger
+    
     # Set environment variable to simulate GCP environment
     os.environ["K_SERVICE"] = "test-service"
 
     # Create a logger
     logger = get_logger(__name__)
-
-    # Test different log levels
-    logger.debug("This is a debug message in GCP")
-    logger.info("This is an info message in GCP")
-    logger.warning("This is a warning message in GCP")
-    logger.error("This is an error message in GCP")
-    logger.critical("This is a critical message in GCP")
-
-    # Test logging with context
-    logger.info(
-        "GCP message with context",
-        user_id="456",
-        action="test",
-        timestamp=datetime.now().isoformat(),
-    )
+    
+    # Test logging
+    logger.info("Test GCP info message")
+    logger.warning("Test GCP warning message")
+    logger.error("Test GCP error message")
+    
+    # Verify mock was called
+    assert mock_logger.log_text.called
+    
+    # Clean up
+    del os.environ["K_SERVICE"]
 
 
 if __name__ == "__main__":
