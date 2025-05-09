@@ -2,14 +2,14 @@
 
 [paths]
 # Input path for the expert-coded gold standard data (relative to project root)
-batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
+batch_filepath = "data/artificial_data/artificial_test_data.csv"
 
 # Output file for batch processing results
-output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
+output_filepath = "data/analysis_outputs/output6.jsonl" # Changed from .csv to .jsonl
 
 [parameters]
-test_mode = true
-test_num = 4
+test_mode = false
+test_num = 2
 
 [column_names]
 # --- Column names from the input CSV to be used for API payload ---
