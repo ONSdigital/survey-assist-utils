@@ -1,6 +1,5 @@
 # Configuration for SIC Evaluation 
 
-
 [paths]
 # Input path for the expert-coded gold standard data (relative to project root)
 batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
@@ -15,13 +14,7 @@ output_dir = "data/analysis_outputs"
 test_mode = true
 test_num = 4
 
-
-[parameters]
-test_mode = true
-test_num = 3
-
 [column_names]
-
 # --- Column names from the input CSV to be used for API payload ---
 payload_unique_id = "unique_id"
 payload_job_title = "soc2020_job_title"
@@ -32,7 +25,6 @@ payload_industry_description = "sic2007_employee"
 base_url = "https://example-api-gateway-d90b4xu9.nw.gateway.dev/survey-assist/classify"
 # llm_model = "gemini" # Example if you want to configure this too
 # request_type = "sic" # Example
-
 
 # --- Key columns in the gold standard input file ---
 unique_id = "unique_id"
@@ -53,8 +45,3 @@ level = "INFO"
 # Optional: Log file path (relative to project root). If commented out, logs to console.
 file = "logs/evaluation.log"
 format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-
-# Add other parameters here as needed, e.g., for sampling, thresholds, etc.
-# [analysis_params]
-# top_n = 5
-# min_sic_frequency = 11

@@ -12,8 +12,7 @@ The utilities allow for the following:
 
 import logging
 import re
-from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -141,7 +140,6 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
-    
     # Load configuration from .toml file
     main_config = load_config("config.toml")
 
@@ -152,12 +150,7 @@ if __name__ == "__main__":
     sic_dataframe = pd.read_csv(analysis_filepath, delimiter=",", dtype=str)
 
     # add quality flags
-    sic_dataframe_with_flags = add_data_quality_flags(
-        sic_dataframe, main_config
-    )
-
-
-
+    sic_dataframe_with_flags = add_data_quality_flags(sic_dataframe, main_config)
 
     print("\nDataFrame Head with Quality Flags:")
     print(sic_dataframe_with_flags.head())
@@ -176,8 +169,4 @@ if __name__ == "__main__":
     for col_to_show in flag_cols_to_show:
         if col_to_show in sic_dataframe_with_flags.columns:
             print(f"\n--- {col_to_show} ---")
-            print(
-                sic_dataframe_with_flags[col_to_show].value_counts(
-                    dropna=False
-                )
-            )
+            print(sic_dataframe_with_flags[col_to_show].value_counts(dropna=False))
