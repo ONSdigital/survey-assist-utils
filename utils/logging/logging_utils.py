@@ -146,7 +146,6 @@ class SurveyAssistLogger:
 
         context = {
             "message": message,
-            "timestamp": datetime.now(UTC).isoformat(),
             "module": module_name,
             "func": func_name,
             **kwargs,
