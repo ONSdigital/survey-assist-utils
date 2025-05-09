@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
-from typing import Any, Union
+from typing import Any, Union, Dict
 
 # Import cloud logging at module level
 GCP_LOGGING_AVAILABLE = False
@@ -131,12 +131,13 @@ class SurveyAssistLogger:
         Returns:
             str: The formatted message
         """
-        if not kwargs:
-            return message
-
-        # Get the calling function's name
+        # Get the calling function's name by going up two frames
         frame = inspect.currentframe()
-        func_name = frame.f_back.f_code.co_name if frame and frame.f_back else "unknown"
+        try:
+            caller_frame = frame.f_back.f_back
+            func_name = caller_frame.f_code.co_name if caller_frame else "unknown"
+        finally:
+            del frame
 
         # Abbreviate module name if message is long
         module_name = self.name
@@ -147,7 +148,7 @@ class SurveyAssistLogger:
             "message": message,
             "timestamp": datetime.now(UTC).isoformat(),
             "module": module_name,
-            "function": func_name,
+            "func": func_name,
             **kwargs,
         }
         return json.dumps(context)
@@ -191,6 +192,25 @@ class SurveyAssistLogger:
             self.logger.log_text(formatted_message, severity="CRITICAL")
         else:
             self.logger.critical(formatted_message)
+
+    def _get_caller_info(self) -> Dict[str, str]:
+        """Get information about the calling function.
+
+        Returns:
+            Dict[str, str]: Dictionary containing module and function information
+        """
+        frame = inspect.currentframe()
+        try:
+            # Go up two frames to get the actual caller
+            caller_frame = frame.f_back.f_back
+            module_name = caller_frame.f_globals.get("__name__", "unknown")
+            function_name = caller_frame.f_code.co_name
+            return {
+                "module": module_name,
+                "func": function_name
+            }
+        finally:
+            del frame
 
 
 def get_logger(name: str, level: str = DEFAULT_LOG_LEVEL) -> SurveyAssistLogger:
