@@ -5,7 +5,10 @@
 batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
 
 # Output file for batch processing results
-output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
+output_filepath = "data/analysis_outputs/output_7.jsonl" # Changed from .csv to .jsonl
+
+# Output for processed csv:
+analysis_csv = "data/analysis_outputs/analysis_flags.csv"
 
 # Output directory for analysis results (relative to project root)
 output_dir = "data/analysis_outputs"

@@ -146,6 +146,9 @@ if __name__ == "__main__":
     # Where the input data csv is. We'll use the batch filepath from batch script
     analysis_filepath = main_config["paths"]["batch_filepath"]
 
+    # We'll write the post analysis csv here:
+    analysis_csv = main_config["paths"]["analysis_csv"]
+
     # Load the data
     sic_dataframe = pd.read_csv(analysis_filepath, delimiter=",", dtype=str)
 
@@ -170,3 +173,7 @@ if __name__ == "__main__":
         if col_to_show in sic_dataframe_with_flags.columns:
             print(f"\n--- {col_to_show} ---")
             print(sic_dataframe_with_flags[col_to_show].value_counts(dropna=False))
+
+
+    # write new dataframe out:            
+    sic_dataframe_with_flags.to_csv(analysis_csv, index=False)
