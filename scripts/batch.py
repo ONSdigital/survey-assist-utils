@@ -59,15 +59,11 @@ from utils.api_token.jwt_utils import (
     check_and_refresh_token,  # this does everything we need
 )
 
-
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-    logging.FileHandler("logs/batch2.log"),
-    logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("logs/batch2.log"), logging.StreamHandler()],
 )
 
 logger = logging.getLogger(__name__)
@@ -104,8 +100,8 @@ def process_row(row, secret_code, app_config):
     Returns:
     dict: The response JSON with additional information.
     """
-    api_gateway = os.getenv("API_GATEWAY", "")
-    base_url = api_gateway + "/survey-assist/classify"
+    api_gateway_base = os.getenv("API_GATEWAY", "")
+    base_url = api_gateway_base + "/survey-assist/classify"
 
     unique_id = row[app_config["column_names"]["payload_unique_id"]]
     job_title = row[app_config["column_names"]["payload_job_title"]]
