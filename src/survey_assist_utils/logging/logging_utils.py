@@ -145,6 +145,10 @@ class SurveyAssistLogger:
         if len(message) > MAX_MESSAGE_LENGTH and len(module_name) > MIN_MODULE_LENGTH:
             module_name = f"{module_name[:MODULE_NAME_TRUNCATE_LENGTH]}..."
 
+        # Remove severity from kwargs if present
+        if "severity" in kwargs:
+            del kwargs["severity"]
+
         context = {
             "message": message,
             "module": module_name,
