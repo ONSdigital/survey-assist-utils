@@ -48,6 +48,7 @@ Functions:
 import json
 import logging
 import os
+import tempfile
 import time
 
 import pandas as pd
@@ -58,6 +59,7 @@ import toml
 from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 
 WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
+UPLOAD_ROWS = 5 # upload every 5 rows
 
 # Load the config:
 def load_config(config_path):
@@ -161,23 +163,72 @@ def process_test_set(
         process_batch_data = process_batch_data.head(test_limit)
         logging.info("Test mode enabled. Processing first %s rows.", test_limit)
 
+    is_gcs_output = output_filepath.startswith("gs://")
+    total_rows = len(process_batch_data)
+
+    if is_gcs_output:
+        # Use a persistent temp file for incremental upload
+        tmp_dir = tempfile.gettempdir()
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        local_output_path = os.path.join(tmp_dir, f"partial_output_{timestamp}.json")
+        logging.info(
+            "Using temporary file for intermediate results: %s", local_output_path
+        )
+
+        # Set the full path in gcs, inlude date and time to avoid overwriting
+        output_filepath = output_filepath.rstrip("/")  # Remove trailing slash
+        output_filepath += "/analysis_outputs/"
+        output_filepath += time.strftime("%Y%m%d_%H%M%S") + "_output.json"
+        logging.info(
+            "Output will be uploaded to GCS bucket: %s", output_filepath
+        )
+    else:
+        local_output_path = output_filepath
+
     # Process each row in the DataFrame
-    with open(output_filepath, "w", encoding="utf-8") as file:
+    with open(local_output_path, "w+", encoding="utf-8") as target_file:
         # Write the opening array bracket
-        file.write("[\n")
-        for _index, row in process_batch_data.iterrows():
+        target_file.write("[\n")
+        for i, (_index, row) in enumerate(process_batch_data.iterrows()):
             logging.info("Processing row %s", _index)
             response_json = process_row(row, secret_code, app_config=app_config)
-            file.write(json.dumps(response_json) + ",\n")
+            target_file.write(json.dumps(response_json) + ",\n")
+            target_file.flush()
+
+            if is_gcs_output and ((i + 1) % UPLOAD_ROWS == 0 or (i + 1) == total_rows):
+                logging.info(
+                    "Uploading intermediate results to GCS bucket: %s, i: %s tot:%s",
+                    output_filepath,
+                    i,
+                    total_rows
+                )
+
+                upload_to_gcs(local_output_path, output_filepath)
+
+            percent_complete = round(((i + 1) / total_rows) * 100, 2)
+            logging.info("Processed row %d of %d (%.2f%%)", i + 1, total_rows, percent_complete)
             time.sleep(WAIT_TIMER)  # Wait between requests to avoid rate limiting
+
         # Remove the last comma and close the array
-        file.seek(file.tell() - 2, os.SEEK_SET)
-        file.write("\n]")
+        target_file.seek(target_file.tell() - 2, os.SEEK_SET)
+        target_file.write("\n]")
         logging.info("Finished processing rows.")
+
+    # Final upload: now the file is valid JSON
+    if is_gcs_output:
+        upload_to_gcs(local_output_path, output_filepath)
+        logging.info("Final upload completed.")
+
+        # Optional: clean up
+        os.remove(local_output_path)
+        logging.info("Deleted local temp file.")
 
 
 if __name__ == "__main__":
-
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    logging.info("Starting batch processing script.")
     # Load configuration from .toml file
     config = load_config("config.toml")
 
@@ -191,6 +242,15 @@ if __name__ == "__main__":
     api_gateway = os.getenv("API_GATEWAY", "")
     sa_email = os.getenv("SA_EMAIL", "")
     jwt_secret_path = os.getenv("JWT_SECRET", "")
+
+    if batch_filepath.startswith("gs://"):
+        logging.info("Downloading batch file from GCS: %s", batch_filepath)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_file:
+            download_from_gcs(batch_filepath, tmp_file.name)
+            local_csv_path = tmp_file.name
+            logging.info("Downloaded GCS file %s to %s", batch_filepath, local_csv_path)
+    else:
+        local_csv_path = batch_filepath
 
     # Load the data
     batch_data = pd.read_csv(batch_filepath, delimiter=",", dtype=str)
