@@ -373,6 +373,4 @@ if __name__ == "__main__":
     )
 
     # Display an analysis of the results
-    perform_graphical_analysis(
-        sic_dataframe_with_flags, config=main_config, run_id="test_run"
-    )
+    perform_graphical_analysis(sic_dataframe_with_flags, config=main_config)
