@@ -57,6 +57,7 @@ import toml
 # load the utils:
 from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 
+WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
 
 # Load the config:
 def load_config(config_path):
@@ -89,7 +90,7 @@ def process_row(row, secret_code, app_config):
     Returns:
     dict: The response JSON with additional information.
     """
-    base_url = app_config["api_settings"]["base_url"]
+    base_url = os.getenv("API_GATEWAY", "http://127.0.0.1:5000") + "/survey-assist/classify"
     unique_id = row[app_config["column_names"]["payload_unique_id"]]
     job_title = row[app_config["column_names"]["payload_job_title"]]
     job_description = row[app_config["column_names"]["payload_job_description"]]
@@ -162,10 +163,17 @@ def process_test_set(
 
     # Process each row in the DataFrame
     with open(output_filepath, "w", encoding="utf-8") as file:
+        # Write the opening array bracket
+        file.write("[\n")
         for _index, row in process_batch_data.iterrows():
+            logging.info("Processing row %s", _index)
             response_json = process_row(row, secret_code, app_config=app_config)
-            file.write(json.dumps(response_json) + "\n")
-            time.sleep(10)  # Wait between requests to avoid rate limiting
+            file.write(json.dumps(response_json) + ",\n")
+            time.sleep(WAIT_TIMER)  # Wait between requests to avoid rate limiting
+        # Remove the last comma and close the array
+        file.seek(file.tell() - 2, os.SEEK_SET)
+        file.write("\n]")
+        logging.info("Finished processing rows.")
 
 
 if __name__ == "__main__":
