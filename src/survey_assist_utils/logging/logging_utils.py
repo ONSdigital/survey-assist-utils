@@ -7,8 +7,7 @@ import inspect
 import json
 import logging
 import os
-from datetime import UTC, datetime
-from typing import Any, Union, Dict
+from typing import Any, Union
 
 # Import cloud logging at module level
 GCP_LOGGING_AVAILABLE = False
@@ -133,11 +132,13 @@ class SurveyAssistLogger:
         """
         # Get the calling function's name by going up two frames
         frame = inspect.currentframe()
-        try:
-            caller_frame = frame.f_back.f_back
-            func_name = caller_frame.f_code.co_name if caller_frame else "unknown"
-        finally:
-            del frame
+        func_name = "unknown"
+        if frame is not None:
+            back_frame = frame.f_back
+            if back_frame is not None:
+                back_back_frame = back_frame.f_back
+                if back_back_frame is not None:
+                    func_name = back_back_frame.f_code.co_name
 
         # Abbreviate module name if message is long
         module_name = self.name
@@ -192,24 +193,27 @@ class SurveyAssistLogger:
         else:
             self.logger.critical(formatted_message)
 
-    def _get_caller_info(self) -> Dict[str, str]:
+    def _get_caller_info(self) -> dict[str, str]:
         """Get information about the calling function.
 
         Returns:
-            Dict[str, str]: Dictionary containing module and function information
+            dict[str, str]: Dictionary containing caller information.
         """
         frame = inspect.currentframe()
-        try:
-            # Go up two frames to get the actual caller
-            caller_frame = frame.f_back.f_back
-            module_name = caller_frame.f_globals.get("__name__", "unknown")
-            function_name = caller_frame.f_code.co_name
-            return {
-                "module": module_name,
-                "func": function_name
-            }
-        finally:
-            del frame
+        if frame is None:
+            return {"module": "unknown", "func": "unknown"}
+
+        back_frame = frame.f_back
+        if back_frame is None:
+            return {"module": "unknown", "func": "unknown"}
+
+        back_back_frame = back_frame.f_back
+        if back_back_frame is None:
+            return {"module": "unknown", "func": "unknown"}
+
+        module_name = back_back_frame.f_globals.get("__name__", "unknown")
+        function_name = back_back_frame.f_code.co_name
+        return {"module": module_name, "func": function_name}
 
 
 def get_logger(name: str, level: str = DEFAULT_LOG_LEVEL) -> SurveyAssistLogger:
