@@ -55,9 +55,7 @@ import requests
 import toml
 
 # load the utils:
-from utils.api_token.jwt_utils import (
-    check_and_refresh_token,  # this does everything we need
-)
+from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 
 
 # Load the config:

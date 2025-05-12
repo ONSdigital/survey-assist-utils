@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from utils.api_token.jwt_utils import (
+from survey_assist_utils.api_token.jwt_utils import (
     REFRESH_THRESHOLD,
     TOKEN_EXPIRY,
     check_and_refresh_token,

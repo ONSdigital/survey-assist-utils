@@ -1,13 +1,13 @@
 """Manual test script for logging utilities."""
 
+import logging
 import os
 import time
 from datetime import datetime
-from unittest.mock import MagicMock, patch
 from io import StringIO
-import logging
+from unittest.mock import MagicMock, patch
 
-from survey_assist_utils.logging import get_logger
+from survey_assist_utils.logging.logging_utils import get_logger
 
 
 def test_local_logging():
@@ -70,37 +70,39 @@ def test_function_name_in_logs():
     # Set up a string buffer to capture logs
     log_buffer = StringIO()
     handler = logging.StreamHandler(log_buffer)
-    handler.setFormatter(logging.Formatter('%(message)s'))  # Just capture the message part
-    
+    handler.setFormatter(
+        logging.Formatter("%(message)s")
+    )  # Just capture the message part
+
     # Get the root logger and add our handler
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
-    
+
     logger = get_logger("test_module")
-    
+
     def inner_function():
         logger.info("Test message from inner function")
-    
+
     def outer_function():
         logger.info("Test message from outer function")
         inner_function()
-    
+
     # Run the test
     outer_function()
-    
+
     # Get the output
     output = log_buffer.getvalue()
-    
+
     # Print debug info
     print("\nCaptured logs:")
     print(output)
-    
+
     # Check that we see both messages in the log output with correct function names
     assert '"func": "outer_function"' in output
     assert '"func": "inner_function"' in output
     # Verify we don't see the logger's internal method name
     assert "debug" not in output
-    
+
     # Clean up
     root_logger.removeHandler(handler)
 
@@ -111,10 +113,10 @@ if __name__ == "__main__":
     time.sleep(1)  # Wait for logs to flush
 
     print("\nTesting GCP logging...")
-    test_gcp_logging()
+    with patch("google.cloud.logging.Client") as mock_gcp_client:
+        test_gcp_logging(mock_gcp_client)
     time.sleep(1)  # Wait for logs to flush
-    
+
     print("\nTesting function names in logs...")
     test_function_name_in_logs()
     time.sleep(1)  # Wait for logs to flush
- 
