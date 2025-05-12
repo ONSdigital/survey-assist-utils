@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from utils.logging.logging_utils import (
+from survey_assist_utils.logging.logging_utils import (
     get_logger,
 )
 

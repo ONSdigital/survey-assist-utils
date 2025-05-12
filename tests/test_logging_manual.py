@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from io import StringIO
 import logging
 
-from utils.logging import get_logger
+from survey_assist_utils.logging import get_logger
 
 
 def test_local_logging():
@@ -117,3 +117,4 @@ if __name__ == "__main__":
     print("\nTesting function names in logs...")
     test_function_name_in_logs()
     time.sleep(1)  # Wait for logs to flush
+ 
