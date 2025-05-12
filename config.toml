@@ -25,7 +25,7 @@ payload_job_description = "soc2020_job_description"
 payload_industry_description = "sic2007_employee"
 
 [api_settings]
-base_url = "https://example-api-gateway-d90b4xu9.nw.gateway.dev/survey-assist/classify"
+base_url = "https://<API Domain>/survey-assist/classify"
 # llm_model = "gemini" # Example if you want to configure this too
 # request_type = "sic" # Example
 
