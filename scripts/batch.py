@@ -11,7 +11,7 @@ poetry run python scripts/batch.py
 
 It also requires the following environment variables to be exported:
 - API_GATEWAY: The base API gateway URL. This is used to get and refresh
-    the token and is different to the API destination in the config.toml.
+    the token and is NOT stored in the config.toml.
 - SA_EMAIL: The service account email.
 - JWT_SECRET: The path to the JWT secret.
 
@@ -60,6 +60,19 @@ from utils.api_token.jwt_utils import (
 )
 
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+    logging.FileHandler("logs/batch2.log"),
+    logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+
 # Load the config:
 def load_config(config_path):
     """Loads configuration settings from a .toml file.
@@ -91,7 +104,9 @@ def process_row(row, secret_code, app_config):
     Returns:
     dict: The response JSON with additional information.
     """
-    base_url = app_config["api_settings"]["base_url"]
+    api_gateway = os.getenv("API_GATEWAY", "")
+    base_url = api_gateway + "/survey-assist/classify"
+
     unique_id = row[app_config["column_names"]["payload_unique_id"]]
     job_title = row[app_config["column_names"]["payload_job_title"]]
     job_description = row[app_config["column_names"]["payload_job_description"]]
@@ -165,12 +180,14 @@ def process_test_set(
     # Process each row in the DataFrame
     with open(output_filepath, "w", encoding="utf-8") as file:
         for _index, row in process_batch_data.iterrows():
+            logging.info("Processing  %s row", _index)
             response_json = process_row(row, secret_code, app_config=app_config)
             file.write(json.dumps(response_json) + "\n")
             time.sleep(10)  # Wait between requests to avoid rate limiting
 
 
 if __name__ == "__main__":
+    logger.info("Script started")
 
     # Load configuration from .toml file
     config = load_config("config.toml")
@@ -182,7 +199,10 @@ if __name__ == "__main__":
     TOKEN_START_TIME = 0
     CURRENT_TOKEN = ""
 
+    # Set the location of the API
     api_gateway = os.getenv("API_GATEWAY", "")
+    api_url = api_gateway + "/survey-assist/classify"
+
     sa_email = os.getenv("SA_EMAIL", "")
     jwt_secret_path = os.getenv("JWT_SECRET", "")
 
@@ -198,3 +218,5 @@ if __name__ == "__main__":
     process_test_set(
         secret_code=CURRENT_TOKEN, process_batch_data=batch_data, app_config=config
     )
+
+    logger.info("Script finished")
