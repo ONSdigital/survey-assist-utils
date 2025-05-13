@@ -10,8 +10,15 @@ Functions:
 """
 
 import logging
+import sys
+from pathlib import Path
 
 import pytest
+
+# Add src directory to Python path
+SRC_PATH = str(Path(__file__).parent.parent / "src")
+if SRC_PATH not in sys.path:
+    sys.path.insert(0, SRC_PATH)
 
 # Configure a global logger
 logger = logging.getLogger(__name__)

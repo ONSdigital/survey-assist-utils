@@ -6,9 +6,7 @@ authors = ["Steve Gibbard <steve.gibbard@ons.gov.uk>"]
 license = "MIT"
 readme = "README.md"
 
-packages = [
-    { include = "survey_assist_utils", from = "src" },
-]
+packages = [{ include = "survey_assist_utils", from = "src" }]
 
 [tool.poetry.scripts]
 generate-api-token = "survey_assist_utils.api_token.jwt_utils:generate_api_token"
@@ -90,6 +88,8 @@ convention = "google"
 "tests/*" = [
     # Allow use of assert statements in tests
     "S101",
+    # Allow unused imports in tests as they might be used in fixtures or mocks
+    "F401",
 ]
 
 [tool.ruff.format]
@@ -102,3 +102,6 @@ ignore_missing_imports = true
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pylint.MASTER]
+disable = ["E0401"]

@@ -1,14 +1,11 @@
-"""Module that provides example test functions for the Survey Assist API.
+"""Test module for utility functions."""
 
-Unit tests for endpoints and utility functions in the Survey Assist API.
-"""
-
-import logging
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from survey_assist_utils import get_logger
 from survey_assist_utils.api_token.jwt_utils import (
     REFRESH_THRESHOLD,
     TOKEN_EXPIRY,
@@ -18,7 +15,7 @@ from survey_assist_utils.api_token.jwt_utils import (
     generate_jwt,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @pytest.mark.utils
