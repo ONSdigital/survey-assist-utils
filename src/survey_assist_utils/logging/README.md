@@ -26,7 +26,7 @@ google-cloud-logging = "^3.9.0"
 ### Basic Usage
 
 ```python
-from utils.logging import get_logger
+from survey_assist_utils.logging import get_logger
 
 # Create a logger instance
 logger = get_logger(__name__)
@@ -62,7 +62,7 @@ The logger automatically detects the environment:
 
 ### Local Development
 ```
-2024-03-14 10:30:45,123 - INFO - module_name - function_name - Log message
+2024-03-14 10:30:45,123 - INFO - module_name - func_name - Log message
 ```
 
 ### GCP Environment
@@ -71,7 +71,7 @@ The logger automatically detects the environment:
     "message": "Log message",
     "timestamp": "2024-03-14T10:30:45.123Z",
     "module": "module_name",
-    "function": "function_name",
+    "func": "func_name",
     "user_id": 123,
     "action": "login"
 }
