@@ -76,9 +76,13 @@ def test_function_name_in_logs():
 
     # Get the root logger and add our handler
     root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # Set the level to DEBUG to capture all logs
     root_logger.addHandler(handler)
 
+    # Create a logger and ensure it uses the root logger's handlers
     logger = get_logger("test_module")
+    logger.logger.handlers = []  # Clear existing handlers
+    logger.logger.addHandler(handler)  # Add our handler
 
     def inner_function():
         logger.info("Test message from inner function")

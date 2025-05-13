@@ -102,14 +102,14 @@ class SurveyAssistLogger:
 
         # Remove any existing handlers to prevent duplicates
         logger.handlers = []
-        
+
         handler = logging.StreamHandler()
         formatter = logging.Formatter(
             "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        
+
         # Prevent propagation to root logger to avoid duplicate messages
         logger.propagate = False
 

@@ -2,10 +2,10 @@
 
 # pylint: disable=redefined-outer-name,unused-argument
 
-from unittest.mock import MagicMock, patch
-from io import StringIO
 import json
 import logging
+from io import StringIO
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -121,34 +121,34 @@ def test_log_format_no_duplicate_severity():
     log_buffer = StringIO()
     handler = logging.StreamHandler(log_buffer)
     handler.setFormatter(logging.Formatter("%(message)s"))
-    
+
     # Get the root logger and add our handler
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
-    
+
     # Create a logger and log messages at different levels
     logger = get_logger("test_module")
     logger.info("Test info message")
     logger.warning("Test warning message")
     logger.error("Test error message")
-    
+
     # Get the output
     output = log_buffer.getvalue()
-    
+
     # Verify that the severity level only appears once in each log line
-    for line in output.strip().split('\n'):
+    for line in output.strip().split("\n"):
         if not line.strip():
             continue
         # Extract the JSON part (after the last ' - ')
-        if ' - ' in line:
-            json_part = line.split(' - ', 3)[-1]
-        else:
-            json_part = line
+        json_part = line.split(" - ", 3)[-1] if " - " in line else line
         log_data = json.loads(json_part)
         # Verify that severity is not in log_data
         assert "severity" not in log_data
         # Verify that the message doesn't contain the severity level
-        assert not any(level in log_data["message"].lower() for level in ["info", "warning", "error", "critical", "debug"])
-    
+        assert not any(
+            level in log_data["message"].lower()
+            for level in ["info", "warning", "error", "critical", "debug"]
+        )
+
     # Clean up
     root_logger.removeHandler(handler)
