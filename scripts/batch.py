@@ -56,7 +56,11 @@ import requests
 import toml
 
 # load the utils:
-from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
+from survey_assist_utils.api_token.jwt_utils import (
+    check_and_refresh_token,
+    resolve_jwt_secret_path,
+)
+from survey_assist_utils.cloud_store.gcs_utils import download_from_gcs, upload_to_gcs
 
 WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
 UPLOAD_ROWS = 5 # upload every 5 rows
@@ -241,7 +245,14 @@ if __name__ == "__main__":
 
     api_gateway = os.getenv("API_GATEWAY", "")
     sa_email = os.getenv("SA_EMAIL", "")
-    jwt_secret_path = os.getenv("JWT_SECRET", "")
+    raw_jwt_env = os.getenv("JWT_SECRET", "")
+
+    logging.info("API Gateway: %s", api_gateway[:10])
+    logging.info("Service Account Email: %s", sa_email[:10])
+
+    # Check if the JWT_SECRET is a file path or a JSON string
+    # It will be a JSON string when run in GCP
+    jwt_secret_path = resolve_jwt_secret_path(raw_jwt_env)
 
     if batch_filepath.startswith("gs://"):
         logging.info("Downloading batch file from GCS: %s", batch_filepath)
