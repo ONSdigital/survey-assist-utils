@@ -35,6 +35,21 @@ EXPECTED_SIC_LENGTH = 5
 X_COUNT_FOR_MATCH_3 = 2
 X_COUNT_FOR_MATCH_2 = 3
 
+# Load configuration from .toml file
+main_config = load_config("config.toml")
+log_config = main_config.get("logging", {})
+
+# Extract values with defaults
+log_level = getattr(logging, log_config.get("level", "INFO").upper(), logging.INFO)
+log_format = log_config.get("format", "%(asctime)s - %(levelname)s - %(message)s")
+log_file = log_config.get("file")
+print("log_file", log_file)
+
+# Set up logging
+logger = logging.getLogger()
+logger.setLevel(log_level)
+formatter = logging.Formatter(log_format)
+
 
 def _calculate_num_answers(
     df: pd.DataFrame, col_occ1: str, col_occ2: str, col_occ3: str
@@ -265,20 +280,6 @@ def add_data_quality_flags(
 
 
 if __name__ == "__main__":
-    # Load configuration from .toml file
-    main_config = load_config("config.toml")
-    log_config = main_config.get("logging", {})
-
-    # Extract values with defaults
-    log_level = getattr(logging, log_config.get("level", "INFO").upper(), logging.INFO)
-    log_format = log_config.get("format", "%(asctime)s - %(levelname)s - %(message)s")
-    log_file = log_config.get("file")
-    print("log_file", log_file)
-
-    # Set up logging
-    logger = logging.getLogger()
-    logger.setLevel(log_level)
-    formatter = logging.Formatter(log_format)
 
     if log_file:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
