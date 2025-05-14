@@ -2,13 +2,12 @@
 
 [paths]
 # Input path for the SIC Evaluation Dataset (relative to project root)
-batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
-
+batch_filepath = "data/evaluation_data/TLFS_evaluation_data_IT2.csv"
 # Output file for batch processing results
 output_filepath = "data/analysis_outputs/output_7.jsonl" # Changed from .csv to .jsonl
 
 # Output for processed csv:
-analysis_csv = "data/analysis_outputs/analysis_flags.csv"
+analysis_csv = "data/analysis_outputs/TLFS_evaluation_data_IT2_output.csv"
 
 # Output directory for analysis results (relative to project root)
 output_dir = "data/analysis_outputs"
@@ -35,5 +34,5 @@ coding_flag = "sic_ind_code_flag"   # Analysis column for KB/CC/MC flag
 # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 level = "INFO"
 # Optional: Log file path (relative to project root). If commented out, logs to console.
-file = "logs/evaluation2.log"
+file = "logs/evaluation3.log"
 format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
