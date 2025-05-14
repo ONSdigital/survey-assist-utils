@@ -211,7 +211,7 @@ def add_data_quality_flags(
 
     # Add SIC division (2 digits)
     df_out["SIC_Division"] = _extract_sic_division(
-        df_out[col_occ1], df_out["Not_Codeable"], df_out["Multiple_Possible_SICs"]
+        df_out[col_occ1], df_out["Not_Codeable"], df_out["Four_Or_More"]
     )
 
     # --- 2. Number of Answers ---
