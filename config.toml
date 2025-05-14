@@ -1,7 +1,7 @@
 # Configuration for SIC Evaluation 
 
 [paths]
-# Input path for the expert-coded gold standard data (relative to project root)
+# Input path for the SIC Evaluation Dataset (relative to project root)
 batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
 
 # Output file for batch processing results
@@ -24,26 +24,16 @@ payload_job_title = "soc2020_job_title"
 payload_job_description = "soc2020_job_description"
 payload_industry_description = "sic2007_employee"
 
-[api_settings]
-# llm_model = "gemini" # Example if you want to configure this too
-# request_type = "sic" # Example
-
-# --- Key columns in the gold standard input file ---
+# --- Key columns in the SIC Evaluation Dataset input file ---
 unique_id = "unique_id"
-gold_sic = "sic_ind_occ1"         # Gold standard SIC code column
-gold_flag = "sic_ind_code_flag"   # Gold standard KB/CC/MC flag
-
-# --- Expected key columns/fields in the LLM response data ---
-response_candidates = "sic_candidates"  # Field in response JSON with candidates list
-response_top_sic = "sic_code"         # Top-level sic_code in response JSON (if available)
-
-# --- Column names for extracted LLM data in analysis dataframes ---
-llm_top_sic = "llm_sic_code_1"        # Renamed for clarity after extraction
-llm_top_likelihood = "llm_likelihood_1" # Renamed for clarity after extraction
+sic_ind_occ1 = "sic_ind_occ1"         # Analysis SIC code column
+sic_ind_occ2 = "sic_ind_occ2"         # Analysis SIC code column
+sic_ind_occ3 = "sic_ind_occ3"         # Analysis SIC code column
+coding_flag = "sic_ind_code_flag"   # Analysis column for KB/CC/MC flag
 
 [logging]
 # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 level = "INFO"
 # Optional: Log file path (relative to project root). If commented out, logs to console.
-file = "logs/evaluation.log"
+file = "logs/evaluation2.log"
 format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
