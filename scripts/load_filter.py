@@ -26,7 +26,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_OUTPUT_DIR = "analysis_outputs"
 DEFAULT_SIC_OCC1_COL = "sic_ind_occ1"
 DEFAULT_SIC_OCC2_COL = "sic_ind_occ2"
-TOP_N_HISTOGRAM = 20  # Number of top items to show in SIC code histograms
+DEFAULT_SIC_OCC3_COL = "sic_ind_occ3"
+
+SPECIAL_SIC_NOT_CODEABLE = "-9"
+SPECIAL_SIC_MULTIPLE_POSSIBLE = "+4"
 
 # --- Constants for Data Quality ---
 EXPECTED_SIC_LENGTH = 5
@@ -146,12 +149,22 @@ def add_data_quality_flags(
         )
         return df  # Return original df
 
+    # --- 1. Special SIC Code Flags for col_occ1 ---
+    df_out["Not_Codeable"] = col_occ1 == SPECIAL_SIC_NOT_CODEABLE
+    df_out["Four_Possible_SICs"] = col_occ1 == SPECIAL_SIC_MULTIPLE_POSSIBLE
+
     # --- 2. Number of Answers ---
     df_out["num_answers"] = _calculate_num_answers(df_out, col_occ1, col_occ2, col_occ3)
 
-    # --- 2. Digit/Character Match Flags for col_occ1 ---
+    # --- 3. Digit/Character Match Flags for col_occ1 ---
     s_occ1 = df_out[col_occ1].fillna("").astype(str)
     match_flags_dict = _create_sic_match_flags(s_occ1)
+
+    # --- 4.  col_occ1 ---
+    # Create a new column 'Combined' with a list of values from columns A, B, and C
+    df_out["All_Clerical_codes"] = df_out.apply(
+        lambda row: [row[col_occ1], row[col_occ2], row[col_occ3]], axis=1
+    )
 
     for flag_name, flag_series in match_flags_dict.items():
         df_out[flag_name] = flag_series
