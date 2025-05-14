@@ -245,7 +245,7 @@ if __name__ == "__main__":
         else:
             logging.warning("Directory does not exist: %s ", output_dir)
             raise FileNotFoundError(
-                "Required output directory not found: %s ", output_dir
+                f"Required output directory not found: {output_dir}"
             )
     except KeyError as e:
         logging.error("Missing configuration key: %s", e)
