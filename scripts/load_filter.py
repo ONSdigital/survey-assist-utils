@@ -29,7 +29,7 @@ DEFAULT_SIC_OCC2_COL = "sic_ind_occ2"
 DEFAULT_SIC_OCC3_COL = "sic_ind_occ3"
 
 SPECIAL_SIC_NOT_CODEABLE = "-9"
-SPECIAL_SIC_MULTIPLE_POSSIBLE = "+4"
+SPECIAL_SIC_MULTIPLE_POSSIBLE = "4+"
 
 # --- Constants for Data Quality ---
 EXPECTED_SIC_LENGTH = 5
@@ -150,8 +150,8 @@ def add_data_quality_flags(
         return df  # Return original df
 
     # --- 1. Special SIC Code Flags for col_occ1 ---
-    df_out["Not_Codeable"] = col_occ1 == SPECIAL_SIC_NOT_CODEABLE
-    df_out["Four_Possible_SICs"] = col_occ1 == SPECIAL_SIC_MULTIPLE_POSSIBLE
+    df_out["Not_Codeable"] = df_out[col_occ1] == SPECIAL_SIC_NOT_CODEABLE
+    df_out["Multiple_Possible_SICs"] = df_out[col_occ1] == SPECIAL_SIC_MULTIPLE_POSSIBLE
 
     # --- 2. Number of Answers ---
     df_out["num_answers"] = _calculate_num_answers(df_out, col_occ1, col_occ2, col_occ3)
