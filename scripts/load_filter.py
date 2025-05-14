@@ -155,7 +155,7 @@ def add_data_quality_flags(
     """Adds data quality flag columns to the DataFrame based on SIC/SOC codes.
 
     Args:
-        df (pd.DataFrame): The input DataFrame (typically loaded by read_sic_data).
+        df (pd.DataFrame): The input DataFrame 
         loaded_config (Optional[dict]): Loaded configuration dictionary to get column names.
 
     Returns:
