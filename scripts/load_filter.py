@@ -69,6 +69,7 @@ def _calculate_num_answers(
                 "Column '%s' not found for num_answers calculation. It will be ignored.",
                 col_name,
             )
+
     return num_answers
 
 
@@ -155,6 +156,11 @@ def add_data_quality_flags(
 
     # --- 2. Number of Answers ---
     df_out["num_answers"] = _calculate_num_answers(df_out, col_occ1, col_occ2, col_occ3)
+
+    # handle the edge cases of -9:
+    df_out.loc[df_out[col_occ1] == SPECIAL_SIC_NOT_CODEABLE, "num_answers"] = 0
+    # and of 4+
+    df_out.loc[df_out[col_occ1] == SPECIAL_SIC_MULTIPLE_POSSIBLE, "num_answers"] = 4
 
     # --- 3. Digit/Character Match Flags for col_occ1 ---
     s_occ1 = df_out[col_occ1].fillna("").astype(str)
