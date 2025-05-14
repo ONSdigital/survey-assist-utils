@@ -19,7 +19,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from utils.config_loader import load_config  # Using the imported load_config
+
 
 # --- Default Configuration Values (if not found in config) ---
 DEFAULT_OUTPUT_DIR = "analysis_outputs"
@@ -34,6 +34,26 @@ SPECIAL_SIC_MULTIPLE_POSSIBLE = "4+"
 EXPECTED_SIC_LENGTH = 5
 X_COUNT_FOR_MATCH_3 = 2
 X_COUNT_FOR_MATCH_2 = 3
+
+
+# Load the config:
+def load_config(config_path):
+    """Loads configuration settings from a .toml file.
+
+    Args:
+        config_path (str): The path to the .toml configuration file.
+
+    Returns:
+        dict: A dictionary containing the configuration settings.
+
+    Example:
+        config = load_config("config.toml")
+        print(config["settings"]["api_gateway"])
+    """
+    with open(config_path, encoding="utf-8") as file:
+        configuration = toml.load(file)
+    return configuration
+
 
 # Load configuration from .toml file
 main_config = load_config("config.toml")
