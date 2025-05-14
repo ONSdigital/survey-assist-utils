@@ -13,6 +13,7 @@ and SIC code distributions.
 """
 
 import logging
+import os
 import re
 from typing import Any, Optional
 
@@ -232,6 +233,22 @@ if __name__ == "__main__":
 
     # We'll write the post analysis csv here:
     analysis_csv = main_config["paths"]["analysis_csv"]
+
+    # Check the location exists:
+    # Extract the directory from the file path
+    output_dir = os.path.dirname(analysis_csv)
+
+    # Check if it exists
+    try:
+        if os.path.exists(output_dir):
+            logging.info("Directory exists: %s ", output_dir)
+        else:
+            logging.warning("Directory does not exist: %s ", output_dir)
+            raise FileNotFoundError(
+                "Required output directory not found: %s ", output_dir
+            )
+    except KeyError as e:
+        logging.error("Missing configuration key: %s", e)
 
     # Load the data
     sic_dataframe = pd.read_csv(analysis_filepath, delimiter=",", dtype=str)
