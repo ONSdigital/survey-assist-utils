@@ -216,6 +216,7 @@ def add_data_quality_flags(
 
     # Check if essential columns exist
     required_input_cols = [col_occ1, col_occ2, col_occ3]
+
     if not all(col_name in df_out.columns for col_name in required_input_cols):
         missing_cols = set(required_input_cols) - set(df_out.columns)
         logger.error(
@@ -225,8 +226,9 @@ def add_data_quality_flags(
         return df  # Return original df
 
     # --- 1. Special SIC Code Flags for col_occ1 ---
-    df_out["Not_Codeable"] = df_out[col_occ1] == SPECIAL_SIC_NOT_CODEABLE
-    df_out["Four_Or_More"] = df_out[col_occ1] == SPECIAL_SIC_MULTIPLE_POSSIBLE
+    df_out["Not_Codeable"] = df_out[col_occ1] == SPECIAL_SIC_NOT_CODEABLE # -9
+    df_out["Four_Or_More"] = df_out[col_occ1] == SPECIAL_SIC_MULTIPLE_POSSIBLE # 4+
+
 
     # Add SIC division (2 digits)
     df_out["SIC_Division"] = _extract_sic_division(
@@ -246,7 +248,7 @@ def add_data_quality_flags(
     match_flags_dict = _create_sic_match_flags(s_occ1)
 
     # --- 4.  col_occ1 ---
-    # Create a new column 'Combined' with a list of values from columns A, B, and C
+    # Create a new column 'All_Clerical_codes' with a list of values from columns
     df_out["All_Clerical_codes"] = df_out.apply(
         lambda row: [row[col_occ1], row[col_occ2], row[col_occ3]], axis=1
     )
@@ -254,21 +256,19 @@ def add_data_quality_flags(
     for flag_name, flag_series in match_flags_dict.items():
         df_out[flag_name] = flag_series
 
-    # --- 3. Unambiguous Flag ---
+    # --- 5. Unambiguous Flag ---
     # Ensure "Match_5_digits" was created by the helper
     if "Match_5_digits" in df_out.columns:
-        df_out["Unambiguous"] = df_out["num_answers"] == 1 & df_out[
-            "Match_5_digits"
-        ].fillna(False)
+        df_out["Unambiguous"] = (df_out["num_answers"] == 1) & (df_out["Match_5_digits"] == True)
     else:
         # Handle case where Match_5_digits might not be created if s_occ1 was problematic
         # Though _create_sic_match_flags should always return it.
         df_out["Unambiguous"] = False
         logger.warning(
             "'Match_5_digits' column not found for 'Unambiguous' flag calculation."
-        )
+        )   
 
-    # --- 4. Convert to Pandas Nullable Boolean Type ---
+    # --- 6. Convert to Pandas Nullable Boolean Type ---
     flag_cols_list = [
         "Match_5_digits",
         "Match_3_digits",
@@ -338,11 +338,10 @@ if __name__ == "__main__":
     print(sic_dataframe_with_flags.head())
 
     # Explanation of logic:
-
     print("Match_5_digits - a value in sic_ind_occ1 has 5 numeric digits")
     print("Match_3_digits - a value in sic_ind_occ1 has 3 numeric digits and 2 of x")
     print("Match_2_digits - a value in sic_ind_occ1 has 2 numeric digits and 3 of x")
-    print("Unambiguous - value in ")
+    print("Unambiguous: True if - value in num_answers is one, Match_5_digits is True")
 
     print("\nValue Counts for Quality Flags:")
     flag_cols_to_show = [

@@ -3,6 +3,7 @@
 [paths]
 # Input path for the SIC Evaluation Dataset (relative to project root)
 batch_filepath = "data/evaluation_data/TLFS_evaluation_data_IT2.csv"
+
 # Output file for batch processing results
 output_filepath = "data/analysis_outputs/output_7.jsonl" # Changed from .csv to .jsonl
 
