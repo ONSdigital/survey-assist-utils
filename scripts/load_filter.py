@@ -226,9 +226,8 @@ def add_data_quality_flags(
         return df  # Return original df
 
     # --- 1. Special SIC Code Flags for col_occ1 ---
-    df_out["Not_Codeable"] = df_out[col_occ1] == SPECIAL_SIC_NOT_CODEABLE # -9
-    df_out["Four_Or_More"] = df_out[col_occ1] == SPECIAL_SIC_MULTIPLE_POSSIBLE # 4+
-
+    df_out["Not_Codeable"] = df_out[col_occ1] == SPECIAL_SIC_NOT_CODEABLE  # -9
+    df_out["Four_Or_More"] = df_out[col_occ1] == SPECIAL_SIC_MULTIPLE_POSSIBLE  # 4+
 
     # Add SIC division (2 digits)
     df_out["SIC_Division"] = _extract_sic_division(
@@ -259,14 +258,16 @@ def add_data_quality_flags(
     # --- 5. Unambiguous Flag ---
     # Ensure "Match_5_digits" was created by the helper
     if "Match_5_digits" in df_out.columns:
-        df_out["Unambiguous"] = (df_out["num_answers"] == 1) & (df_out["Match_5_digits"] == True)
+        df_out["Unambiguous"] = (df_out["num_answers"] == 1) & (
+            df_out["Match_5_digits"]
+        )
     else:
         # Handle case where Match_5_digits might not be created if s_occ1 was problematic
         # Though _create_sic_match_flags should always return it.
         df_out["Unambiguous"] = False
         logger.warning(
             "'Match_5_digits' column not found for 'Unambiguous' flag calculation."
-        )   
+        )
 
     # --- 6. Convert to Pandas Nullable Boolean Type ---
     flag_cols_list = [
