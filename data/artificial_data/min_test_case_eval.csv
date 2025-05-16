@@ -1,0 +1,7 @@
+﻿Num,Description sic_ind_occ1,Description sic_ind_occ2,Description sic_ind_occ3,Expected Unambiguous,unique_id,sic_section,sic2007_employee,sic2007_self_employed,sic_ind1,sic_ind2,sic_ind3,sic_ind_code_flag,soc2020_job_title,soc2020_job_description,sic_ind_occ1,sic_ind_occ2,sic_ind_occ3,sic_ind_occ_flag
+num = 0,-9,Missing,Missing,FALSE,test0001,-9,ADMIN,-9,-9,,,CC,OCCUPATIONAL HEALTH MOVING AND HANDLING ADMINISTRATOR,ADMIN,-9,,,CC
+num = 1,5 digits,Missing,Missing,TRUE,test0002,Q,A LARGE HOSPITAL  NHS,-9,86101,,,CC,QUALITY IMPROVEMENT LEAD,LEADING ON ENSURING THAT QUALITY CLINICAL CARE IS DELIVERED TO PATOENTS,86101,,,CC
+num = 2,5 digits,5 digits,5 digits,FALSE,test0003,-9,A Fictional Charity TO MAINTAIN WILDLIFE HABITATS,-9,91040,94990,,CC,COMMUNITY LEARNING OFFICER,ENVIRONMENTAL EDUCATION WORKING WITH VOLUNTEERS TO MAINTAIN A WILDLIFE GARDEN,91040,94990,,CC
+num = 3, not fully matched,Missing,Missing,FALSE,test0004,-9,ADMIN,-9,-9,,,CC,MANAGER,NHS,86xxx,87xxx,47730,CC
+num = 3,5 digits,Missing,Missing,FALSE,test0005,Q,ADULT HEALTH CARE,-9,4+,,,CC,DEPUTY WARD SISTER,MANAGEMENT OF SICK PATIENTS  SUPERVISE AND TRAIN JUNIOR STAFF CLINICAL SKILLS,86101,86102,87100,CC
+num = 4,Missing,Missing,Missing,FALSE,test0006,-9,ADMIN,-9,-9,,,CC,ADMIN,NHS,4+,,,CC
