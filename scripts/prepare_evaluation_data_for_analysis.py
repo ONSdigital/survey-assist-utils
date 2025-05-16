@@ -8,8 +8,6 @@ The utilities allow for the following:
 1. Loads the configuration from the .toml file.
 2. Loads the test data.
 3. Adds data quality flag columns to the DataFrame.
-4. Utility functions for analysing and visualising data quality flags
-and SIC code distributions.
 """
 
 import logging
@@ -359,8 +357,3 @@ if __name__ == "__main__":
 
     # write new dataframe out:
     sic_dataframe_with_flags.to_csv(analysis_csv, index=False)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    )
