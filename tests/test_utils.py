@@ -1,15 +1,12 @@
-"""Module that provides example test functions for the Survey Assist API.
+"""Test module for utility functions."""
 
-Unit tests for endpoints and utility functions in the Survey Assist API.
-"""
-
-import logging
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from utils.api_token.jwt_utils import (
+from survey_assist_utils import get_logger
+from survey_assist_utils.api_token.jwt_utils import (
     REFRESH_THRESHOLD,
     TOKEN_EXPIRY,
     check_and_refresh_token,
@@ -18,7 +15,7 @@ from utils.api_token.jwt_utils import (
     generate_jwt,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @pytest.mark.utils
@@ -38,8 +35,8 @@ def test_current_utc_time():
     assert abs((now - result).total_seconds()) < 1  # Allow a small time difference
 
 
-@patch("utils.api_token.jwt_utils.RSASigner.from_service_account_file")
-@patch("utils.api_token.jwt_utils.google_jwt.encode")
+@patch("survey_assist_utils.api_token.jwt_utils.RSASigner.from_service_account_file")
+@patch("survey_assist_utils.api_token.jwt_utils.google_jwt.encode")
 @pytest.mark.utils
 def test_generate_jwt(mock_encode, mock_rsa_signer):
     """Test the generate_jwt function with mocked dependencies."""
@@ -74,8 +71,8 @@ def test_generate_jwt(mock_encode, mock_rsa_signer):
     assert "exp" in payload
 
 
-@patch("utils.api_token.jwt_utils.current_utc_time")
-@patch("utils.api_token.jwt_utils.generate_jwt")
+@patch("survey_assist_utils.api_token.jwt_utils.current_utc_time")
+@patch("survey_assist_utils.api_token.jwt_utils.generate_jwt")
 @pytest.mark.utils
 def test_check_and_refresh_token(mock_generate_jwt, mock_current_utc_time):
     """Test the check_and_refresh_token function."""
@@ -150,8 +147,8 @@ def test_check_and_refresh_token(mock_generate_jwt, mock_current_utc_time):
     mock_generate_jwt.assert_not_called()
 
 
-@patch("utils.api_token.jwt_utils.generate_jwt")
-@patch("utils.api_token.jwt_utils.os.getenv")
+@patch("survey_assist_utils.api_token.jwt_utils.generate_jwt")
+@patch("survey_assist_utils.api_token.jwt_utils.os.getenv")
 @pytest.mark.utils
 def test_generate_api_token(mock_getenv, mock_generate_jwt, capsys):
     """Test the generate_api_token function."""
