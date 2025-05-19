@@ -6,6 +6,12 @@
 /data/analysis_output/
 /data/
 
+# ignore pictures and graphs of data
+*.png
+*.jpg
+*.pdf
+*.bmp 
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
