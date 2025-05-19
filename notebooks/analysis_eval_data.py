@@ -121,7 +121,6 @@ def plot_sic_code_histogram(
 
     # Option for percentages
     if show_percent:
-        print(show_percent)
         counts = df[column_name].value_counts(normalize=True).nlargest(top_n) * 100
         ylabel_text = "Percentage"
     else:
@@ -191,3 +190,81 @@ plot_sic_code_histogram(
     show_percent=True,
     filename_suffix="Combined_sic_codes",
 )
+
+# %% [markdown]
+# ### Add a histogram for unambiguous only:
+
+# %%
+filtered_data = eval_data[eval_data["Unambiguous"]]
+plot_sic_code_histogram(
+    filtered_data,
+    column_name="sic_ind_occ1",
+    output_dir=output_dir_path,
+    show_percent=True,
+    filename_suffix="Unambiguous_only",
+)
+
+# %% [markdown]
+# ### Adding a Hist of the number of codes CCs applied:
+# Distribution of number of possible SIC codes (uncodeable - 0 code, 1 code, 2 codes, 3 codes)
+
+# %%
+plot_sic_code_histogram(
+    eval_data,
+    column_name="num_answers",
+    output_dir=output_dir_path,
+    show_percent=True,
+    filename_suffix="",
+)
+
+# %% [markdown]
+# ### 6.	Calculate proportion of codeable at 5-digit across the total set.
+# This is to answer the question how many responses don't need a follow up?
+
+# %%
+print(f"Number of True in 'Match_5_digits': {eval_data['Match_5_digits'].sum()}")
+print(
+    f"Fraction of True 'Match_5_digits': {eval_data['Match_5_digits'].sum() /len(eval_data):.2f}"
+)
+
+print(f"Number of True in 'Match_2_digits': {eval_data['Match_2_digits'].sum()}")
+print(
+    f"Fraction of True 'Match_2_digits': {eval_data['Match_2_digits'].sum() /len(eval_data):.2f}"
+)
+
+filtered_data = eval_data[
+    eval_data["Match_5_digits"]
+    | eval_data["Match_3_digits"]
+    | eval_data["Match_2_digits"]
+]
+true_count_2_or_more = len(filtered_data)
+fraction_2_or_more = true_count_2_or_more / len(eval_data)
+print(
+    f"""Number of True values in 'Match_2_digits',
+ 'Match_3_digits' or 'Match_5_digits': {true_count_2_or_more}"""
+)
+print(
+    f"Fraction of True values in 'Match_2_digits' or more digits: {fraction_2_or_more:.2f}"
+)
+print(f"Total Dataset: {len(eval_data)}")
+
+# %% [markdown]
+# ### Codeable at 2 or more digits:
+
+# %%
+# codeable at 2d
+filtered_data = eval_data[
+    eval_data["Match_5_digits"]
+    | eval_data["Match_3_digits"]
+    | eval_data["Match_2_digits"]
+]
+plot_sic_code_histogram(
+    filtered_data,
+    column_name="sic_ind_occ1",
+    output_dir=output_dir_path,
+    show_percent=True,
+    filename_suffix="Codeable",
+)
+
+# %% [markdown]
+#
