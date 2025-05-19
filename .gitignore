@@ -5,6 +5,7 @@
 /data/evaluation_data/
 /data/analysis_output/
 /data/
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

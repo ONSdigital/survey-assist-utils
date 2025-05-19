@@ -1,15 +1,21 @@
-# Configuration for the SIC Evaluation Script
+# Configuration for SIC Evaluation 
 
 [paths]
-# Input path for the expert-coded gold standard data (relative to project root)
-batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
+# Input path for the SIC Evaluation Dataset (relative to project root)
+batch_filepath = "data/evaluation_data/TLFS_evaluation_data_IT2.csv"
 
 # Output file for batch processing results
-output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
+output_filepath = "data/analysis_outputs/output_7.jsonl" # Changed from .csv to .jsonl
+
+# Output for processed csv:
+analysis_csv = "data/analysis_outputs/TLFS_evaluation_data_IT2_output.csv"
+
+# Output directory for analysis results (relative to project root)
+output_dir = "data/analysis_outputs"
 
 [parameters]
 test_mode = true
-test_num = 4
+test_num = 2
 
 [column_names]
 # --- Column names from the input CSV to be used for API payload ---
@@ -18,14 +24,16 @@ payload_job_title = "soc2020_job_title"
 payload_job_description = "soc2020_job_description"
 payload_industry_description = "sic2007_employee"
 
-[api_settings]
-base_url = "https://<API Domain>/survey-assist/classify"
-# llm_model = "gemini" # Example if you want to configure this too
-# request_type = "sic" # Example
+# --- Key columns in the SIC Evaluation Dataset input file ---
+unique_id = "unique_id"
+sic_ind_occ1 = "sic_ind_occ1"         # Analysis SIC code column
+sic_ind_occ2 = "sic_ind_occ2"         # Analysis SIC code column
+sic_ind_occ3 = "sic_ind_occ3"         # Analysis SIC code column
+coding_flag = "sic_ind_code_flag"   # Analysis column for KB/CC/MC flag
 
 [logging]
 # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 level = "INFO"
 # Optional: Log file path (relative to project root). If commented out, logs to console.
-# file = "logs/evaluation.log" # Corrected path example
+file = "logs/evaluation3.log"
 format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
