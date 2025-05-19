@@ -162,7 +162,6 @@ def plot_sic_code_histogram(
 
 # %% [markdown]
 # ### Sub-subsection
-#
 # First make a histogram of the top 10 2digit codes (Division)
 
 # %%
@@ -173,4 +172,22 @@ plot_sic_code_histogram(
     output_dir=output_dir_path,
     show_percent=True,
     filename_suffix="SIC_Division",
+)
+
+# %%
+
+# %% [markdown]
+# ### Next make a histogram of the top 10 of all codes across all three choices, including 2 digits
+
+# %%
+combined_data = pd.concat(
+    [eval_data["sic_ind_occ1"], eval_data["sic_ind_occ2"], eval_data["sic_ind_occ3"]]
+)
+combined_df = pd.DataFrame(combined_data, columns=["combined"])
+plot_sic_code_histogram(
+    combined_df,
+    column_name="combined",
+    output_dir=output_dir_path,
+    show_percent=True,
+    filename_suffix="Combined_sic_codes",
 )
