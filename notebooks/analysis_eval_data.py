@@ -160,8 +160,7 @@ def plot_sic_code_histogram(
 
 
 # %% [markdown]
-# ### Sub-subsection
-# First make a histogram of the top 10 2digit codes (Division)
+# ### histogram of the top 10 2 digit codes (Division)
 
 # %%
 output_dir_path = Path("/home/user/survey-assist-utils/notebooks")
@@ -176,7 +175,7 @@ plot_sic_code_histogram(
 # %%
 
 # %% [markdown]
-# ### Next make a histogram of the top 10 of all codes across all three choices, including 2 digits
+# ### Histogram of the top 10 of all codes across all three choices, including 2 digits
 
 # %%
 combined_data = pd.concat(
@@ -192,7 +191,7 @@ plot_sic_code_histogram(
 )
 
 # %% [markdown]
-# ### Add a histogram for unambiguous only:
+# ### Histogram for unambiguous only:
 
 # %%
 filtered_data = eval_data[eval_data["Unambiguous"]]
@@ -205,7 +204,7 @@ plot_sic_code_histogram(
 )
 
 # %% [markdown]
-# ### Adding a Hist of the number of codes CCs applied:
+# ### Histogram of the number of codes CCs applied:
 # Distribution of number of possible SIC codes (uncodeable - 0 code, 1 code, 2 codes, 3 codes)
 
 # %%
@@ -249,7 +248,7 @@ print(
 print(f"Total Dataset: {len(eval_data)}")
 
 # %% [markdown]
-# ### Codeable at 2 or more digits:
+# ### Histogram of Codeable at 2 or more digits:
 
 # %%
 # codeable at 2d
