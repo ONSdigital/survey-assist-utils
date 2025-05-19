@@ -13,7 +13,7 @@
 # ---
 
 # %% [markdown]
-# # Main Section
+# # Analysis of TLFS SIC Evaluation Dataset
 #
 
 # %%
@@ -32,8 +32,7 @@ Developed in a notebook and converted to script for version control and reproduc
 """
 
 # %% [markdown]
-# ## Subsection
-# Set constants, import graphical package, logging
+# ## Set import graphical package, logging
 
 import logging
 from pathlib import Path
@@ -84,6 +83,10 @@ TOP_N_HISTOGRAM = 10  # Number of top items to show in SIC code histograms
 EXPECTED_SIC_LENGTH = 5
 X_COUNT_FOR_MATCH_3 = 2
 X_COUNT_FOR_MATCH_2 = 3
+
+
+# %% [markdown]
+# ### Make a graphing function
 
 
 # %%
@@ -160,7 +163,10 @@ def plot_sic_code_histogram(
 
 
 # %% [markdown]
-# ### histogram of the top 10 2 digit codes (Division)
+# ## Metrics
+
+# %% [markdown]
+# ### Histogram of the top 10 2 digit codes (Division)
 
 # %%
 output_dir_path = Path("/home/user/survey-assist-utils/notebooks")
