@@ -14,7 +14,16 @@
 
 # %% [markdown]
 # # Analysis of TLFS SIC Evaluation Dataset
+# Intro: this notebook contain the following analysis of TLFS_evaluation_data_IT2.csv
+#  - Breakdown of  2 digit codes (Division)
+#  - Breakdown of all codes across all three choices
+#  (need to add in 4+ codes)
+#  - Analysis of the number of codes CCs applied (truncated at 4)
+#  - Most frequent codes when unambiguous only
+#  - proportion of codeable at 5-digit across the total set
 #
+#
+#  - And therefore... there are x000 where SA can make a difference.
 
 # %%
 
