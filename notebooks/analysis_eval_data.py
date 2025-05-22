@@ -22,8 +22,16 @@
 #  - Most frequent codes when unambiguous only
 #  - proportion of codeable at 5-digit across the total set
 #
+# Key takeaway for business value:
+#  - Unambiguous Codes represent 64% of this dataset.
+#  - A confirmation for early stopping of the quesioning would be a potential business value.
+#  - Ambiguous answers representing the remainder, contain only 5% uncodeable (represented by
+# the code -9 in this data) - an opportunity for SA to add value.
+#  - A specific set, 28% are coded to two digits, and would benefit from a follow up question.
 #
-#  - And therefore... there are x000 where SA can make a difference.
+# It is worth knowing that SIC/SOC project described this data as from the set most likely to
+# give problems.
+#
 
 # %%
 
@@ -187,8 +195,6 @@ plot_sic_code_histogram(
     filename_suffix="SIC_Division",
 )
 
-# %%
-
 # %% [markdown]
 # ### Histogram of the top 10 of all codes across all three choices, including 2 digits
 
@@ -232,8 +238,19 @@ plot_sic_code_histogram(
 )
 
 # %% [markdown]
-# ### 6.	Calculate proportion of codeable at 5-digit across the total set.
+# ## Section 2: levels of codeability in the labelled set:
+#
+# ### Calculate proportion of codeable at 5-digit across the total set.
 # This is to answer the question how many responses don't need a follow up?
+#
+# Codeable at 5 digits: 64%
+#
+# Codeable at 2 digits, but not 5, 28%
+#
+# Codeable at 2 or more digits, 92%
+#
+# Uncodeable 6%
+#
 
 # %%
 print(f"Number of True in 'Match_5_digits': {eval_data['Match_5_digits'].sum()}")
@@ -281,4 +298,13 @@ plot_sic_code_histogram(
 )
 
 # %% [markdown]
+# ### Findings:
+# Strong skew to 86xxx and 87xxx, representing the divisions that this data were taken from.
+#
+# Uncodeable are a small percentage ~5%.
+#
+# Ambiguous, and coded only to two digits will benefit from SA as a system, 28%
+#
+# Early stopping instruction from SA required for the unambiguous set of 65%.
+#
 #
