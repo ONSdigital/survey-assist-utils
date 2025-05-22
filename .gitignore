@@ -6,6 +6,12 @@
 /data/analysis_output/
 /data/
 
+# ignore data pictures
+*.png
+
+# ignore notebooks
+*.ipynb
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
