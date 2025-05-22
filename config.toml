@@ -2,17 +2,17 @@
 
 [paths]
 # Input path for the expert-coded gold standard data (relative to project root)
-batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
-# batch_filepath = "gs://survey_assist_sandbox_data/evaluation_data/coding_df_with_validated.csv"
+#batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
+batch_filepath = "gs://survey_assist_sandbox_data/evaluation_data/TLFS_evaluation_data_IT2.csv"
 
 # Output file for batch processing results
-output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
-# output_filepath = "gs://survey_assist_sandbox_data/"
+#output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
+output_filepath = "gs://survey_assist_sandbox_data/"
 
 [parameters]
 test_mode = true
-test_num = 2
-rows_to_skip = 0
+test_num = 4800
+rows_to_skip = 3800
 
 [column_names]
 # --- Column names from the input CSV to be used for API payload ---
