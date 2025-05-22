@@ -12,6 +12,7 @@ output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .j
 [parameters]
 test_mode = true
 test_num = 2
+rows_to_skip = 0
 
 [column_names]
 # --- Column names from the input CSV to be used for API payload ---
