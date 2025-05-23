@@ -11,8 +11,8 @@ output_filepath = "gs://survey_assist_sandbox_data/"
 
 [parameters]
 test_mode = true
-test_num = 4800
-rows_to_skip = 3800
+test_num = 4600
+rows_to_skip = 8600
 
 [column_names]
 # --- Column names from the input CSV to be used for API payload ---
