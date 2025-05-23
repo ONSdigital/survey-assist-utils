@@ -23,7 +23,7 @@
 #  - proportion of codeable at 5-digit across the total set
 #
 # Key takeaway for business value:
-#  - Unambiguous Codes represent 64% of this dataset.
+#  - Unambiguous Codes represent 60% of this dataset.
 #  - A confirmation for early stopping of the quesioning would be a potential business value.
 #  - Ambiguous answers representing the remainder, contain only 5% uncodeable (represented by
 # the code -9 in this data) - an opportunity for SA to add value.
@@ -31,6 +31,18 @@
 #
 # It is worth knowing that SIC/SOC project described this data as from the set most likely to
 # give problems.
+#
+# Summary Statistics:
+# Group memberships:
+# - Uncodeable to any digits: 6.79 %
+# - Codeable to two digits only:  27.6 %
+# - Codeable to five Digits (ambiguous and unambiguous): 63.8 %
+# - Codeable unambiguously to five digits: 59.7 %
+# - Codeable ambiguously to five digits: 4.1 %
+# - Codeable at 2 or more digits, 92%
+#
+#
+#
 #
 
 # %%
@@ -243,19 +255,40 @@ plot_sic_code_histogram(
 # ### Calculate proportion of codeable at 5-digit across the total set.
 # This is to answer the question how many responses don't need a follow up?
 #
-# Codeable at 5 digits: 64%
-#
-# Codeable at 2 digits, but not 5, 28%
-#
-# Codeable at 2 or more digits, 92%
-#
-# Uncodeable 6%
-#
+# - Uncodeable to any digits: 6.79 %
+# - Codeable to two digits only:  27.6 %
+# - Codeable to five Digits (ambiguous and unambiguous): 63.8 %
+# - Codeable unambiguously to five digits: 59.7 %
+# - Codeable ambiguously to five digits: 4.1 %
 
 # %%
+print("Group memberships:")
+print(
+    f"""Uncodeable to any digits: {100*(eval_data["num_answers"] == 0).sum() /
+        len(eval_data["num_answers"]):.2f} %"""
+)
+print(
+    f"""Codeable to two digits only:  {100*eval_data['Match_2_digits'].sum() /
+        len(eval_data):.1f} %"""
+)
+print(
+    f"""Codeable to five Digits (ambiguous and unambiguous):
+        {100*eval_data['Match_5_digits'].sum() /len(eval_data):.1f} %"""
+)
+print(
+    f"""Codeable unambiguously to five digits:
+        {100*eval_data['Unambiguous'].sum() / len(eval_data["Match_5_digits"]):.1f} %"""
+)
+
+ambiguous_data = eval_data[~eval_data["Unambiguous"]]
+print(
+    f"""Codeable ambiguously to five digits:
+        {100*ambiguous_data["Match_5_digits"].sum() / len(eval_data["Match_5_digits"]):.1f} %"""
+)
+
 print(f"Number of True in 'Match_5_digits': {eval_data['Match_5_digits'].sum()}")
 print(
-    f"Fraction of True 'Match_5_digits': {eval_data['Match_5_digits'].sum() /len(eval_data):.2f}"
+    f"Fraction of True 'Match_5_digits': {eval_data['Match_5_digits'].sum() /len(eval_data):.1f}"
 )
 
 print(f"Number of True in 'Match_2_digits': {eval_data['Match_2_digits'].sum()}")
@@ -278,6 +311,7 @@ print(
     f"Fraction of True values in 'Match_2_digits' or more digits: {fraction_2_or_more:.2f}"
 )
 print(f"Total Dataset: {len(eval_data)}")
+
 
 # %% [markdown]
 # ### Histogram of Codeable at 2 or more digits:
