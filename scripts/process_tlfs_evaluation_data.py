@@ -5,10 +5,6 @@ Prior to invocation, ensure to run the following CLI commands:
 > gcloud auth application-default login
 By defalut the output file overwritten.
 
-Run from the root of the project as follows:
-
-poetry run python scripts/batch.py
-
 It also requires the following environment variables to be exported:
 - API_GATEWAY: The base API gateway URL. This is used to get and refresh
     the token and is different to the API destination in the config.toml.
@@ -29,8 +25,11 @@ The script performs the following steps:
 6. Writes the results to the file specified in config.toml
 
 Usage:
-    poetry run python scripts/batch.py
+Run from the root of the project as follows:
+    poetry run python scripts/process_tlfs_evaluation_data.py
 
+This now supports Docker implementation with gc buckets as storage.
+Ensure the config file points to the appropriate gs:// locations if used in this way.
 
 Functions:
     load_config(config_path: str) -> dict
