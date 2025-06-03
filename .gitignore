@@ -5,6 +5,7 @@
 /data/evaluation_data/
 /data/analysis_output/
 /data/
+*.png
 
 # ignore data pictures
 *.png
