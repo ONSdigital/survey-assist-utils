@@ -289,11 +289,11 @@ if __name__ == "__main__":
 
     # Option to skip rows:
     skip_n_rows = config["parameters"]["rows_to_skip"]
-    if (skip_n_rows > 0 ):
+    if skip_n_rows > 0:
         logging.info("Skipping %s rows", skip_n_rows)
         batch_data = batch_data.iloc[skip_n_rows:]
 
-    logging.info(f"Processing %s rows of data ", len(batch_data))
+    logging.info("Processing %s rows of data ", len(batch_data))
 
     # Get token:
     token_information["token_start_time"], token_information["current_token"] = (
