@@ -2,7 +2,7 @@
 
 [paths]
 # Input path for the expert-coded gold standard data (relative to project root)
-#batch_filepath = "data/evaluation_data/coding_df_with_validated.csv"
+#batch_filepath = "data/evaluation_data/TLFS_evaluation_data_IT2.csv"
 batch_filepath = "gs://survey_assist_sandbox_data/evaluation_data/TLFS_evaluation_data_IT2.csv"
 
 # Output file for batch processing results
@@ -11,8 +11,8 @@ output_filepath = "gs://survey_assist_sandbox_data/"
 
 [parameters]
 test_mode = true
-test_num = 4600
-rows_to_skip = 8600
+test_num = 175
+rows_to_skip = 13099
 
 [column_names]
 # --- Column names from the input CSV to be used for API payload ---

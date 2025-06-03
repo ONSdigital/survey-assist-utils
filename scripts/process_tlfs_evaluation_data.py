@@ -11,7 +11,7 @@ poetry run python scripts/batch.py
 
 It also requires the following environment variables to be exported:
 - API_GATEWAY: The base API gateway URL. This is used to get and refresh
-    the token and is NOT stored in the config.toml.
+    the token and is different to the API destination in the config.toml.
 - SA_EMAIL: The service account email.
 - JWT_SECRET: The path to the JWT secret.
 
@@ -48,6 +48,7 @@ Functions:
 import json
 import logging
 import os
+import tempfile
 import time
 
 import pandas as pd
@@ -55,16 +56,14 @@ import requests
 import toml
 
 # load the utils:
-from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("logs/batch2.log"), logging.StreamHandler()],
+from survey_assist_utils.api_token.jwt_utils import (
+    check_and_refresh_token,
+    resolve_jwt_secret_path,
 )
+from survey_assist_utils.cloud_store.gcs_utils import download_from_gcs, upload_to_gcs
 
-logger = logging.getLogger(__name__)
+WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
+UPLOAD_ROWS = 5  # upload every 5 rows
 
 
 # Load the config:
@@ -98,9 +97,9 @@ def process_row(row, secret_code, app_config):
     Returns:
     dict: The response JSON with additional information.
     """
-    api_gateway_base = os.getenv("API_GATEWAY", "")
-    base_url = api_gateway_base + "/survey-assist/classify"
-
+    base_url = (
+        os.getenv("API_GATEWAY", "http://127.0.0.1:5000") + "/survey-assist/classify"
+    )
     unique_id = row[app_config["column_names"]["payload_unique_id"]]
     job_title = row[app_config["column_names"]["payload_job_title"]]
     job_description = row[app_config["column_names"]["payload_job_description"]]
@@ -141,14 +140,15 @@ def process_row(row, secret_code, app_config):
 
 
 def process_test_set(
-    secret_code,
+    token_information,
     process_batch_data,
     app_config,
 ):
     """Process the test set CSV file, make API requests, and save the responses to an output file.
 
     Parameters:
-    secret_code (str): The secret code for API authorisation.
+    token_information (dict): The information containing the secret code and
+            other related details for API authorisation.
     process_batch_data (dataframe): The data to process.
     app_config : the toml config.
     """
@@ -171,46 +171,142 @@ def process_test_set(
         process_batch_data = process_batch_data.head(test_limit)
         logging.info("Test mode enabled. Processing first %s rows.", test_limit)
 
+    is_gcs_output = output_filepath.startswith("gs://")
+    total_rows = len(process_batch_data)
+
+    if is_gcs_output:
+        # Use a persistent temp file for incremental upload
+        tmp_dir = tempfile.gettempdir()
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        local_output_path = os.path.join(tmp_dir, f"partial_output_{timestamp}.json")
+        logging.info(
+            "Using temporary file for intermediate results: %s", local_output_path
+        )
+
+        # Set the full path in gcs, inlude date and time to avoid overwriting
+        output_filepath = output_filepath.rstrip("/")  # Remove trailing slash
+        output_filepath += "/analysis_outputs/"
+        output_filepath += time.strftime("%Y%m%d_%H%M%S") + "_output.json"
+        logging.info("Output will be uploaded to GCS bucket: %s", output_filepath)
+    else:
+        local_output_path = output_filepath
+
     # Process each row in the DataFrame
-    with open(output_filepath, "w", encoding="utf-8") as file:
-        for _index, row in process_batch_data.iterrows():
-            logging.info("Processing  %s row", _index)
-            response_json = process_row(row, secret_code, app_config=app_config)
-            file.write(json.dumps(response_json) + "\n")
-            time.sleep(10)  # Wait between requests to avoid rate limiting
+    with open(local_output_path, "w+", encoding="utf-8") as target_file:
+        # Write the opening array bracket
+        target_file.write("[\n")
+        for i, (_index, row) in enumerate(process_batch_data.iterrows()):
+            logging.info("Processing row %s", _index)
+            # Check and refresh the token if necessary
+            (
+                token_information["token_start_time"],
+                token_information["current_token"],
+            ) = check_and_refresh_token(
+                token_information["token_start_time"],
+                token_information["current_token"],
+                token_information["jwt_secret_path"],
+                token_information["api_gateway"],
+                token_information["sa_email"],
+            )
+
+            response_json = process_row(
+                row, token_information["current_token"], app_config=app_config
+            )
+            target_file.write(json.dumps(response_json) + ",\n")
+            target_file.flush()
+
+            if is_gcs_output and ((i + 1) % UPLOAD_ROWS == 0 or (i + 1) == total_rows):
+                logging.info(
+                    "Uploading intermediate results to GCS bucket: %s, i: %s tot:%s",
+                    output_filepath,
+                    i,
+                    total_rows,
+                )
+
+                upload_to_gcs(local_output_path, output_filepath)
+
+            percent_complete = round(((i + 1) / total_rows) * 100, 2)
+            logging.info(
+                "Processed row %d of %d (%.2f%%)", i + 1, total_rows, percent_complete
+            )
+            time.sleep(WAIT_TIMER)  # Wait between requests to avoid rate limiting
+
+        # Remove the last comma and close the array
+        target_file.seek(target_file.tell() - 2, os.SEEK_SET)
+        target_file.write("\n]")
+        logging.info("Finished processing rows.")
+
+    # Final upload: now the file is valid JSON
+    if is_gcs_output:
+        upload_to_gcs(local_output_path, output_filepath)
+        logging.info("Final upload completed.")
+
+        # Optional: clean up
+        os.remove(local_output_path)
+        logging.info("Deleted local temp file.")
 
 
 if __name__ == "__main__":
-    logger.info("Script started")
-
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    logging.info("Starting batch processing script.")
     # Load configuration from .toml file
     config = load_config("config.toml")
 
     # Where the input data csv is
     batch_filepath = config["paths"]["batch_filepath"]
 
-    # Get a secret token - initially set to empty, then refresh it.
-    TOKEN_START_TIME = 0
-    CURRENT_TOKEN = ""
+    # Create a dictionary to hold the TOKEN variables
+    raw_jwt_env = os.getenv("JWT_SECRET", "")
 
-    # Set the location of the API
-    api_gateway = os.getenv("API_GATEWAY", "")
-    api_url = api_gateway + "/survey-assist/classify"
+    # Check if the JWT_SECRET is a file path or a JSON string
+    # It will be a JSON string when run in GCP
+    jwt_secret_path = resolve_jwt_secret_path(raw_jwt_env)
 
-    sa_email = os.getenv("SA_EMAIL", "")
-    jwt_secret_path = os.getenv("JWT_SECRET", "")
+    token_information = {
+        "token_start_time": 0,
+        "current_token": "",
+        "api_gateway": os.getenv("API_GATEWAY", ""),
+        "sa_email": os.getenv("SA_EMAIL", ""),
+        "jwt_secret_path": resolve_jwt_secret_path(raw_jwt_env),
+    }
+
+    logging.info("API Gateway: %s", token_information["api_gateway"][:10])
+    logging.info("Service Account Email: %s", token_information["sa_email"][:10])
+
+    if batch_filepath.startswith("gs://"):
+        logging.info("Downloading batch file from GCS: %s", batch_filepath)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_file:
+            download_from_gcs(batch_filepath, tmp_file.name)
+            local_csv_path = tmp_file.name
+            logging.info("Downloaded GCS file %s to %s", batch_filepath, local_csv_path)
+    else:
+        local_csv_path = batch_filepath
 
     # Load the data
     batch_data = pd.read_csv(batch_filepath, delimiter=",", dtype=str)
 
+    # Option to skip rows:
+    skip_n_rows = config["parameters"]["rows_to_skip"]
+    if (skip_n_rows > 0 ):
+        logging.info("Skipping %s rows", skip_n_rows)
+        batch_data = batch_data.iloc[skip_n_rows:]
+
+    logging.info(f"Processing %s rows of data ", len(batch_data))
+
     # Get token:
-    TOKEN_START_TIME, CURRENT_TOKEN = check_and_refresh_token(
-        TOKEN_START_TIME, CURRENT_TOKEN, jwt_secret_path, api_gateway, sa_email
+    token_information["token_start_time"], token_information["current_token"] = (
+        check_and_refresh_token(
+            token_information["token_start_time"],
+            token_information["current_token"],
+            token_information["jwt_secret_path"],
+            token_information["api_gateway"],
+            token_information["sa_email"],
+        )
     )
 
     # process file:
     process_test_set(
-        secret_code=CURRENT_TOKEN, process_batch_data=batch_data, app_config=config
+        token_information, process_batch_data=batch_data, app_config=config
     )
-
-    logger.info("Script finished")
