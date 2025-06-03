@@ -1,3 +1,14 @@
+"""Utilities for interacting with Google Cloud Storage (GCS).
+
+This module provides helper functions to upload and download files
+between the local filesystem and GCS buckets using the Google Cloud
+Storage Python client library.
+
+Functions:
+    - upload_to_gcs(local_path, gcs_uri): Uploads a local file to a specified GCS URI.
+    - download_from_gcs(gcs_uri, local_path): Downloads a file from a GCS URI to a local path.
+"""
+
 import logging
 from urllib.parse import urlparse
 

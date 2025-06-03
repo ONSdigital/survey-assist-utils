@@ -50,6 +50,7 @@ import logging
 import os
 import tempfile
 import time
+from typing import TypedDict, cast
 
 import pandas as pd
 import requests
@@ -64,6 +65,25 @@ from survey_assist_utils.cloud_store.gcs_utils import download_from_gcs, upload_
 
 WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
 UPLOAD_ROWS = 5  # upload every 5 rows
+
+
+# Add a class for the token
+class TokenInformation(TypedDict):
+    """Represents authentication and configuration details required for token-based API access.
+
+    Attributes:
+        token_start_time (int): The Unix timestamp indicating when the token was issued.
+        current_token (str): The current access token string.
+        api_gateway (str): The base URL of the API gateway.
+        sa_email (str): The service account email associated with the token.
+        jwt_secret_path (str): The file path or resolved location of the JWT secret.
+    """
+
+    token_start_time: int
+    current_token: str
+    api_gateway: str
+    sa_email: str
+    jwt_secret_path: str
 
 
 # Load the config:
@@ -140,14 +160,14 @@ def process_row(row, secret_code, app_config):
 
 
 def process_test_set(
-    token_information,
+    token_information_batch,
     process_batch_data,
     app_config,
 ):
     """Process the test set CSV file, make API requests, and save the responses to an output file.
 
     Parameters:
-    token_information (dict): The information containing the secret code and
+    token_information_batch (Class): The information containing the secret code and
             other related details for API authorisation.
     process_batch_data (dataframe): The data to process.
     app_config : the toml config.
@@ -158,18 +178,19 @@ def process_test_set(
     )
 
     # Unpack variables from config
-
-    # for test, select a small sample:
-    test_limit = app_config["parameters"]["test_num"]
-    test_mode_option = app_config["parameters"]["test_mode"]
-
     # Where to put the output
     output_filepath = app_config["paths"]["output_filepath"]
 
-    # Determine the subset of data to process
-    if test_mode_option:
-        process_batch_data = process_batch_data.head(test_limit)
-        logging.info("Test mode enabled. Processing first %s rows.", test_limit)
+    # Determine the subset of data to process - Check the truth
+    # of test_mode and cut to only test_num top rows
+    if app_config["parameters"]["test_mode"]:
+        process_batch_data = process_batch_data.head(
+            app_config["parameters"]["test_num"]
+        )
+        logging.info(
+            "Test mode enabled. Processing first %s rows.",
+            app_config["parameters"]["test_num"],
+        )
 
     is_gcs_output = output_filepath.startswith("gs://")
     total_rows = len(process_batch_data)
@@ -199,18 +220,18 @@ def process_test_set(
             logging.info("Processing row %s", _index)
             # Check and refresh the token if necessary
             (
-                token_information["token_start_time"],
-                token_information["current_token"],
+                token_information_batch["token_start_time"],
+                token_information_batch["current_token"],
             ) = check_and_refresh_token(
-                token_information["token_start_time"],
-                token_information["current_token"],
-                token_information["jwt_secret_path"],
-                token_information["api_gateway"],
-                token_information["sa_email"],
+                token_information_batch["token_start_time"],
+                token_information_batch["current_token"],
+                token_information_batch["jwt_secret_path"],
+                token_information_batch["api_gateway"],
+                token_information_batch["sa_email"],
             )
 
             response_json = process_row(
-                row, token_information["current_token"], app_config=app_config
+                row, token_information_batch["current_token"], app_config=app_config
             )
             target_file.write(json.dumps(response_json) + ",\n")
             target_file.flush()
@@ -262,14 +283,14 @@ if __name__ == "__main__":
 
     # Check if the JWT_SECRET is a file path or a JSON string
     # It will be a JSON string when run in GCP
-    jwt_secret_path = resolve_jwt_secret_path(raw_jwt_env)
+    jwt_secret_path = cast(str, resolve_jwt_secret_path(raw_jwt_env))
 
-    token_information = {
+    token_information: TokenInformation = {
         "token_start_time": 0,
         "current_token": "",
         "api_gateway": os.getenv("API_GATEWAY", ""),
         "sa_email": os.getenv("SA_EMAIL", ""),
-        "jwt_secret_path": resolve_jwt_secret_path(raw_jwt_env),
+        "jwt_secret_path": jwt_secret_path,
     }
 
     logging.info("API Gateway: %s", token_information["api_gateway"][:10])
