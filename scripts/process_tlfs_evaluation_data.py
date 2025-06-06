@@ -7,7 +7,7 @@ By defalut the output file overwritten.
 
 It also requires the following environment variables to be exported:
 - API_GATEWAY: The base API gateway URL. This is used to get and refresh
-    the token and is different to the API destination in the config.toml.
+    the token.
 - SA_EMAIL: The service account email.
 - JWT_SECRET: The path to the JWT secret.
 
@@ -104,7 +104,7 @@ def load_config(config_path):
     return configuration
 
 
-def process_row(row, secret_code, app_config):
+def process_row(row, token_information, app_config):
     """Process a single row of the DataFrame, make an API request, and return the response.
     If an error occours (404, 503, etc), the UID, payload and error are returned instead.
 
@@ -116,6 +116,18 @@ def process_row(row, secret_code, app_config):
     Returns:
     dict: The response JSON with additional information.
     """
+    # Check and refresh the token if necessary
+    (
+        token_information["token_start_time"],
+        token_information["current_token"],
+    ) = check_and_refresh_token(
+        token_information["token_start_time"],
+        token_information["current_token"],
+        token_information["jwt_secret_path"],
+        token_information["api_gateway"],
+        token_information["sa_email"],
+    )
+
     base_url = (
         os.getenv("API_GATEWAY", "http://127.0.0.1:5000") + "/survey-assist/classify"
     )
@@ -128,7 +140,7 @@ def process_row(row, secret_code, app_config):
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {secret_code}",
+        "Authorization": f"Bearer {token_information["current_token"]}",
     }
     payload = {
         "llm": "gemini",
@@ -159,14 +171,14 @@ def process_row(row, secret_code, app_config):
 
 
 def process_test_set(
-    token_information_batch,
+    token_information,
     process_batch_data,
     app_config,
 ):
     """Process the test set CSV file, make API requests, and save the responses to an output file.
 
     Parameters:
-    token_information_batch (Class): The information containing the secret code and
+    token_information (Class): The information containing the secret code and
             other related details for API authorisation.
     process_batch_data (dataframe): The data to process.
     app_config : the toml config.
@@ -217,21 +229,8 @@ def process_test_set(
         target_file.write("[\n")
         for i, (_index, row) in enumerate(process_batch_data.iterrows()):
             logging.info("Processing row %s", _index)
-            # Check and refresh the token if necessary
-            (
-                token_information_batch["token_start_time"],
-                token_information_batch["current_token"],
-            ) = check_and_refresh_token(
-                token_information_batch["token_start_time"],
-                token_information_batch["current_token"],
-                token_information_batch["jwt_secret_path"],
-                token_information_batch["api_gateway"],
-                token_information_batch["sa_email"],
-            )
 
-            response_json = process_row(
-                row, token_information_batch["current_token"], app_config=app_config
-            )
+            response_json = process_row(row, token_information, app_config=app_config)
             target_file.write(json.dumps(response_json) + ",\n")
             target_file.flush()
 
@@ -261,7 +260,6 @@ def process_test_set(
         upload_to_gcs(local_output_path, output_filepath)
         logging.info("Final upload completed.")
 
-        # Optional: clean up
         os.remove(local_output_path)
         logging.info("Deleted local temp file.")
 
@@ -284,7 +282,7 @@ if __name__ == "__main__":
     # It will be a JSON string when run in GCP
     jwt_secret_path = cast(str, resolve_jwt_secret_path(raw_jwt_env))
 
-    token_information: TokenInformation = {
+    token_information_init: TokenInformation = {
         "token_start_time": 0,
         "current_token": "",
         "api_gateway": os.getenv("API_GATEWAY", ""),
@@ -292,8 +290,8 @@ if __name__ == "__main__":
         "jwt_secret_path": jwt_secret_path,
     }
 
-    logging.info("API Gateway: %s", token_information["api_gateway"][:10])
-    logging.info("Service Account Email: %s", token_information["sa_email"][:10])
+    logging.info("API Gateway: %s", token_information_init["api_gateway"][:10])
+    logging.info("Service Account Email: %s", token_information_init["sa_email"][:10])
 
     if batch_filepath.startswith("gs://"):
         logging.info("Downloading batch file from GCS: %s", batch_filepath)
@@ -315,18 +313,19 @@ if __name__ == "__main__":
 
     logging.info("Processing %s rows of data ", len(batch_data))
 
-    # Get token:
-    token_information["token_start_time"], token_information["current_token"] = (
-        check_and_refresh_token(
-            token_information["token_start_time"],
-            token_information["current_token"],
-            token_information["jwt_secret_path"],
-            token_information["api_gateway"],
-            token_information["sa_email"],
-        )
+    # Get token initially:
+    (
+        token_information_init["token_start_time"],
+        token_information_init["current_token"],
+    ) = check_and_refresh_token(
+        token_information_init["token_start_time"],
+        token_information_init["current_token"],
+        token_information_init["jwt_secret_path"],
+        token_information_init["api_gateway"],
+        token_information_init["sa_email"],
     )
 
     # process file:
     process_test_set(
-        token_information, process_batch_data=batch_data, app_config=config
+        token_information_init, process_batch_data=batch_data, app_config=config
     )

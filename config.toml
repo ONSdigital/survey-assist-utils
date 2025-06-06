@@ -1,13 +1,10 @@
 # Configuration for SIC Evaluation 
 
 [paths]
-# Input path for the expert-coded gold standard data (relative to project root)
-#batch_filepath = "data/evaluation_data/TLFS_evaluation_data_IT2.csv"
-batch_filepath = "gs://survey_assist_sandbox_data/evaluation_data/TLFS_evaluation_data_IT2.csv"
+batch_filepath = "gs://<insert-location>/evaluation_data/TLFS_evaluation_data_IT2.csv"
 
 # Output file for batch processing results
-#output_filepath = "data/analysis_outputs/output.jsonl" # Changed from .csv to .jsonl
-output_filepath = "gs://survey_assist_sandbox_data/"
+output_filepath = "gs://<insert-location>/"
 
 [parameters]
 test_mode = true
