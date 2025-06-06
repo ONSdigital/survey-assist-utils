@@ -7,6 +7,12 @@
 /data/
 *.png
 
+# ignore data pictures
+*.png
+
+# ignore notebooks
+*.ipynb
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -181,3 +187,5 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+.DS_Store
