@@ -61,6 +61,7 @@ from survey_assist_utils.api_token.jwt_utils import (
     resolve_jwt_secret_path,
 )
 from survey_assist_utils.cloud_store.gcs_utils import download_from_gcs, upload_to_gcs
+from survey_assist_utils.logging import get_logger
 
 WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
 UPLOAD_ROWS = 5  # upload every 5 rows
@@ -265,10 +266,11 @@ def process_test_set(
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-    logging.info("Starting batch processing script.")
+
+    # Create a logger instance
+    logger = get_logger(__name__)
+
+    logger.info("Starting batch processing script.")
     # Load configuration from .toml file
     config = load_config("config.toml")
 
@@ -290,15 +292,17 @@ if __name__ == "__main__":
         "jwt_secret_path": jwt_secret_path,
     }
 
-    logging.info("API Gateway: %s", token_information_init["api_gateway"][:10])
-    logging.info("Service Account Email: %s", token_information_init["sa_email"][:10])
+    logger.info(f"API Gateway: {token_information_init['api_gateway']}")
+    # logger.info("API Gateway: %s", token_information_init["api_gateway"])
+    # logger.info("Service Account Email: %s", token_information_init["sa_email"])
+    logger.info(f"Service Account Email: {token_information_init["sa_email"]}")
 
     if batch_filepath.startswith("gs://"):
-        logging.info("Downloading batch file from GCS: %s", batch_filepath)
+        logger.info(f"Downloading batch file from GCS: {batch_filepath}")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_file:
             download_from_gcs(batch_filepath, tmp_file.name)
             local_csv_path = tmp_file.name
-            logging.info("Downloaded GCS file %s to %s", batch_filepath, local_csv_path)
+            logger.info("Downloaded GCS file {batch_filepath} to {local_csv_path}")
     else:
         local_csv_path = batch_filepath
 
@@ -308,10 +312,10 @@ if __name__ == "__main__":
     # Option to skip rows:
     skip_n_rows = config["parameters"]["rows_to_skip"]
     if skip_n_rows > 0:
-        logging.info("Skipping %s rows", skip_n_rows)
+        logger.info(f"Skipping {skip_n_rows} rows")
         batch_data = batch_data.iloc[skip_n_rows:]
 
-    logging.info("Processing %s rows of data ", len(batch_data))
+    logger.info(f"Processing {len(batch_data)} rows of data ")
 
     # Get token initially:
     (
