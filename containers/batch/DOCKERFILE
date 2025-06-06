@@ -25,7 +25,7 @@ ENV PYTHONPATH="/app/src"
 COPY ../../pyproject.toml ../../poetry.lock* ./
 
 # Copy the rest of the source code and script
-COPY ../../scripts/process_tlfs_evaluation_data.py ./scripts/
+COPY ../../scripts/process_tlfs_evaluation_data_ASYNC_POC.py ./scripts/
 COPY ../../src ./src
 COPY ../../config.toml ./config.toml
 
@@ -47,4 +47,4 @@ RUN chown -R appuser:appgroup /home/appuser/.config /home/appuser
 USER appuser
 
 # Run the batch script via poetry
-ENTRYPOINT ["poetry", "run", "python", "scripts/process_tlfs_evaluation_data.py"]
+ENTRYPOINT ["poetry", "run", "python", "scripts/process_tlfs_evaluation_data_ASYNC_POC.py"]
