@@ -12,8 +12,25 @@
 #     name: python3
 # ---
 
+# %%
+
+"""Summary analysis of the TLFS_evaluation_data_IT2 dataset."""
+
 # %% [markdown]
 # # Analysis of TLFS SIC Evaluation Dataset
+#
+# What the data are:
+#
+# The first iteration of the TLFS SIC Evaluation Dataset which contains 13,274 TLFS records.
+# SIC codes are derived from both the Occupation and Industry responses (sic_ind_occ variables)
+#
+# Key outputs include:
+# - Coverage of 2-digit SIC groups
+# - Distribution of possible SIC codes per record
+# - Codeability and unambiguous coding stats at 2-digit and 5-digit levels
+# - Analysis of derived SIC from `sic_ind_occ1`
+# - Identification of uncodeable records and those requiring follow-up
+#
 # Intro: this notebook contain the following analysis of TLFS_evaluation_data_IT2.csv
 #  - Breakdown of  2 digit codes (Division)
 #  - Breakdown of all codes across all three choices
@@ -36,35 +53,26 @@
 # Group memberships:
 # - Uncodeable to any digits: 6.79 %
 # - Codeable to two digits only:  27.6 %
-# - Codeable to five Digits (ambiguous and unambiguous): 63.8 %
+# - Codeable to three digits only	0.7 %
 # - Codeable unambiguously to five digits: 59.7 %
 # - Codeable ambiguously to five digits: 4.1 %
-# - Codeable at 2 or more digits, 92%
+# - Having 4 or more codes: 1%
+# - Other (coded to four digits): 0.1%
+# - Total	items 13274
 #
 #
+# ### Unambiguouisly codeable being 60% of the data.
+#  - An opportunity to test whether the LLM is able to match the human coder's
+#  assessment.
 #
 #
-
-# %%
-
-"""Summary analysis of the TLFS_evaluation_data_IT2 dataset,
-    prepared via `prepare_evaluation_data_for_analysis`.
-
-Key outputs include:
-- Coverage of 2-digit SIC groups
-- Distribution of possible SIC codes per record
-- Codeability and unambiguous coding stats at 2-digit and 5-digit levels
-- Analysis of derived SIC from `sic_ind_occ1`
-- Identification of uncodeable records and those requiring follow-up
-
-Developed in a notebook and converted to script for version control and reproducibility.
-"""
 
 # %% [markdown]
 # ## Set import graphical package, logging
 
 import logging
 from pathlib import Path
+from typing import Optional
 
 import matplotlib.pyplot as plt
 
@@ -75,27 +83,9 @@ import seaborn as sns
 logger = logging.getLogger(__name__)
 
 # %%
-cols_wanted = [
-    "unique_id",
-    "sic_ind_occ1",
-    "sic_ind_occ2",
-    "sic_ind_occ3",
-    "sic_ind_occ_flag",
-    "Not_Codeable",
-    "Four_Or_More",
-    "SIC_Division",
-    "num_answers",
-    "All_Clerical_codes",
-    "Match_5_digits",
-    "Match_3_digits",
-    "Match_2_digits",
-    "Unambiguous",
-]
-
-# Load your DataFrame
+# Load the DataFrame
 eval_data = pd.read_csv(
     "../data/analysis_outputs/TLFS_evaluation_data_IT2_output.csv",
-    usecols=cols_wanted,
     dtype={"SIC_Division": str},
 )
 
@@ -112,29 +102,172 @@ TOP_N_HISTOGRAM = 10  # Number of top items to show in SIC code histograms
 EXPECTED_SIC_LENGTH = 5
 X_COUNT_FOR_MATCH_3 = 2
 X_COUNT_FOR_MATCH_2 = 3
+X_COUNT_FOR_MULTI_ANSWERS = 4
+
+output_dir_path = Path("/home/user/survey-assist-utils/notebooks")
 
 
 # %% [markdown]
-# ### Make a graphing function
+# ## Section 1: Group Membership of Total Data
+#  This section calculates and displays a pie chart representing the main group
+#  memberships within the dataset:
+#  - Uncodeable to any digits
+#  - Codeable to two digits only
+#  - Codeable to three digits only
+#  - Codeable unambiguously to five digits
+#  - Codeable ambiguously to five digits
+#  - 4 or more answers given
+#  - Any remaining data as 'Other'
+#
+#  ## Finding 1: A single answer is given in 76% of cases.
+# In over three quarters of cases, coders are sufficiently confident to provide a single answer
+# only (with either 2 or five digits defined).
+#
+# # Implication for our work:
+# - Make an initial test of the LLM's ability to match the human codres' results.
+# - Use this as a benchmark for ongoing improvements.
+
+# %%
+# --- Calculate counts for each group membership category ---
+N = len(eval_data)
+
+# 1. Uncodeable to any digits
+count_uncodeable = (eval_data["num_answers"] == 0).sum()
+
+# 2. Codeable to two digits only
+count_2_digits_only = eval_data["Match_2_digits"].sum()
+
+# 3. Codeable unambiguously to five digits
+count_5_digits_unambiguous = eval_data["Unambiguous"].sum()
+
+# 4. Codeable ambiguously to five digits
+# These are items that Match_5_digits but are NOT Unambiguous.
+count_5_digits_ambiguous = (
+    eval_data["Match_5_digits"] & ~eval_data["Unambiguous"]
+).sum()
+
+# Check what is in the small remaining quantity:
+count_3_digits_only = eval_data["Match_3_digits"].sum()
+count_four_plus = (eval_data["num_answers"] == X_COUNT_FOR_MULTI_ANSWERS).sum()
+
+# --- Define data for the pie chart ---
+group_counts_for_pie = [
+    count_uncodeable,
+    count_four_plus,
+    count_2_digits_only,
+    count_3_digits_only,
+    count_5_digits_unambiguous,
+    count_5_digits_ambiguous,
+]
+
+group_labels_template = [
+    "Uncodeable",
+    "4+ Codes",
+    "Codeable to 2 digits only",
+    "Codeable to 3 digits only",
+    "Codeable unambiguously to 5 digits",
+    "Codeable ambiguously to 5 digits",
+]
+
+
+# Check for 'Other' category (data not falling into the above groups)
+total_categorised_count = sum(group_counts_for_pie)
+count_other = N - total_categorised_count
+group_counts_for_pie.append(count_other)
+group_labels_template.append("Other")
+
+# Calculate percentages for precise labeling
+calculated_percentages = [(count / N) * 100 for count in group_counts_for_pie]
+
+# Create labels with percentages
+chart_labels = [
+    f"{label}\n({percent:.1f}%)"
+    for label, percent in zip(group_labels_template, calculated_percentages)
+]
+
+# --- Create and save the pie chart ---
+plt.figure(figsize=(10, 10))
+plt.pie(
+    group_counts_for_pie,
+    labels=chart_labels,
+    autopct=lambda p: (f"{p:.1f}%" if p > 1 else ""),  # Show autopct % for slices > 1%
+    startangle=90,
+    wedgeprops={"edgecolor": "white"},  # Adds a white border to slices
+    colors=sns.color_palette(
+        "pastel", len(group_counts_for_pie)
+    ),  # Use a seaborn palette
+)
+plt.title("Distribution of Group Membership in Total Data", fontsize=16)
+plt.axis("equal")
+plt.tight_layout()
+
+# Add a comment about the 'other'
+plt.text(
+    -1,
+    -1.2,
+    (f"*Other - 4 digit coded\n({calculated_percentages[-1]:.1f}%)"),
+    bbox={"facecolor": "lightgrey", "alpha": 0.5},
+    ha="center",
+    fontsize=10,
+)
+
+# Save the figure
+output_pie_chart_path = output_dir_path / "group_membership_pie_chart.png"
+plt.savefig(output_pie_chart_path)
+
+plt.show()
+plt.close()
+
+# Create and display the summary table
+# Add totals
+group_labels_template.append("Total")
+group_counts_for_pie.append(sum(group_counts_for_pie))
+calculated_percentages.append(sum(calculated_percentages))
+df_summary = pd.DataFrame(
+    {
+        "Category": group_labels_template,
+        "Count": group_counts_for_pie,
+        "Percentage": calculated_percentages,
+    }
+)
+print(df_summary)
+
+# %% [markdown]
+# ## Section 2: Distribution of the SIC codes of the labelled set
+#
+# ### Finding 1 - Strong bias to Divisions 86, 87: 68.2%
+#
+# Division 86 is "Human Health Activities"
+#
+# Division 87 is "Residential Care"
+#
+# ### Implication for our work:
+#
+# A wider range of evaluation data is requested to remove the risks
+# associated with bias, such as a difference performance in one division compared to another.
+#
 
 
 # %%
 def plot_sic_code_histogram(
     df: pd.DataFrame,
     column_name: str,
-    output_dir: Path,
     show_percent=False,
     filename_suffix: str = "",
+    relabel_remap: Optional[dict] = None,
 ) -> None:
     """Generates and saves a histogram (bar plot) for the value counts of a SIC code column.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
         column_name (str): The name of the SIC code column to analyze.
-        output_dir (Path): The directory to save the plot.
         show_percent (bool): Whether to display percentages instead of raw counts.
         filename_suffix (str): Suffix to add to the plot filename.
+        relabel_remap (dict, optional): A dictionary to remap x-axis
+            tick labels for better readability.
+
     """
+    output_dir = Path("/home/user/survey-assist-utils/notebooks")
     top_n = TOP_N_HISTOGRAM
     if column_name not in df.columns:
         logger.warning(
@@ -154,17 +287,25 @@ def plot_sic_code_histogram(
     # Option for percentages
     if show_percent:
         counts = df[column_name].value_counts(normalize=True).nlargest(top_n) * 100
+        total_count = 100
         ylabel_text = "Percentage"
     else:
         counts = df[column_name].value_counts().nlargest(top_n)
+        # Calculate the 'Others' category
+        total_count = eval_data[column_name].value_counts().sum()
         ylabel_text = "Frequency (Count)"
+
+    # Append 'Others' to counts
+    counts["Others"] = total_count - counts.sum()
+    # Calculate the percentage that top_n represents
+    top_n_percentage = (counts.sum() - counts["Others"]) / total_count * 100
 
     if counts.empty:
         logger.warning("No data to plot for histogram of column '%s'.", column_name)
         plt.close()  # Close the empty figure
         return
 
-    sns.barplot(
+    ax = sns.barplot(
         x=counts.index,
         y=counts.values,
         hue=counts.index,
@@ -172,11 +313,17 @@ def plot_sic_code_histogram(
         dodge=False,
         legend=False,
     )
-
-    plt.title(
-        f"Top {top_n} Most Frequent Codes in '{column_name}' (Total Rows: {len(df)})"
+    ax.set_title(
+        f"""Top {top_n} Most Frequent Codes in '{column_name}',
+        representing {top_n_percentage:.1f}% of (Total Rows: {len(eval_data)})"""
     )
-    plt.xlabel(f"{column_name} Code")
+    if relabel_remap:
+        new_labels = [
+            relabel_remap.get(label.get_text(), label.get_text())
+            for label in ax.get_xticklabels()
+        ]
+        ax.set_xticklabels(new_labels)
+
     plt.ylabel(ylabel_text)
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
@@ -191,50 +338,22 @@ def plot_sic_code_histogram(
 
 
 # %% [markdown]
-# ## Section 1: Distribution of the SIC codes of the labelled set
-
-# %% [markdown]
 # ### Histogram of the top 10 2 digit codes (Division)
 
 # %%
-output_dir_path = Path("/home/user/survey-assist-utils/notebooks")
+
 plot_sic_code_histogram(
     eval_data,
     column_name="SIC_Division",
-    output_dir=output_dir_path,
     show_percent=True,
     filename_suffix="SIC_Division",
 )
 
 # %%
-# Calculate membership of 86 and 87  combined
+# Calculate membership of 86, "Human Health Activities"  and 87, "Residential Care" combined
 print(
     f"""Fraction of the dataset being in Division 86 or 87:
     {100 * eval_data['SIC_Division'].isin(['86', '87']).sum() / len(eval_data):.1f}%"""
-)
-
-# %% [markdown]
-# ### Finding 1 - Strong bias to Divisions 86, 87: 68.2%
-#
-# ### Implication for our work:
-#
-# A wider range of evaluation data is requested to remove the risks
-# associated with bias, such as a difference performance in one division compared to another.
-
-# %% [markdown]
-# ### Histogram of the top 10 of all codes across all three choices, including 2 digits
-
-# %%
-combined_data = pd.concat(
-    [eval_data["sic_ind_occ1"], eval_data["sic_ind_occ2"], eval_data["sic_ind_occ3"]]
-)
-combined_df = pd.DataFrame(combined_data, columns=["combined"])
-plot_sic_code_histogram(
-    combined_df,
-    column_name="combined",
-    output_dir=output_dir_path,
-    show_percent=True,
-    filename_suffix="Combined_sic_codes",
 )
 
 # %% [markdown]
@@ -245,7 +364,6 @@ filtered_data = eval_data[eval_data["Unambiguous"]]
 plot_sic_code_histogram(
     filtered_data,
     column_name="sic_ind_occ1",
-    output_dir=output_dir_path,
     show_percent=True,
     filename_suffix="Unambiguous_only",
 )
@@ -253,14 +371,18 @@ plot_sic_code_histogram(
 # %% [markdown]
 # ### Histogram of the number of codes CCs applied:
 # Distribution of number of possible SIC codes (uncodeable - 0 code, 1 code, 2 codes, 3 codes)
+#
+# relabel the 4 to 4+ to remove ambiguity
 
 # %%
+# relabel the 4 to 4+
+relabel_remap_four = {"4": "4+"}
 plot_sic_code_histogram(
     eval_data,
     column_name="num_answers",
-    output_dir=output_dir_path,
     show_percent=True,
     filename_suffix="",
+    relabel_remap=relabel_remap_four,
 )
 
 # %%
@@ -270,104 +392,7 @@ print(
 )
 
 # %% [markdown]
-# ### Finding 2: A single answer is given in 76% of cases.
-# In over three quareters of cases, coders are sufficiently confident to provide a single answer
-# only (with either 2 or five digits defined).
-#
-# ### Implication for our work:
-#
-# Within this 3/4ths majority, there is sufficient information given that a single
-# definite answer is arrived at.
-#
-# We should understand whether the LLM is able to do the same.
-#
-#
-#
-
-# %% [markdown]
-# ## Section 2: levels of codeability in the labelled set:
-#
-# ### Calculate proportion of codeable at 5-digit across the total set.
-# This is to answer the question how many responses don't need a follow up?
-#
-# - Uncodeable to any digits: 6.79 %
-# - Codeable to two digits only:  27.6 %
-# - Codeable to five Digits (ambiguous and unambiguous): 63.8 %
-# - Codeable unambiguously to five digits: 59.7 %
-# - Codeable ambiguously to five digits: 4.1 %
-
-# %%
-print("Group memberships:")
-print(
-    f"""Uncodeable to any digits: {100*(eval_data["num_answers"] == 0).sum() /
-        len(eval_data["num_answers"]):.2f} %"""
-)
-print(
-    f"""Codeable to two digits only:  {100*eval_data['Match_2_digits'].sum() /
-        len(eval_data):.1f} %"""
-)
-print(
-    f"""Codeable to five Digits (ambiguous and unambiguous):
-        {100*eval_data['Match_5_digits'].sum() /len(eval_data):.1f} %"""
-)
-print(
-    f"""Codeable unambiguously to five digits:
-        {100*eval_data['Unambiguous'].sum() / len(eval_data["Match_5_digits"]):.1f} %"""
-)
-
-ambiguous_data = eval_data[~eval_data["Unambiguous"]]
-print(
-    f"""Codeable ambiguously to five digits:
-        {100*ambiguous_data["Match_5_digits"].sum() / len(eval_data["Match_5_digits"]):.1f} %"""
-)
-
-print(f"Number of True in 'Match_5_digits': {eval_data['Match_5_digits'].sum()}")
-print(
-    f"Fraction of True 'Match_5_digits': {eval_data['Match_5_digits'].sum() /len(eval_data):.1f}"
-)
-
-print(f"Number of True in 'Match_2_digits': {eval_data['Match_2_digits'].sum()}")
-print(
-    f"Fraction of True 'Match_2_digits': {eval_data['Match_2_digits'].sum() /len(eval_data):.2f}"
-)
-
-filtered_data = eval_data[
-    eval_data["Match_5_digits"]
-    | eval_data["Match_3_digits"]
-    | eval_data["Match_2_digits"]
-]
-true_count_2_or_more = len(filtered_data)
-fraction_2_or_more = true_count_2_or_more / len(eval_data)
-print(
-    f"""Number of True values in 'Match_2_digits',
- 'Match_3_digits' or 'Match_5_digits': {true_count_2_or_more}"""
-)
-print(
-    f"Fraction of True values in 'Match_2_digits' or more digits: {fraction_2_or_more:.2f}"
-)
-print(f"Total Dataset: {len(eval_data)}")
-
-
-# %% [markdown]
-# ### Histogram of Codeable at 2 or more digits for 'Unambiguous' category:
-
-# %%
-# codeable at 2d
-filtered_data = eval_data[
-    eval_data["Match_5_digits"]
-    | eval_data["Match_3_digits"]
-    | eval_data["Match_2_digits"]
-]
-plot_sic_code_histogram(
-    filtered_data,
-    column_name="sic_ind_occ1",
-    output_dir=output_dir_path,
-    show_percent=True,
-    filename_suffix="Codeable",
-)
-
-# %% [markdown]
-# ### Findings and implications:
+# ### Conclusion:
 # Strong skew to 86xxx and 87xxx, 68.2%, representing the divisions that this data were taken from.
 # A more diverse data set has been requested.
 #
