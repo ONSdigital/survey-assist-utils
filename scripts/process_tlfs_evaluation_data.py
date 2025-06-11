@@ -283,8 +283,6 @@ if __name__ == "__main__":
     }
 
     logger.info(f"API Gateway: {token_information_init['api_gateway']}")
-    # logger.info("API Gateway: %s", token_information_init["api_gateway"])
-    # logger.info("Service Account Email: %s", token_information_init["sa_email"])
     logger.info(f"Service Account Email: {token_information_init["sa_email"]}")
 
     if batch_filepath.startswith("gs://"):
