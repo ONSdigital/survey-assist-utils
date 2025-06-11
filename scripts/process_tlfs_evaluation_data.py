@@ -45,7 +45,6 @@ Functions:
 """
 
 import json
-import logging
 import os
 import tempfile
 import time
@@ -63,11 +62,14 @@ from survey_assist_utils.api_token.jwt_utils import (
 from survey_assist_utils.cloud_store.gcs_utils import download_from_gcs, upload_to_gcs
 from survey_assist_utils.logging import get_logger
 
+# Create a logger instance
+logger = get_logger(__name__)
+
 WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
 UPLOAD_ROWS = 5  # upload every 5 rows
 
 
-# Add a class for the token
+# Add a dict for the token
 class TokenInformation(TypedDict):
     """Represents authentication and configuration details required for token-based API access.
 
@@ -158,7 +160,7 @@ def process_row(row, token_information, app_config):
         response.raise_for_status()
         response_json = response.json()
     except requests.exceptions.RequestException as e:
-        logging.error("Request failed for unique_id %s: %s", unique_id, e)
+        logger.error(f"Request failed for unique_id {unique_id}: {e}")
         response_json = {
             "unique_id": unique_id,
             "request_payload": payload,
@@ -179,16 +181,11 @@ def process_test_set(
     """Process the test set CSV file, make API requests, and save the responses to an output file.
 
     Parameters:
-    token_information (Class): The information containing the secret code and
+    token_information (dict): The information containing the secret code and
             other related details for API authorisation.
     process_batch_data (dataframe): The data to process.
     app_config : the toml config.
     """
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-
     # Unpack variables from config
     # Where to put the output
     output_filepath = app_config["paths"]["output_filepath"]
@@ -199,9 +196,8 @@ def process_test_set(
         process_batch_data = process_batch_data.head(
             app_config["parameters"]["test_num"]
         )
-        logging.info(
-            "Test mode enabled. Processing first %s rows.",
-            app_config["parameters"]["test_num"],
+        logger.info(
+            f"Test mode enabled. Processing first {app_config['parameters']['test_num']} rows."
         )
 
     is_gcs_output = output_filepath.startswith("gs://")
@@ -212,15 +208,15 @@ def process_test_set(
         tmp_dir = tempfile.gettempdir()
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         local_output_path = os.path.join(tmp_dir, f"partial_output_{timestamp}.json")
-        logging.info(
-            "Using temporary file for intermediate results: %s", local_output_path
+        logger.info(
+            "Using temporary file for intermediate results: {local_output_path}"
         )
 
         # Set the full path in gcs, inlude date and time to avoid overwriting
         output_filepath = output_filepath.rstrip("/")  # Remove trailing slash
         output_filepath += "/analysis_outputs/"
         output_filepath += time.strftime("%Y%m%d_%H%M%S") + "_output.json"
-        logging.info("Output will be uploaded to GCS bucket: %s", output_filepath)
+        logger.info(f"Output will be uploaded to GCS bucket: {output_filepath}")
     else:
         local_output_path = output_filepath
 
@@ -229,46 +225,40 @@ def process_test_set(
         # Write the opening array bracket
         target_file.write("[\n")
         for i, (_index, row) in enumerate(process_batch_data.iterrows()):
-            logging.info("Processing row %s", _index)
+            logger.info("Processing row {_index}")
 
             response_json = process_row(row, token_information, app_config=app_config)
             target_file.write(json.dumps(response_json) + ",\n")
             target_file.flush()
 
             if is_gcs_output and ((i + 1) % UPLOAD_ROWS == 0 or (i + 1) == total_rows):
-                logging.info(
-                    "Uploading intermediate results to GCS bucket: %s, i: %s tot:%s",
-                    output_filepath,
-                    i,
-                    total_rows,
+                logger.info(
+                    f"""Uploading intermediate results to GCS bucket:
+                     {output_filepath}, i: {i} tot:{total_rows}"""
                 )
-
                 upload_to_gcs(local_output_path, output_filepath)
 
             percent_complete = round(((i + 1) / total_rows) * 100, 2)
-            logging.info(
-                "Processed row %d of %d (%.2f%%)", i + 1, total_rows, percent_complete
+            logger.info(
+                f"Processed row {i + 1} of {total_rows} {percent_complete:.2f}%"
             )
             time.sleep(WAIT_TIMER)  # Wait between requests to avoid rate limiting
 
         # Remove the last comma and close the array
         target_file.seek(target_file.tell() - 2, os.SEEK_SET)
         target_file.write("\n]")
-        logging.info("Finished processing rows.")
+        logger.info("Finished processing rows.")
 
     # Final upload: now the file is valid JSON
     if is_gcs_output:
         upload_to_gcs(local_output_path, output_filepath)
-        logging.info("Final upload completed.")
+        logger.info("Final upload completed.")
 
         os.remove(local_output_path)
-        logging.info("Deleted local temp file.")
+        logger.info("Deleted local temp file.")
 
 
 if __name__ == "__main__":
-
-    # Create a logger instance
-    logger = get_logger(__name__)
 
     logger.info("Starting batch processing script.")
     # Load configuration from .toml file
