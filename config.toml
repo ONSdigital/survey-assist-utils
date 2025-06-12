@@ -1,39 +1,24 @@
 # Configuration for SIC Evaluation 
 
 [paths]
-# Input path for the SIC Evaluation Dataset (relative to project root)
-batch_filepath = "data/evaluation_data/TLFS_evaluation_data_IT2.csv"
-
-# Output file for batch processing results
-output_filepath = "data/analysis_outputs/output_7.jsonl" # Changed from .csv to .jsonl
-
-# Output for processed csv:
-analysis_csv = "data/analysis_outputs/TLFS_evaluation_data_IT2_output.csv"
-
-# Output directory for analysis results (relative to project root)
-output_dir = "data/analysis_outputs"
+batch_filepath = "gs://<insert-location>/evaluation_data/TLFS_evaluation_data_IT2.csv"
+output_filepath = "gs://<insert-location>/"
 
 [parameters]
 test_mode = true
-test_num = 2
+test_num = 175
+rows_to_skip = 13099
 
 [column_names]
-# --- Column names from the input CSV to be used for API payload ---
 payload_unique_id = "unique_id"
 payload_job_title = "soc2020_job_title"
 payload_job_description = "soc2020_job_description"
 payload_industry_description = "sic2007_employee"
 
-# --- Key columns in the SIC Evaluation Dataset input file ---
+
 unique_id = "unique_id"
 sic_ind_occ1 = "sic_ind_occ1"         # Analysis SIC code column
 sic_ind_occ2 = "sic_ind_occ2"         # Analysis SIC code column
 sic_ind_occ3 = "sic_ind_occ3"         # Analysis SIC code column
 coding_flag = "sic_ind_code_flag"   # Analysis column for KB/CC/MC flag
 
-[logging]
-# Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-level = "INFO"
-# Optional: Log file path (relative to project root). If commented out, logs to console.
-file = "logs/evaluation3.log"
-format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"

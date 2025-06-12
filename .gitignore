@@ -13,7 +13,6 @@
 *.pdf
 *.bmp 
 
-
 # ignore jupyter notebooks
 *.ipynb
 
@@ -191,3 +190,5 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+.DS_Store
