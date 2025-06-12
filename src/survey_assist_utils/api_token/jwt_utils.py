@@ -13,10 +13,12 @@ Functions:
         Generate an API token using a JWT at the CLI.
 
 """
+import json
 import os
+import tempfile
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from google.auth import jwt as google_jwt
 from google.auth.crypt import RSASigner
@@ -32,6 +34,29 @@ def current_utc_time() -> datetime:
         datetime: The current time in UTC as a timezone-aware datetime object.
     """
     return datetime.fromtimestamp(time.time(), tz=timezone.utc)
+
+
+def resolve_jwt_secret_path(jwt_secret_env: str) -> Optional[str]:
+    """Resolves the JWT secret environment variable to a file path.
+    - If the value is a valid JSON string, writes it to a temp file and returns that path.
+    - If it's a path to an existing file, returns it as-is.
+    """
+    if os.path.isfile(jwt_secret_env):
+        return jwt_secret_env  # Local dev case
+
+    try:
+        # Try to parse the secret content as JSON
+        secret_content = json.loads(jwt_secret_env)
+        # Write to temp file
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".json"
+        ) as temp:
+            json.dump(secret_content, temp)
+        return temp.name
+    except json.JSONDecodeError as err:
+        raise ValueError(
+            "JWT_SECRET must be a valid file path or JSON string."
+        ) from err
 
 
 def generate_jwt(
