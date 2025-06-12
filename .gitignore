@@ -7,10 +7,13 @@
 /data/
 *.png
 
-# ignore data pictures
+# ignore pictures and graphs of data
 *.png
+*.jpg
+*.pdf
+*.bmp 
 
-# ignore notebooks
+# ignore jupyter notebooks
 *.ipynb
 
 # Byte-compiled / optimized / DLL files
