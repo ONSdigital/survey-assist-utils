@@ -8,114 +8,65 @@ calculate_first_choice_rate
 calculate_match_rate_at_n
 """
 
+from typing import Optional
 import pandas as pd
 
 
+# pylint: disable=too-few-public-methods
 class AlignmentEvaluator:
-    """A class to handle comparison between CC labels and outputs from SA.
+    """A class to handle comparison between two sets of classification codes.
 
-    This object loads, preprocesses, and calculates metrics on SIC code data,
-    encapsulating all the related logic in one place.
+    This object loads data and calculates alignment metrics, such as exact
+    and partial (n-digit) match rates between any two specified columns.
     """
 
     def __init__(self, filepath: str):
-        """Initialises the analyser by loading and preprocessing the data.
+        """Initialises the evaluator by loading the data.
 
         Args:
-            filepath (str): The path to the CSV file containing merged results from both CC
-            and SA.
+            filepath (str): The path to the CSV file containing the data.
         """
-        # Some asserts / try for fileread fails
-        self._data = pd.read_csv(filepath, dtype=str)
-        print(f"Successfully loaded data with shape: {self._data.shape}")
+        try:
+            self._data = pd.read_csv(filepath, dtype=str)
+            print(f"Successfully loaded data with shape: {self._data.shape}")
+        except FileNotFoundError:
+            print(f"ERROR: The file was not found at {filepath}")
+            raise
 
-        self._add_helper_columns()
+    def calculate_match_rate(
+        self, col1: str, col2: str, n: Optional[int] = None
+    ) -> float:
+        """Calculates the match rate between two columns, either fully or at n-digits.
 
-    def _add_helper_columns(self):
-        """A private helper method to perform the initial data setup.
-
-        SIC Division (2 digits), Sub division (3 digits) Class (4 digits).
-        """
-        print("Adding helper columns for analysis...")
-        code_lengths = [2, 3, 4]
-
-        # Generate substrings for 'chosen_sic_code'
-        for n in code_lengths:
-            self._data[f"code_{n}"] = self._data["chosen_sic_code"].str[:n]
-
-        # Generate substrings for 'sic_ind_occ1'
-        for n in code_lengths:
-            self._data[f"code_cc_{n}"] = self._data["sic_ind_occ1"].str[:n]
-
-    def calculate_first_choice_rate(self, col1: str, col2: str) -> float:
-        """Calculates the percentage of exact matches between two specified columns in the dataset.
-
-        This method compares the values in `col1` and `col2` row by row and computes the
-        proportion of rows where the values are identical. The result is returned as a
-        percentage rounded to two decimal places.
-
-        Parameters:
-        ----------
-        col1 : str
-            The name of the first column to compare (e.g., 'sic_ind_occ1').
-        col2 : str
-            The name of the second column to compare (e.g., 'chosen_sic_code').
+        Args:
+            col1 (str): The name of the first column to compare.
+            col2 (str): The name of the second column to compare.
+            n (Optional[int], optional): The number of leading digits to compare.
+                If None, a full string comparison is performed. Defaults to None.
 
         Returns:
-        -------
-        float
-            The percentage of rows where the values in `col1` and `col2` match exactly.
-            Returns 0.0 if the dataset is empty.
+            float: The percentage of rows that match, rounded to two decimal places.
         """
         data = self._data
+        if col1 not in data.columns or col2 not in data.columns:
+            raise ValueError(
+                f"One or both columns ('{col1}', '{col2}') not found in data."
+            )
 
-        # The total number of records is simply the length of the DataFrame.
-        # This is clearer and less error-prone than the original calculation.
         total = len(data)
+        if total == 0:
+            return 0.0
 
-        # Calculate matching values
-        matching = (data[col1] == data[col2].values).sum()
+        # Determine the series to compare based on 'n'
+        if n is None:
+            # Full match - use the original columns
+            series1 = data[col1]
+            series2 = data[col2]
+        else:
+            # Partial match - generate substrings on the fly
+            series1 = data[col1].str[:n]
+            series2 = data[col2].str[:n]
 
-        # Calculate percentage
-        matching_percent = round(100 * matching / total, 2) if total > 0 else 0.0
+        matching = (series1 == series2).sum()
 
-        return matching_percent
-
-    def calculate_match_rate_at_n(self, n: int) -> float:
-        """Calculates the match rate for the first N digits of the SIC code."""
-        data = self._data
-        total = len(data)
-
-        match_col_1 = f"code_{n}"
-        match_col_2 = f"code_cc_{n}"
-
-        if match_col_1 not in data.columns or match_col_2 not in data.columns:
-            raise ValueError(f"Helper columns for n={n} do not exist.")
-
-        matching = (data[match_col_1] == data[match_col_2]).sum()
-        return round(100 * matching / total, 1) if total > 0 else 0.0
-
-
-# Where are the results and original input data kept?
-# Test that was run:
-# Input data (eg 2000 random selection)
-# Output data - some json files
-#
-# Job list
-# @staticmethod
-#    def save_output(
-#        metadata: dict, eval_result: dict, save_path: str = "../data/"
-#    ) -> str:
-#        """Save evaluation results to files.
-
-#    Args:
-#        metadata: Dictionary of metadata parameters
-#        eval_result: Dictionary containing evaluation metrics
-#        save_path: (str) The folder where results should be saved. Default is "../data/".
-
-#        Returns
-#        -------
-#            str: The folder path where results were stored
-#        """
-#
-# Hard coded? chosen_sic_code LLM column name
+        return round(100 * matching / total, 2)
