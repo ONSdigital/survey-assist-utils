@@ -47,12 +47,25 @@ class AlignmentEvaluator:
         for n in code_lengths:
             self._data[f"code_cc_{n}"] = self._data["sic_ind_occ1"].str[:n]
 
-    def calculate_first_choice_rate(self, col1, col2) -> float:
-        """Calculates the percentage of exact matches between 'sic_ind_occ1'.
-        and 'chosen_sic_code'. - Do we want to change which cols we compare.
-        self,
-        col1,
-        col2.
+    def calculate_first_choice_rate(self, col1: str, col2: str) -> float:
+        """Calculates the percentage of exact matches between two specified columns in the dataset.
+
+        This method compares the values in `col1` and `col2` row by row and computes the
+        proportion of rows where the values are identical. The result is returned as a
+        percentage rounded to two decimal places.
+
+        Parameters:
+        ----------
+        col1 : str
+            The name of the first column to compare (e.g., 'sic_ind_occ1').
+        col2 : str
+            The name of the second column to compare (e.g., 'chosen_sic_code').
+
+        Returns:
+        -------
+        float
+            The percentage of rows where the values in `col1` and `col2` match exactly.
+            Returns 0.0 if the dataset is empty.
         """
         data = self._data
 
@@ -61,9 +74,7 @@ class AlignmentEvaluator:
         total = len(data)
 
         # Calculate matching values
-        matching = (
-            data[col1] == data[col2]
-        ).sum()  # matching = (data[col1].values == data[col2].values).sum() ?
+        matching = (data[col1] == data[col2].values).sum()
 
         # Calculate percentage
         matching_percent = round(100 * matching / total, 2) if total > 0 else 0.0
