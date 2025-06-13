@@ -32,11 +32,13 @@ def test_sic_analysis_calculations():
     analyzer = AlignmentEvaluator(filepath=temp_csv_path)
 
     # Call the methods to get the actual results.
-    actual_full_match_rate = analyzer.calculate_first_choice_rate(
+    actual_full_match_rate = analyzer.calculate_match_rate(
         col1="sic_ind_occ1", col2="chosen_sic_code"
     )
     print("actual_full_match_rate", actual_full_match_rate)
-    actual_2_digit_match_rate = analyzer.calculate_match_rate_at_n(2)
+    actual_2_digit_match_rate = analyzer.calculate_match_rate(
+        col1="sic_ind_occ1", col2="chosen_sic_code", n=2
+    )
     print("actual_2_digit_match_rate", actual_2_digit_match_rate)
 
     assert actual_full_match_rate == expected_full_match_rate
