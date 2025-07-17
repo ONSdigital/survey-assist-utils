@@ -48,12 +48,15 @@ def resolve_jwt_secret_path(jwt_secret_env: str) -> Optional[str]:
         # Try to parse the secret content as JSON
         secret_content = json.loads(jwt_secret_env)
         # Write to temp file
-        temp = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json")
-        json.dump(secret_content, temp)
-        temp.close()
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".json"
+        ) as temp:
+            json.dump(secret_content, temp)
         return temp.name
-    except json.JSONDecodeError:
-        raise ValueError("JWT_SECRET must be a valid file path or JSON string.")
+    except json.JSONDecodeError as err:
+        raise ValueError(
+            "JWT_SECRET must be a valid file path or JSON string."
+        ) from err
 
 
 def generate_jwt(

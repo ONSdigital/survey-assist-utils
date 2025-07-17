@@ -39,6 +39,7 @@ pytest = "^8.3.5"
 ipykernel = "^6.29.5"
 pre-commit = "^4.2.0"
 types-toml = "^0.10.8.20240310"
+jupytext = "^1.17.1"
 
 [tool.isort]
 profile = "black"

@@ -37,10 +37,33 @@ def _get_cloud_logging():
 
 
 class EnhancedJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
+    """Custom JSON encoder that serialises additional Python objects.
+
+    This encoder extends the standard library's JSONEncoder to handle objects
+    such as datetime, ensuring they are serialised in a format suitable for JSON output.
+
+    Attributes:
+        None
+
+    Methods:
+        default(obj): Returns a serialisable version of the object for JSON encoding.
+    """
+
+    def default(self, o: object) -> object:
+        """Return a serialisable version of the object for JSON encoding.
+
+        Args:
+            o (object): The object to serialise.
+
+        Returns:
+            o: A serialisable representation of the object.
+
+        Raises:
+            TypeError: If the object cannot be serialised.
+        """
+        if isinstance(o, datetime):
+            return o.isoformat()
+        return super().default(o)
 
 
 class SurveyAssistLogger:
