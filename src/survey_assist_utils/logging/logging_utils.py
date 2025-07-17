@@ -167,7 +167,11 @@ class SurveyAssistLogger:
 
         try:
             # If JSON_DEBUG is set, pretty print the context
-            return json.dumps(context, cls=EnhancedJSONEncoder, indent=2 if os.getenv("JSON_DEBUG") else None)
+            return json.dumps(
+                context,
+                cls=EnhancedJSONEncoder,
+                indent=2 if os.getenv("JSON_DEBUG") else None,
+            )
         except TypeError as e:
             context["serialization_error"] = str(e)
             return json.dumps(context)
