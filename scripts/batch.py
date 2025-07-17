@@ -63,7 +63,8 @@ from survey_assist_utils.api_token.jwt_utils import (
 from survey_assist_utils.cloud_store.gcs_utils import download_from_gcs, upload_to_gcs
 
 WAIT_TIMER = 0.5  # seconds to wait between requests to avoid rate limiting
-UPLOAD_ROWS = 5 # upload every 5 rows
+UPLOAD_ROWS = 5  # upload every 5 rows
+
 
 # Load the config:
 def load_config(config_path):
@@ -96,7 +97,9 @@ def process_row(row, secret_code, app_config):
     Returns:
     dict: The response JSON with additional information.
     """
-    base_url = os.getenv("API_GATEWAY", "http://127.0.0.1:5000") + "/survey-assist/classify"
+    base_url = (
+        os.getenv("API_GATEWAY", "http://127.0.0.1:5000") + "/survey-assist/classify"
+    )
     unique_id = row[app_config["column_names"]["payload_unique_id"]]
     job_title = row[app_config["column_names"]["payload_job_title"]]
     job_description = row[app_config["column_names"]["payload_job_description"]]
@@ -183,9 +186,7 @@ def process_test_set(
         output_filepath = output_filepath.rstrip("/")  # Remove trailing slash
         output_filepath += "/analysis_outputs/"
         output_filepath += time.strftime("%Y%m%d_%H%M%S") + "_output.json"
-        logging.info(
-            "Output will be uploaded to GCS bucket: %s", output_filepath
-        )
+        logging.info("Output will be uploaded to GCS bucket: %s", output_filepath)
     else:
         local_output_path = output_filepath
 
@@ -204,13 +205,15 @@ def process_test_set(
                     "Uploading intermediate results to GCS bucket: %s, i: %s tot:%s",
                     output_filepath,
                     i,
-                    total_rows
+                    total_rows,
                 )
 
                 upload_to_gcs(local_output_path, output_filepath)
 
             percent_complete = round(((i + 1) / total_rows) * 100, 2)
-            logging.info("Processed row %d of %d (%.2f%%)", i + 1, total_rows, percent_complete)
+            logging.info(
+                "Processed row %d of %d (%.2f%%)", i + 1, total_rows, percent_complete
+            )
             time.sleep(WAIT_TIMER)  # Wait between requests to avoid rate limiting
 
         # Remove the last comma and close the array

@@ -28,5 +28,6 @@ def download_from_gcs(gcs_uri, local_path):
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(blob_path)
     blob.download_to_filename(local_path)
-    logging.info("Downloaded GCS file gs://%s/%s to %s", bucket_name, blob_path, local_path)
-
+    logging.info(
+        "Downloaded GCS file gs://%s/%s to %s", bucket_name, blob_path, local_path
+    )
