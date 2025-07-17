@@ -186,7 +186,9 @@ def process_test_set(
         output_filepath = output_filepath.rstrip("/")  # Remove trailing slash
         output_filepath += "/analysis_outputs/"
         output_filepath += time.strftime("%Y%m%d_%H%M%S") + "_output.json"
-        logging.info("Output will be uploaded to GCS bucket: %s", output_filepath)
+        logging.info(
+            "Output will be uploaded to GCS bucket: %s", output_filepath
+        )
     else:
         local_output_path = output_filepath
 
@@ -205,15 +207,13 @@ def process_test_set(
                     "Uploading intermediate results to GCS bucket: %s, i: %s tot:%s",
                     output_filepath,
                     i,
-                    total_rows,
+                    total_rows
                 )
 
                 upload_to_gcs(local_output_path, output_filepath)
 
             percent_complete = round(((i + 1) / total_rows) * 100, 2)
-            logging.info(
-                "Processed row %d of %d (%.2f%%)", i + 1, total_rows, percent_complete
-            )
+            logging.info("Processed row %d of %d (%.2f%%)", i + 1, total_rows, percent_complete)
             time.sleep(WAIT_TIMER)  # Wait between requests to avoid rate limiting
 
         # Remove the last comma and close the array
