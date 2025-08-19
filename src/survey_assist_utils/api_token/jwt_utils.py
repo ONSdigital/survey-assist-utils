@@ -20,8 +20,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from google.auth import jwt as google_jwt
-from google.auth.crypt import RSASigner
+from google.auth import default
+from google.cloud import iam_credentials_v1
 
 TOKEN_EXPIRY: int = 3600  # 1 hour
 REFRESH_THRESHOLD: int = 300  # 5 minutes
@@ -60,41 +60,44 @@ def resolve_jwt_secret_path(jwt_secret_env: str) -> Optional[str]:
 
 
 def generate_jwt(
-    sa_keyfile: str,
-    sa_email: str = "account@project.iam.gserviceaccount.com",
-    audience: str = "service-name",
+    sa_email: str,
+    audience: str,
     expiry_length: int = 3600,
+    extra_claims: dict[str, Any] | None = None,
 ) -> str:
-    """Generates a JSON Web Token (JWT) for authentication using a Google service account.
-
-    Args:
-        sa_keyfile (str): The file path to the service account key file (JSON format).
-        sa_email (str, optional): The email address of the service account.
-                                  Defaults to "account@project.iam.gserviceaccount.com".
-        audience (str, optional): The intended audience for the token, typically the service name.
-                                  Defaults to "service-name".
-        expiry_length (int, optional): The token's expiration time in seconds.
-                                       Defaults to 3600 (1 hour).
+    """Mint a service-account–signed JWT using ADC + IAMCredentials.signJwt,
+    matching API Gateway config where:
+      - x-google-issuer == sa_email
+      - x-google-jwks_uri points to SA public keys
+      - x-google-audiences == audience.
 
     Returns:
-        str: The generated JWT as a string.
+        The signed JWT string.
     """
-    now: int = int(time.time())
-
+    now = int(time.time())
     payload: dict[str, Any] = {
         "iat": now,
         "exp": now + expiry_length,
         "iss": sa_email,
-        "aud": audience,
         "sub": sa_email,
+        "aud": audience,
+        # Optional and often handy for downstream authz:
         "email": sa_email,
     }
+    if extra_claims:
+        payload.update(extra_claims)
 
-    signer = RSASigner.from_service_account_file(sa_keyfile)
-    jwt: bytes = google_jwt.encode(signer, payload)
+    # Get Application Default Credentials to call IAM Credentials API
+    adc, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
 
-    # The actual token is between b'my_jwt_token' so strip the b' and '
-    return jwt.decode("utf-8")
+    # Use the official client to call signJwt
+    client = iam_credentials_v1.IAMCredentialsClient(credentials=adc)
+    name = f"projects/-/serviceAccounts/{sa_email}"
+
+    resp = client.sign_jwt(
+        request={"name": name, "payload": json.dumps(payload, separators=(",", ":"))}
+    )
+    return resp.signed_jwt
 
 
 def check_and_refresh_token(
@@ -124,10 +127,9 @@ def check_and_refresh_token(
         # If no token exists, create one
         token_start_time = int(current_utc_time().timestamp())
         current_token = generate_jwt(
-            jwt_secret_path,
-            audience=api_gateway,
             sa_email=sa_email,
-            expiry_length=TOKEN_EXPIRY,
+            audience=api_gateway,
+            expiry_length=TOKEN_EXPIRY
         )
 
     elapsed_time = (
@@ -140,12 +142,13 @@ def check_and_refresh_token(
         # Refresh the token
         print("Refreshing JWT token...")
         token_start_time = int(current_utc_time().timestamp())
+
         current_token = generate_jwt(
-            jwt_secret_path,
-            audience=api_gateway,
             sa_email=sa_email,
-            expiry_length=TOKEN_EXPIRY,
+            audience=api_gateway,
+            expiry_length=TOKEN_EXPIRY
         )
+
         print(f"JWT Token ends with {current_token[-5:]} created at {token_start_time}")
 
     return token_start_time, current_token
