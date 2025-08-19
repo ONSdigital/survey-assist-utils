@@ -27,6 +27,7 @@ fsspec = "^2025.3.2"
 gcsfs = "^2025.3.2"
 langchain-google-vertexai = "0.0.1"
 langchain = "0.1.0"
+google-cloud-iam = "^2.19.1"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.6.7"
