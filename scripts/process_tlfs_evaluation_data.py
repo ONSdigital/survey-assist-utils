@@ -126,7 +126,6 @@ def process_row(row, token_information, app_config):
     ) = check_and_refresh_token(
         token_information["token_start_time"],
         token_information["current_token"],
-        token_information["jwt_secret_path"],
         token_information["api_gateway"],
         token_information["sa_email"],
     )
@@ -312,7 +311,6 @@ if __name__ == "__main__":
     ) = check_and_refresh_token(
         token_information_init["token_start_time"],
         token_information_init["current_token"],
-        token_information_init["jwt_secret_path"],
         token_information_init["api_gateway"],
         token_information_init["sa_email"],
     )

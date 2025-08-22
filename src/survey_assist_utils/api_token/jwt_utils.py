@@ -65,14 +65,28 @@ def generate_jwt(
     expiry_length: int = 3600,
     extra_claims: dict[str, Any] | None = None,
 ) -> str:
-    """Mint a service-account–signed JWT using ADC + IAMCredentials.signJwt,
-    matching API Gateway config where:
-      - x-google-issuer == sa_email
-      - x-google-jwks_uri points to SA public keys
-      - x-google-audiences == audience.
+    """Mint a service account signed JWT using ADC and IAMCredentials.signJwt.
+
+    This function creates a JWT signed by a Google service account, matching API Gateway
+    configuration where:
+        - x-google-issuer equals sa_email
+        - x-google-jwks_uri points to the service account public keys
+        - x-google-audiences equals audience
+
+    Args:
+        sa_email (str): The service account email address to use as the issuer and subject.
+        audience (str): The intended audience for the JWT (e.g., API Gateway URL).
+        expiry_length (int, optional): The token expiry time in seconds. Defaults to 3600.
+        extra_claims (dict[str, Any] | None, optional): Additional claims to include in
+        the JWT payload.
 
     Returns:
-        The signed JWT string.
+        str: The signed JWT string.
+
+    Raises:
+        google.auth.exceptions.DefaultCredentialsError: If ADC credentials cannot be found.
+        google.api_core.exceptions.GoogleAPIError: If the IAMCredentials API call fails.
+
     """
     now = int(time.time())
     payload: dict[str, Any] = {
@@ -81,7 +95,6 @@ def generate_jwt(
         "iss": sa_email,
         "sub": sa_email,
         "aud": audience,
-        # Optional and often handy for downstream authz:
         "email": sa_email,
     }
     if extra_claims:
@@ -103,7 +116,6 @@ def generate_jwt(
 def check_and_refresh_token(
     token_start_time: int,
     current_token: str,
-    jwt_secret_path: str,
     api_gateway: str,
     sa_email: str,
 ) -> tuple[int, str]:
@@ -115,7 +127,6 @@ def check_and_refresh_token(
     Args:
         token_start_time (int): The UTC timestamp when the current token was created.
         current_token (str): The current JWT token.
-        jwt_secret_path (str): The file path to the JWT secret used for token generation.
         api_gateway (str): The intended audience for the JWT token (e.g., API gateway URL).
         sa_email (str): The service account email used for token generation.
 
@@ -127,9 +138,7 @@ def check_and_refresh_token(
         # If no token exists, create one
         token_start_time = int(current_utc_time().timestamp())
         current_token = generate_jwt(
-            sa_email=sa_email,
-            audience=api_gateway,
-            expiry_length=TOKEN_EXPIRY
+            sa_email=sa_email, audience=api_gateway, expiry_length=TOKEN_EXPIRY
         )
 
     elapsed_time = (
@@ -144,9 +153,7 @@ def check_and_refresh_token(
         token_start_time = int(current_utc_time().timestamp())
 
         current_token = generate_jwt(
-            sa_email=sa_email,
-            audience=api_gateway,
-            expiry_length=TOKEN_EXPIRY
+            sa_email=sa_email, audience=api_gateway, expiry_length=TOKEN_EXPIRY
         )
 
         print(f"JWT Token ends with {current_token[-5:]} created at {token_start_time}")
@@ -166,11 +173,9 @@ def generate_api_token():
     """
     api_gateway = os.getenv("API_GATEWAY")
     sa_email = os.getenv("SA_EMAIL")
-    jwt_secret_path = os.getenv("JWT_SECRET")
 
     # Generate JWT (lasts 1 hour - rotate before expiry)
     jwt_token = generate_jwt(
-        jwt_secret_path,
         audience=api_gateway,
         sa_email=sa_email,
         expiry_length=TOKEN_EXPIRY,

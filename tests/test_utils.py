@@ -1,21 +1,22 @@
 """Test module for utility functions."""
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
+from pytest import MonkeyPatch
 
+import survey_assist_utils.api_token.jwt_utils as tokens
 from survey_assist_utils import get_logger
-from survey_assist_utils.api_token.jwt_utils import (
-    REFRESH_THRESHOLD,
-    TOKEN_EXPIRY,
-    check_and_refresh_token,
-    current_utc_time,
-    generate_api_token,
-    generate_jwt,
-)
+from survey_assist_utils.api_token.jwt_utils import current_utc_time
 
 logger = get_logger(__name__)
+
+# pylint: disable=too-few-public-methods, import-outside-toplevel, unused-argument
 
 
 @pytest.mark.utils
@@ -35,147 +36,232 @@ def test_current_utc_time():
     assert abs((now - result).total_seconds()) < 1  # Allow a small time difference
 
 
-@patch("survey_assist_utils.api_token.jwt_utils.RSASigner.from_service_account_file")
-@patch("survey_assist_utils.api_token.jwt_utils.google_jwt.encode")
 @pytest.mark.utils
-def test_generate_jwt(mock_encode, mock_rsa_signer):
-    """Test the generate_jwt function with mocked dependencies."""
-    # Mock inputs
-    sa_keyfile = "/path/to/mock/keyfile.json"
-    sa_email = "mock-account@project.iam.gserviceaccount.com"
-    audience = "mock-service-name"
-    expiry_length = 3600
+def test_generate_jwt_success(mock_gcp_adc_and_iam, reset_iam_spy) -> None:
+    """Ensure a signed JWT is returned and IAM `sign_jwt` is called with correct payload.
 
-    # Mock RSASigner and encode behavior
-    mock_signer_instance = MagicMock()
-    mock_rsa_signer.return_value = mock_signer_instance
-    mock_encode.return_value = b"mock_jwt_token"
+    Verifies:
+      * The function returns the fake signed JWT.
+      * The request payload contains the expected standard claims.
+      * The IAM client is initialised with the ADC credentials.
+    """
+    # Arrange
+    mock_gcp_adc_and_iam("ey.ok.jwt")  # set fake token
+    sa_email = "svc-abc@project.iam.gserviceaccount.com"
+    audience = "https://apigw-id.a.run.app"
 
-    # Call the function
-    jwt_token = generate_jwt(
-        sa_keyfile=sa_keyfile,
-        sa_email=sa_email,
-        audience=audience,
-        expiry_length=expiry_length,
+    # Act
+    signed = tokens.generate_jwt(
+        sa_email=sa_email, audience=audience, expiry_length=3600
     )
 
-    # Assertions
-    assert jwt_token == "mock_jwt_token"  # noqa: S105
-    mock_rsa_signer.assert_called_once_with(sa_keyfile)
-    mock_encode.assert_called_once()
-    payload = mock_encode.call_args[0][1]  # Extract the payload from the call arguments
+    # Assert
+    assert signed == "ey.ok.jwt"
+
+    # Introspect IAM spy
+    from tests.conftest import _IamClientSpy as Spy  # type: ignore
+
+    assert Spy.last_instance is not None
+    req = Spy.last_instance.last_request
+    assert req is not None
+    assert req["name"] == f"projects/-/serviceAccounts/{sa_email}"
+
+    payload = json.loads(req["payload"])
     assert payload["iss"] == sa_email
-    assert payload["aud"] == audience
     assert payload["sub"] == sa_email
-    assert "iat" in payload
-    assert "exp" in payload
+    assert payload["aud"] == audience
+    assert payload["email"] == sa_email
+    assert isinstance(payload["iat"], int)
+    assert isinstance(payload["exp"], int)
+    assert payload["exp"] > payload["iat"]
 
 
-@patch("survey_assist_utils.api_token.jwt_utils.current_utc_time")
-@patch("survey_assist_utils.api_token.jwt_utils.generate_jwt")
 @pytest.mark.utils
-def test_check_and_refresh_token(mock_generate_jwt, mock_current_utc_time):
-    """Test the check_and_refresh_token function."""
-    # Mock current time
-    mock_time = datetime(2023, 1, 1, 12, 0, 0)
-    mock_current_utc_time.return_value = mock_time
+def test_generate_jwt_includes_extra_claims(
+    mock_gcp_adc_and_iam, reset_iam_spy
+) -> None:
+    """Validate that extra claims are merged into the JWT payload.
 
-    # Mock JWT generation
-    mock_generate_jwt.return_value = "mock_jwt_token"
+    Asserts:
+        The `sign_jwt` payload includes the provided custom claims.
+    """
+    # Arrange
+    mock_gcp_adc_and_iam("ey.extra.jwt")
+    extra = {"role": "system", "scope": ["read", "write"]}
 
-    # Test case 1: No token exists (token_start_time is None)
-    token_start_time = None
-    current_token = None
-    jwt_secret_path = "/path/to/mock/keyfile.json"  # noqa: S105
-    api_gateway = "mock-service-name"
-    sa_email = "mock-account@project.iam.gserviceaccount.com"
-
-    token_start_time, current_token = check_and_refresh_token(
-        token_start_time, current_token, jwt_secret_path, api_gateway, sa_email
+    # Act
+    _ = tokens.generate_jwt(
+        sa_email="svc@x.iam.gserviceaccount.com",
+        audience="https://gw",
+        expiry_length=120,
+        extra_claims=extra,
     )
 
-    assert token_start_time == int(mock_time.timestamp())
-    assert current_token == "mock_jwt_token"  # noqa: S105
-    mock_generate_jwt.assert_called_once_with(
-        jwt_secret_path,
-        audience=api_gateway,
-        sa_email=sa_email,
-        expiry_length=TOKEN_EXPIRY,
-    )
+    # Assert
+    from tests.conftest import _IamClientSpy as Spy  # type: ignore
 
-    # Test case 2: Token exists but needs refreshing
-    mock_generate_jwt.reset_mock()
-    token_start_time = int(
-        (
-            mock_time - timedelta(seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD + 1)
-        ).timestamp()
-    )
-    current_token = "old_jwt_token"  # noqa: S105
+    # Narrow optional types for mypy (and fail fast if the spy wasn't exercised)
+    assert Spy.last_instance is not None, "IAM client was not initialised"
+    req = Spy.last_instance.last_request
+    assert req is not None, "sign_jwt was not called"
 
-    token_start_time, current_token = check_and_refresh_token(
-        token_start_time, current_token, jwt_secret_path, api_gateway, sa_email
-    )
-
-    assert token_start_time == int(mock_time.timestamp())
-    assert current_token == "mock_jwt_token"  # noqa: S105
-    mock_generate_jwt.assert_called_once_with(
-        jwt_secret_path,
-        audience=api_gateway,
-        sa_email=sa_email,
-        expiry_length=TOKEN_EXPIRY,
-    )
-
-    # Test case 3: Token exists and does not need refreshing
-    mock_generate_jwt.reset_mock()
-    token_start_time = int(
-        (
-            mock_time - timedelta(seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD - 1)
-        ).timestamp()
-    )
-    current_token = "valid_jwt_token"  # noqa: S105
-
-    token_start_time, current_token = check_and_refresh_token(
-        token_start_time, current_token, jwt_secret_path, api_gateway, sa_email
-    )
-
-    assert token_start_time == int(
-        (
-            mock_time - timedelta(seconds=TOKEN_EXPIRY - REFRESH_THRESHOLD - 1)
-        ).timestamp()
-    )
-    assert current_token == "valid_jwt_token"  # noqa: S105
-    mock_generate_jwt.assert_not_called()
+    payload = json.loads(req["payload"])
+    assert payload["role"] == "system"
+    assert payload["scope"] == ["read", "write"]
 
 
-@patch("survey_assist_utils.api_token.jwt_utils.generate_jwt")
-@patch("survey_assist_utils.api_token.jwt_utils.os.getenv")
 @pytest.mark.utils
-def test_generate_api_token(mock_getenv, mock_generate_jwt, capsys):
-    """Test the generate_api_token function."""
-    # Mock environment variables
-    mock_getenv.side_effect = {
-        "API_GATEWAY": "mock-api-gateway",
-        "SA_EMAIL": "mock-account@project.iam.gserviceaccount.com",
-        "JWT_SECRET": "/path/to/mock/keyfile.json",
-    }.get
+def test_generate_jwt_adc_failure(monkeypatch: MonkeyPatch) -> None:
+    """Bubble up ADC errors as DefaultCredentialsError."""
 
-    # Mock JWT generation
-    mock_generate_jwt.return_value = "mock_jwt_token"
+    class _ADCError(Exception):
+        pass
 
-    # Call the function
-    generate_api_token()
+    def _fail_default(*_: Any, **__: Any) -> tuple[None, None]:
+        raise _ADCError("no ADC")
 
-    # Capture printed output
-    captured = capsys.readouterr()
+    # Patch at the import location used by the function
+    monkeypatch.setattr(tokens, "default", _fail_default, raising=False)
 
-    # Assertions
-    assert "mock_jwt_token" in captured.out
-    mock_getenv.assert_any_call("API_GATEWAY")
-    mock_getenv.assert_any_call("SA_EMAIL")
-    mock_getenv.assert_any_call("JWT_SECRET")
-    mock_generate_jwt.assert_called_once_with(
-        "/path/to/mock/keyfile.json",
-        audience="mock-api-gateway",
-        sa_email="mock-account@project.iam.gserviceaccount.com",
-        expiry_length=3600,
+    with pytest.raises(Exception) as exc:
+        tokens.generate_jwt("svc@x", "aud")
+    assert "no ADC" in str(exc.value)
+
+
+@pytest.mark.utils
+def test_generate_jwt_iam_api_error(monkeypatch: MonkeyPatch) -> None:
+    """Bubble up underlying IAMCredentials API errors."""
+
+    class _Client:
+        def __init__(self, *, credentials: Any) -> None:
+            self.credentials = credentials
+
+        def sign_jwt(self, *, request: dict[str, Any]) -> Any:
+            """Simulate sign_jwt error."""
+            raise RuntimeError("iam failure")
+
+    class _DummyCreds:
+        pass
+
+    monkeypatch.setattr(
+        "google.auth.default", lambda *a, **k: (_DummyCreds(), None), raising=False
     )
+    monkeypatch.setattr(
+        "google.cloud.iam_credentials_v1.IAMCredentialsClient", _Client, raising=False
+    )
+
+    with pytest.raises(RuntimeError, match="iam failure"):
+        tokens.generate_jwt("svc@x", "aud")
+
+
+@pytest.mark.utils
+def test_check_and_refresh_token_creates_when_missing(
+    monkeypatch: MonkeyPatch, freeze_time
+) -> None:
+    """Create a token when none exists and set start time to current UTC timestamp."""
+    # Fix time to a known instant
+    freeze_time("survey_assist_utils.api_token.jwt_utils", 1_700_000_000.0)
+
+    # Make expiry/threshold deterministic
+    monkeypatch.setattr(tokens, "TOKEN_EXPIRY", 3600, raising=True)
+    monkeypatch.setattr(tokens, "REFRESH_THRESHOLD", 300, raising=True)
+
+    # Stub generate_jwt to track calls and return a predictable token
+    gen_mock = MagicMock(return_value="ey.new.jwt")
+    monkeypatch.setattr(tokens, "generate_jwt", gen_mock, raising=True)
+
+    start, tok = tokens.check_and_refresh_token(
+        token_start_time=0,
+        current_token="",
+        api_gateway="https://gw",
+        sa_email="svc@x",
+    )
+
+    assert start == 1_700_000_000  # noqa: PLR2004
+    assert tok == "ey.new.jwt"
+    gen_mock.assert_called_once_with(
+        sa_email="svc@x", audience="https://gw", expiry_length=3600
+    )
+
+
+@pytest.mark.utils
+def test_check_and_refresh_token_no_refresh_needed(
+    monkeypatch: MonkeyPatch, freeze_time
+) -> None:
+    """Do not refresh if remaining lifetime is above the refresh threshold."""
+    # Now = t0 + 100 seconds -> plenty of time remaining
+    t0 = 1_700_000_000
+    freeze_time("survey_assist_utils.api_token.jwt_utils", t0 + 100.0)
+
+    monkeypatch.setattr(tokens, "TOKEN_EXPIRY", 3600, raising=True)
+    monkeypatch.setattr(tokens, "REFRESH_THRESHOLD", 300, raising=True)
+
+    gen_mock = MagicMock(return_value="should-not-be-used")
+    monkeypatch.setattr(tokens, "generate_jwt", gen_mock, raising=True)
+
+    start, tok = tokens.check_and_refresh_token(
+        token_start_time=t0,
+        current_token="ey.current",  # noqa: S106
+        api_gateway="https://gw",
+        sa_email="svc@x",
+    )
+
+    assert start == t0
+    assert tok == "ey.current"
+    gen_mock.assert_not_called()
+
+
+@pytest.mark.utils
+def test_check_and_refresh_token_refreshes_when_threshold_reached(
+    monkeypatch: MonkeyPatch, freeze_time
+) -> None:
+    """Refresh when remaining lifetime is at or below the configured threshold."""
+    # TOKEN_EXPIRY = 3600, REFRESH_THRESHOLD = 300
+    # If elapsed >= 3300, we must refresh.
+    t0 = 1_700_000_000
+    freeze_time("survey_assist_utils.api_token.jwt_utils", t0 + 3300.0)
+
+    monkeypatch.setattr(tokens, "TOKEN_EXPIRY", 3600, raising=True)
+    monkeypatch.setattr(tokens, "REFRESH_THRESHOLD", 300, raising=True)
+
+    gen_mock = MagicMock(return_value="ey.refreshed")
+    monkeypatch.setattr(tokens, "generate_jwt", gen_mock, raising=True)
+
+    start, tok = tokens.check_and_refresh_token(
+        token_start_time=t0,
+        current_token="ey.stale",  # noqa: S106
+        api_gateway="https://gw",
+        sa_email="svc@x",
+    )
+
+    # Start time should have been updated to "now"
+    assert start == t0 + 3300
+    assert tok == "ey.refreshed"
+    gen_mock.assert_called_once()
+
+
+@pytest.mark.utils
+def test_generate_api_token_reads_env_and_prints(
+    monkeypatch: MonkeyPatch, env: dict[str, str]
+) -> None:
+    """Ensure `generate_api_token` reads environment, calls `generate_jwt`, and prints token.
+
+    This is a CLI function, so stdout is validated as the user visible side effect.
+    """
+    env["API_GATEWAY"] = "https://gw"
+    env["SA_EMAIL"] = "svc@x"
+
+    monkeypatch.setattr(tokens, "TOKEN_EXPIRY", 3600, raising=True)
+    monkeypatch.setattr(tokens, "generate_jwt", lambda **_: "ey.cli.jwt", raising=True)
+
+    # Capture stdout
+    import io
+    import sys
+
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", buf, raising=False)
+
+    tokens.generate_api_token()
+
+    out = buf.getvalue().strip()
+    assert out == "ey.cli.jwt"
