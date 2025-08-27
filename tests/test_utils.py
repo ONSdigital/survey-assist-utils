@@ -263,5 +263,7 @@ def test_generate_api_token_reads_env_and_prints(
 
     tokens.generate_api_token()
 
-    out = buf.getvalue().strip()
+    # The first line is token expiry, second is actual token
+    # just compare the last line.
+    out = buf.getvalue().strip().splitlines()[-1]
     assert out == "ey.cli.jwt"

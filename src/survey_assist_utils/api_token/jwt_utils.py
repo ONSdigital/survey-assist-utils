@@ -13,11 +13,13 @@ Functions:
         Generate an API token using a JWT at the CLI.
 
 """
+import argparse
 import json
 import os
+import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from google.auth import default
@@ -161,24 +163,92 @@ def check_and_refresh_token(
     return token_start_time, current_token
 
 
-def generate_api_token():
-    """Generates an API token using a JWT at the CLI.
+def generate_api_token(
+    audience: Optional[str] = None,
+    expiry_length: Optional[int] = None,
+) -> str:
+    """Generates an API token using a JWT.
 
-    This function retrieves necessary environment variables, such as the API gateway URL,
-    service account email, and the path to the JWT secret file. It then generates a JWT
-    token with a default expiry of 1 hour.
+    Args:
+        audience (str, optional): The audience (API Gateway URL). If not provided,
+            falls back to the API_GATEWAY environment variable.
+        expiry_length (int, optional): Token expiry in seconds. If not provided,
+            falls back to TOKEN_EXPIRY constant.
+
+    Returns:
+        str: The generated JWT token.
+
+    Raises:
+        ValueError: If required values (audience or service account email) are missing.
+    """
+    api_gateway = audience or os.getenv("API_GATEWAY")
+    sa_email = os.getenv("SA_EMAIL")
+    expiry = expiry_length or TOKEN_EXPIRY
+
+    if not api_gateway:
+        raise ValueError("API Gateway not provided and API_GATEWAY env var not set.")
+    if not sa_email:
+        raise ValueError("API access service account email, SA_EMAIL env var not set.")
+
+    # Calculate expiry time (UTC for consistency)
+    expiry_time = datetime.now(timezone.utc) + timedelta(seconds=expiry)
+    human_readable = expiry_time.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+    print(f"Token expiry set as {human_readable} (in {expiry // 60} minutes).")
+
+    jwt_token = generate_jwt(
+        audience=api_gateway,
+        sa_email=sa_email,
+        expiry_length=expiry,
+    )
+
+    print(jwt_token)
+    return jwt_token
+
+
+def main() -> int:
+    """generate-api-token CLI entrypoint.
+
+    Args:
+        audience (str, optional): The audience (API Gateway URL). If not provided,
+            falls back to the API_GATEWAY environment variable.
+        expiry_length (int, optional): Token expiry in seconds. If not provided,
+            falls back to TOKEN_EXPIRY constant.
 
     Returns:
         str: The generated JWT token.
     """
-    api_gateway = os.getenv("API_GATEWAY")
-    sa_email = os.getenv("SA_EMAIL")
-
-    # Generate JWT (lasts 1 hour - rotate before expiry)
-    jwt_token = generate_jwt(
-        audience=api_gateway,
-        sa_email=sa_email,
-        expiry_length=TOKEN_EXPIRY,
+    parser = argparse.ArgumentParser(
+        prog="generate-api-token",
+        description="Generate a short-lived JWT for the Survey Assist API.",
     )
 
-    print(jwt_token)
+    parser.add_argument(
+        "-a",
+        "--api-gateway",
+        dest="audience",
+        type=str,
+        help="""Audience / API Gateway URL (overrides API_GATEWAY env var).
+        E.g: example-api-gw.url.aws.dev (Do NOT include https://)""",
+    )
+
+    # Optional flags to allow API GATEWAY and token expiry setting from cli
+    parser.add_argument(
+        "-e",
+        "--expiry",
+        dest="expiry_length",
+        type=int,
+        help="Token expiry in seconds (default 3600s / 1h)",
+    )
+    args = parser.parse_args()
+
+    try:
+        generate_api_token(audience=args.audience, expiry_length=args.expiry_length)
+        return 0
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

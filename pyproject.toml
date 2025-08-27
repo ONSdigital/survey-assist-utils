@@ -9,7 +9,7 @@ readme = "README.md"
 packages = [{ include = "survey_assist_utils", from = "src" }]
 
 [tool.poetry.scripts]
-generate-api-token = "survey_assist_utils.api_token.jwt_utils:generate_api_token"
+generate-api-token = "survey_assist_utils.api_token.jwt_utils:main"
 
 [tool.poetry.dependencies]
 python = "^3.12"

@@ -49,9 +49,9 @@ install: ## Install the dependencies
 install-dev: ## Install the dev dependencies
 	poetry install --no-root
 
-# Note: You need API_GATEWAY, SA_EMAIL and JWT_SECRET environment variables set appropriately
+# Note: You need API_GATEWAY and SA_EMAIL
 generate-api-token:
-	generate-api-token
+	poetry run generate-api-token
 
 .PHONY: colima-start
 colima-start: ## Start Colima
