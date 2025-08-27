@@ -17,7 +17,7 @@ Fixtures:
                          object for use across multiple test suites.
 """
 
-# pylint: disable=missing-function-docstring, redefined-outer-name, line-too-long
+# pylint: disable=missing-function-docstring, redefined-outer-name, line-too-long, unused-argument
 from __future__ import annotations
 
 import datetime as dt
@@ -239,3 +239,30 @@ def freeze_time(monkeypatch: MonkeyPatch) -> Callable[[str, float], None]:
         monkeypatch.setattr(f"{module_path}.current_utc_time", _fixed_now, raising=True)
 
     return _setter
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Skip credentialled ADC tests when running in CI.
+
+    This hook inspects the environment for the ``CI`` variable that GitHub Actions
+    sets to ``"true"``. When present, it marks any test carrying the ``adc`` marker
+    as skipped. Locally (where ``CI`` is typically unset), the tests run normally.
+
+    Args:
+        config: The pytest configuration object (unused, but required by the hook).
+        items: The collected test items.
+
+    Best practice:
+        • Avoid networked or credential-dependent tests in your default CI path.
+        • A marker is introduced for such tests so they can be run locally with:
+          ``poetry run pytest -m adc``.
+    """
+    if os.getenv("CI") == "true":
+        skip_adc = pytest.mark.skip(
+            reason="Skipped in CI: requires GCP ADC/real credentials."
+        )
+        for item in items:
+            if "adc" in item.keywords:
+                item.add_marker(skip_adc)

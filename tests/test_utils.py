@@ -37,6 +37,7 @@ def test_current_utc_time():
 
 
 @pytest.mark.utils
+@pytest.mark.adc
 def test_generate_jwt_success(mock_gcp_adc_and_iam, reset_iam_spy) -> None:
     """Ensure a signed JWT is returned and IAM `sign_jwt` is called with correct payload.
 
@@ -77,6 +78,7 @@ def test_generate_jwt_success(mock_gcp_adc_and_iam, reset_iam_spy) -> None:
 
 
 @pytest.mark.utils
+@pytest.mark.adc
 def test_generate_jwt_includes_extra_claims(
     mock_gcp_adc_and_iam, reset_iam_spy
 ) -> None:
@@ -129,6 +131,7 @@ def test_generate_jwt_adc_failure(monkeypatch: MonkeyPatch) -> None:
 
 
 @pytest.mark.utils
+@pytest.mark.adc
 def test_generate_jwt_iam_api_error(monkeypatch: MonkeyPatch) -> None:
     """Bubble up underlying IAMCredentials API errors."""
 
