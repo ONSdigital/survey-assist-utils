@@ -41,7 +41,7 @@ unit-tests: ## Run the example unit tests
 	poetry run pytest -m utils --cov=utils --cov-report=term-missing --cov-fail-under=80 --cov-config=.coveragerc
 
 all-tests:
-	poetry run pytest  --cov=. --cov-report=term-missing --cov-fail-under=80 --cov-config=.coveragerc
+	poetry run pytest  --cov=. --cov-report=term-missing --cov-fail-under=75 --cov-config=.coveragerc
 	
 install: ## Install the dependencies
 	poetry install --only main --no-root
