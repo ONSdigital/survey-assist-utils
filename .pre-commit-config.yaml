@@ -21,13 +21,11 @@ repos:
       - id: check-case-conflict # check for files that would conflict in case-insensitive file systems.
       - id: check-merge-conflict # check for files that contain merge conflict strings.
 
-
 # ----- Detect-secrets - Detects high entropy strings that are likely to be passwords.
 - repo: https://github.com/Yelp/detect-secrets
   rev: v1.5.0
   hooks:
     - id: detect-secrets
-
 
 # ---- Ruff ---- A *very* fast formatter and linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -38,4 +36,5 @@ repos:
     - id: ruff-check
       args: [ --fix ]
     # Run the formatter.
-    - id: ruff-format
+    # disabled for now as it fights with makefile checks
+    # - id: ruff-format

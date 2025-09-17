@@ -4,22 +4,21 @@ import re
 
 import pandas as pd
 
+INVALID_VALUES = (("-9", "", None, pd.NA, "NAN", "NaN", "nan"),)
+
 
 def parse_clerical_code(candidates_str: str):
     """Converts the clerical coder responses from a
     stringified list to a proper list of strings.
     """
-    if (
-        pd.isna(candidates_str)
-        or candidates_str == ""
-        or str(candidates_str).lower() == "nan"
-    ):
+    candidates_str = str(candidates_str).strip()
+    if candidates_str in INVALID_VALUES:
         return []
 
     try:
         # Extract all RagCandidate entries using regex
         pattern = r"([0-9]+x*X*)"
-        matches = re.findall(pattern, str(candidates_str))  # pylint: disable=W0621
+        matches = re.findall(pattern, candidates_str)
 
         return matches
     except Exception as e:

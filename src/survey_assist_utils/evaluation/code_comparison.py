@@ -1,6 +1,8 @@
 """Functions to compare clerical codes with model codes."""
 
-INVALID_VALUES = ("-9", "", None, "nan")
+from survey_assist_utils.data_cleaning.sic_codes import (
+    INVALID_VALUES,
+)
 
 
 def compare_codes(
@@ -54,10 +56,9 @@ def compare_oo(
             "For 'OO' method, both clerical_col and model_col must be strings."
         )
 
-    if clerical_col in INVALID_VALUES:
+    if (clerical_col in INVALID_VALUES) or (model_col in INVALID_VALUES):
         return False
-    if model_col in INVALID_VALUES:
-        return False
+
     return clerical_col == model_col
 
 
@@ -82,10 +83,6 @@ def compare_om(
             "must be a set or list."
         )
 
-    if clerical_col in INVALID_VALUES:
-        return False
-    if len(model_col) == 0:
-        return False
     return clerical_col in model_col
 
 
@@ -99,7 +96,7 @@ def compare_mo(
     If the model's top choice is empty string, returns False.
     """
     if isinstance(clerical_col, str):
-        clerical_col = [clerical_col]
+        clerical_col = set(clerical_col)
     if isinstance(model_col, (set, list)):
         if len(model_col) != 1:
             return False
@@ -110,10 +107,6 @@ def compare_mo(
             "must be a string."
         )
 
-    if model_col in INVALID_VALUES:
-        return False
-    if len(clerical_col) == 0:
-        return False
     return model_col in clerical_col
 
 
@@ -126,9 +119,9 @@ def compare_mm(
     If either list is empty, returns False.
     """
     if isinstance(clerical_col, str):
-        clerical_col = [clerical_col]
+        clerical_col = set(clerical_col)
     if isinstance(model_col, str):
-        model_col = [model_col]
+        model_col = set(model_col)
     if not isinstance(clerical_col, (set, list)) or not isinstance(
         model_col, (set, list)
     ):
@@ -136,8 +129,4 @@ def compare_mm(
             "For 'MM' method, both clerical_col and model_col must be sets or lists."
         )
 
-    if len(model_col) == 0:
-        return False
-    if len(clerical_col) == 0:
-        return False
-    return any(i in clerical_col for i in model_col)
+    return bool(set(clerical_col) & set(model_col))
