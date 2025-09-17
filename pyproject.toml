@@ -113,3 +113,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pylint.MASTER]
 disable = ["E0401"]
+
+[tool.pylint]
+ignore = [".venv"]
