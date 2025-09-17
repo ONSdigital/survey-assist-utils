@@ -78,7 +78,8 @@ def compare_om(
         model_col = [model_col]
     if not isinstance(clerical_col, str) or not isinstance(model_col, (set, list)):
         raise ValueError(
-            "For 'OM' method, both clerical_col must be a string and model_col must be a set or list."
+            "For 'OM' method, both clerical_col must be a string and model_col "
+            "must be a set or list."
         )
 
     if clerical_col in INVALID_VALUES:
@@ -105,7 +106,8 @@ def compare_mo(
         model_col = model_col.pop()
     if not isinstance(clerical_col, (set, list)) or not isinstance(model_col, str):
         raise ValueError(
-            "For 'MO' method, both clerical_col must be a set or list and model_col must be a string."
+            "For 'MO' method, both clerical_col must be a set or list and model_col "
+            "must be a string."
         )
 
     if model_col in INVALID_VALUES:
