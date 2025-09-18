@@ -4,7 +4,7 @@ import re
 
 import pandas as pd
 
-INVALID_VALUES = (("-9", "", None, pd.NA, "NAN", "NaN", "nan"),)
+INVALID_VALUES = (("-9", "4+", "", None, pd.NA, "NAN", "NaN", "nan"),)
 
 
 def parse_clerical_code(candidates_str: str):
@@ -16,6 +16,8 @@ def parse_clerical_code(candidates_str: str):
         return []
 
     try:
+        # remove -9 and 4+ from the string
+        candidates_str = candidates_str.replace("-9", "").replace("4+", "")
         # Extract all RagCandidate entries using regex
         pattern = r"([0-9]+x*X*)"
         matches = re.findall(pattern, candidates_str)
