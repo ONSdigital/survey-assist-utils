@@ -46,11 +46,11 @@ def compare_oo(
     if isinstance(clerical_col, (set, list)):
         if len(clerical_col) != 1:
             return False
-        clerical_col = clerical_col.pop()
+        clerical_col = next(iter(clerical_col))
     if isinstance(model_col, (set, list)):
         if len(model_col) != 1:
             return False
-        model_col = model_col.pop()
+        model_col = next(iter(model_col))
     if not isinstance(clerical_col, str) or not isinstance(model_col, str):
         raise ValueError(
             "For 'OO' method, both clerical_col and model_col must be strings."
@@ -74,7 +74,7 @@ def compare_om(
     if isinstance(clerical_col, (set, list)):
         if len(clerical_col) != 1:
             return False
-        clerical_col = clerical_col.pop()
+        clerical_col = next(iter(clerical_col))
     if isinstance(model_col, str):
         model_col = [model_col]
     if not isinstance(clerical_col, str) or not isinstance(model_col, (set, list)):
@@ -100,7 +100,7 @@ def compare_mo(
     if isinstance(model_col, (set, list)):
         if len(model_col) != 1:
             return False
-        model_col = model_col.pop()
+        model_col = next(iter(model_col))
     if not isinstance(clerical_col, (set, list)) or not isinstance(model_col, str):
         raise ValueError(
             "For 'MO' method, both clerical_col must be a set or list and model_col "

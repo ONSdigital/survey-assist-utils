@@ -161,8 +161,7 @@ def calc_accuracy_metrics(
         return compare_codes(row[truth_col], row[model_col], method=method)
 
     for method in ["OO", "MM"]:
-        df["match"] = df.apply(compare_row, method=method, axis=1)
-        matches[method] = df["match"].sum()
+        matches[method] = sum(df.apply(compare_row, method=method, axis=1))
 
     accuracy_oo = matches["OO"] / total
     accuracy_mm = matches["MM"] / total
@@ -226,8 +225,8 @@ def calc_simple_metrics(
 
     final_accuracy_metrics = calc_accuracy_metrics(
         df,
-        model_col="sa_final_codes",
-        truth_col="clerical_codes",
+        model_col=final_model_col,
+        truth_col=truth_col,
     )
 
     return SimpleMetrics(

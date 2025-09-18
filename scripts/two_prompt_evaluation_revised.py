@@ -134,7 +134,6 @@ parser.add_argument(
     default=False,
     help="add flag to only consider CC-reported NOT unambiguously codable responses",
 )
-# pylint: disable=R0801
 parser.add_argument(
     "--neglect_impossible",
     "-n",
@@ -142,7 +141,6 @@ parser.add_argument(
     default=False,
     help="ignore rows where no n-digit clerical code is available when calculating accuracy",
 )
-# pylint: enable=R0801
 args = parser.parse_args()
 
 assert args.test_type in [  # noqa: S101

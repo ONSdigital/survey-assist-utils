@@ -2,7 +2,7 @@
 
 Takes evaluation_data and test_type as positional arguments.
 
-Allows parsing --neglect_impossible as optional arguments.
+Allows parsing --neglect_four_plus as optional arguments.
 
 Use:
     -h, --help to show help message.
@@ -34,15 +34,17 @@ def prep_dataframe(input_df: pd.DataFrame, digits: int = 5) -> pd.DataFrame:
     Raises:
         ValueError: If required columns are missing in the input DataFrame.
     """
-    required_columns = {
-        "Unambiguous",
+    required_columns = [
+        "unique_id",
+        "Four_Or_More",
         "All_Clerical_codes",
         "initial_code",
         "alt_sic_candidates",
         "final_sic",
-    }
-    if miss := required_columns - set(input_df.columns):
+    ]
+    if miss := set(required_columns) - set(input_df.columns):
         raise ValueError(f"Input DataFrame is missing required columns: {miss}")
+    input_df = input_df[required_columns].copy()
 
     # Parse clerical coder column to actual list of strings
     input_df["clerical_codes"] = (
@@ -64,6 +66,9 @@ def prep_dataframe(input_df: pd.DataFrame, digits: int = 5) -> pd.DataFrame:
     )
 
     # Parse the final sic code from the model output
+    input_df.loc[~fill_alternatives, "final_sic"] = input_df.loc[
+        ~fill_alternatives, "initial_code"
+    ]
     input_df["sa_final_codes"] = (
         input_df["final_sic"]
         .apply(parse_clerical_code)
@@ -71,25 +76,6 @@ def prep_dataframe(input_df: pd.DataFrame, digits: int = 5) -> pd.DataFrame:
     )
 
     return input_df
-
-
-def remove_four_plus(df: pd.DataFrame) -> pd.DataFrame:
-    """Removes rows where clerical coder recorded '4+' or similar.
-
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-
-    Returns:
-        pd.DataFrame: Filtered DataFrame without '4+' clerical codes.
-    """
-    clerical_missing = df["clerical_codes"].apply(lambda x: len(x) == 0)
-
-    if clerical_missing.any():
-        print(
-            f"{clerical_missing.sum()} records had no usable clerically coded "
-            "answer (such as 4+), and are ignored in calculation"
-        )
-    return df[~clerical_missing].reset_index(drop=True)
 
 
 if __name__ == "__main__":
@@ -102,11 +88,11 @@ if __name__ == "__main__":
     parser.add_argument("match_type", type=str, help="match type: full / n-digit")
 
     parser.add_argument(
-        "--neglect_impossible",
+        "--neglect_four_plus",
         "-n",
         action="store_true",
         default=False,
-        help="ignore rows where no n-digit clerical code is available when calculating accuracy",
+        help="ignore rows where additional clerical codes are saved outside of the input DataFrame",
     )
 
     args = parser.parse_args()
@@ -129,8 +115,10 @@ if __name__ == "__main__":
     )
 
     # Remove rows with no usable clerical code (if specified)
-    if args.neglect_impossible:
-        my_dataframe = remove_four_plus(my_dataframe)
+    if args.neglect_four_plus:
+        my_dataframe = my_dataframe[~my_dataframe["Four_Or_More"]].reset_index(
+            drop=True
+        )
 
     evaluation_metrics = calc_simple_metrics(my_dataframe)
 
