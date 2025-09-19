@@ -23,13 +23,16 @@ class AmbiguityMetrics(BaseModel):
     FN: int
     TN: int
 
-    def print_metrics(self):
+    def report_metrics(self):
         """Pretty print the ambiguity detection metrics."""
-        print("\nAmbiguity decision statistics:")
-        print(f"Precision: {100 * self.precision:.2f}%")
-        print(f"Recall: {100 * self.recall:.2f}%")
-        print(f"F1-score: {100 * self.f1:.2f}%")
-        print(f"TP: {self.TP}, FP: {self.FP}, FN: {self.FN}, TN: {self.TN}")
+        lines = [
+            "\nAmbiguity decision statistics:",
+            f" F1-score: {100 * self.f1:.2f}%",
+            f" Precision: {100 * self.precision:.2f}%",
+            f" Recall: {100 * self.recall:.2f}%",
+            f" Confusion matrix counts: TP={self.TP}, FP={self.FP}, FN={self.FN}, TN={self.TN}",
+        ]
+        return "\n".join(lines)
 
 
 class AccuracyMetrics(BaseModel):
@@ -37,23 +40,32 @@ class AccuracyMetrics(BaseModel):
     matches (MM and OO), and accuracy (MM and OO).
     """
 
-    total_records: int
-    unambiguous_records: int
-    matches_mm: int
-    accuracy_mm_total: float
-    matches_oo: int
-    accuracy_oo_total: float
-    accuracy_oo_unambiguous: float
+    total_records: int = 0
+    unambiguous_records: int = 0
+    matches_oo: int = 0
+    matches_om: int = 0
+    matches_mo: int = 0
+    matches_mm: int = 0
+    accuracy_oo_total: float = 0.0
+    accuracy_mm_total: float = 0.0
+    accuracy_oo_unambiguous: float = 0.0
+    accuracy_om_unambiguous: float = 0.0
+    accuracy_mo_unambiguous: float = 0.0
 
-    def print_metrics(self, title: str = "Initial"):
+    def report_metrics(self, title: str = "Initial"):
         """Pretty print the accuracy metrics."""
-        print(f"\n{title} classification accuracy metrics:")
-        print(
-            f"{title} accuracy (OO, subset coded unambiguously by both): "
-            f"{100 * self.accuracy_oo_unambiguous:.2f}%"
-        )
-        print(f"{title} accuracy (OO, full set): {100 * self.accuracy_oo_total:.2f}%")
-        print(f"{title} accuracy (MM, full set): {100 * self.accuracy_mm_total:.2f}%")
+        lines = [
+            f"\n{title} classification accuracy metrics:",
+            f""" {title} accuracy (OO, subset coded unambiguously by both): {
+                100 * self.accuracy_oo_unambiguous:.2f}% ({self.matches_oo} records)""",
+            f""" {title} accuracy (OM, subset coded unambiguously by clerical): {
+                100 * self.accuracy_om_unambiguous:.2f}% ({self.matches_om} records)""",
+            f""" {title} accuracy (MO, subset coded unambiguously by model): {
+                100 * self.accuracy_mo_unambiguous:.2f}% ({self.matches_mo} records)""",
+            f""" {title} accuracy (MM, full set): {
+                100 * self.accuracy_mm_total:.2f}% ({self.matches_mm} records)""",
+        ]
+        return "\n".join(lines)
 
 
 class CodabilityMetrics(BaseModel):
@@ -67,14 +79,24 @@ class CodabilityMetrics(BaseModel):
     initial_codable_count: int
     final_codable_count: int | None = None
 
-    def print_metrics(self):
+    def report_metrics(self):
         """Pretty print the codability metrics."""
-        print("\nCodability metrics:")
-        print(f"Initial codability: {100 * self.initial_codable_prop:.2f}%")
+        lines = [
+            "\nCodability metrics:",
+            f""" Initial codability: {
+                100 * self.initial_codable_prop:.2f}% ({self.initial_codable_count} records)""",
+        ]
         if self.final_codable_prop is not None:
-            print(f"Final codability: {100 * self.final_codable_prop:.2f}%")
+            lines.append(
+                f""" Final codability: {
+                100 * self.final_codable_prop:.2f}% ({self.final_codable_count} records)"""
+            )
         if self.codability_improvement_prop is not None:
-            print(f"Gain in codability: {100 * self.codability_improvement_prop:.2f}pp")
+            lines.append(
+                f""" Gain in codability: {100 * self.codability_improvement_prop:.2f}pp ({
+                    self.final_codable_count - self.initial_codable_count} records)"""
+            )
+        return "\n".join(lines)
 
 
 class SimpleMetrics(BaseModel):
@@ -85,13 +107,17 @@ class SimpleMetrics(BaseModel):
     initial_accuracy_metrics: AccuracyMetrics
     final_accuracy_metrics: AccuracyMetrics | None = None
 
-    def print_metrics(self):
+    def report_metrics(self):
         """Pretty print all simple metrics."""
-        self.ambiguity_metrics.print_metrics()
-        self.codability_metrics.print_metrics()
-        self.initial_accuracy_metrics.print_metrics("Initial")
+        lines = [
+            "Evaluation metrics summary:",
+            self.ambiguity_metrics.report_metrics(),
+            self.codability_metrics.report_metrics(),
+            self.initial_accuracy_metrics.report_metrics("Initial"),
+        ]
         if self.final_accuracy_metrics:
-            self.final_accuracy_metrics.print_metrics("Final")
+            lines.append(self.final_accuracy_metrics.report_metrics("Final"))
+        return "\n".join(lines)
 
 
 def calc_ambiguity_metrics(
@@ -196,38 +222,42 @@ def calc_accuracy_metrics(
     """
     total = len(df)
     if total == 0:
-        return AccuracyMetrics(
-            total_records=0,
-            unambiguous_records=0,
-            matches_mm=0,
-            accuracy_mm_total=0.0,
-            matches_oo=0,
-            accuracy_oo_total=0.0,
-            accuracy_oo_unambiguous=0.0,
-        )
-
-    unambiguous = sum((df[truth_col].apply(len) == 1) & (df[model_col].apply(len) == 1))
-
-    matches = {}
+        return AccuracyMetrics()
 
     def compare_row(row: pd.Series, method) -> bool:
         return compare_codes(row[truth_col], row[model_col], method=method)
 
-    for method in ["OO", "MM"]:
+    matches = {}
+    for method in ["OO", "OM", "MO", "MM"]:
         matches[method] = sum(df.apply(compare_row, method=method, axis=1))
 
-    accuracy_oo = matches["OO"] / total
-    accuracy_mm = matches["MM"] / total
-    accuracy_oo_unambiguous = matches["OO"] / unambiguous if unambiguous > 0 else 0.0
+    unambiguous_oo = sum(
+        (df[truth_col].apply(len) == 1) & (df[model_col].apply(len) == 1)
+    )
+    unambiguous_om = sum(df[truth_col].apply(len) == 1)
+    unambiguous_mo = sum(df[model_col].apply(len) == 1)
+    accuracy_oo_unambiguous = (
+        matches["OO"] / unambiguous_oo if unambiguous_oo > 0 else 0.0
+    )
+    accuracy_om_unambiguous = (
+        matches["OM"] / unambiguous_om if unambiguous_om > 0 else 0.0
+    )
+    accuracy_mo_unambiguous = (
+        matches["MO"] / unambiguous_mo if unambiguous_mo > 0 else 0.0
+    )
 
     return AccuracyMetrics(
         total_records=total,
-        unambiguous_records=unambiguous,
+        unambiguous_records=unambiguous_oo,
         matches_mm=matches["MM"],
-        accuracy_mm_total=accuracy_mm,
+        accuracy_mm_total=matches["MM"] / total,
         matches_oo=matches["OO"],
-        accuracy_oo_total=accuracy_oo,
+        accuracy_oo_total=matches["OO"] / total,
         accuracy_oo_unambiguous=accuracy_oo_unambiguous,
+        matches_om=matches["OM"],
+        accuracy_om_unambiguous=accuracy_om_unambiguous,
+        matches_mo=matches["MO"],
+        accuracy_mo_unambiguous=accuracy_mo_unambiguous,
     )
 
 

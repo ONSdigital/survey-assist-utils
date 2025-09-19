@@ -2,9 +2,7 @@
 
 import re
 
-import pandas as pd
-
-INVALID_VALUES = (("-9", "4+", "", None, pd.NA, "NAN", "NaN", "nan"),)
+INVALID_VALUES = ("-9", "4+", "", None, "NAN", "NaN", "nan")
 
 
 def parse_clerical_code(candidates_str: str):

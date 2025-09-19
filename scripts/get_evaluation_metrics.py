@@ -10,20 +10,51 @@ Use:
     -h, --help to show help message.
 """
 
+import logging
 from argparse import ArgumentParser as AP
 
 import pandas as pd
 
 from survey_assist_utils.data_cleaning.sic_codes import (
+    INVALID_VALUES,
     get_clean_n_digit_codes,
     parse_clerical_code,
 )
 from survey_assist_utils.evaluation.metrics import (
     calc_simple_metrics,
 )
-from survey_assist_utils.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
+def prune_alt_candidates(
+    alt_candidates: list[dict],
+    threshold: float = 0.7,
+    score_name: str = "likelihood",
+) -> list[dict]:
+    """Prunes the alternative candidates based on a likelihood threshold.
+    If there is one entry above the threshold, keep only that one.
+
+    Args:
+        alt_candidates: List of dictionaries with alternative code predictions.
+        threshold: Minimum likelihood score to keep a candidate.
+        code_name: Key name to extract codes from alternative predictions.
+        score_name: Key name to extract likelihood scores from alternative predictions.
+
+    Returns:
+        List of pruned alternative codes.
+    """
+    if threshold <= 0:
+        return alt_candidates
+
+    pruned = [x for x in alt_candidates if x.get(score_name, 0) >= threshold]
+    if len(pruned) == 1:
+        return pruned
+
+    return alt_candidates
 
 
 def prep_dataframe(
@@ -42,6 +73,7 @@ def prep_dataframe(
             initial_alt_codes_col: Column name for alternative codes (list of dicts).
             final_sic: Column name for final model predicted code (string), if available.
             code_name: Key name to extract codes from alternative predictions.
+            threshold: Likelihood threshold for pruning alternative candidates.
 
     Returns:
         Prepared DataFrame with necessary columns.
@@ -56,6 +88,7 @@ def prep_dataframe(
     )
     final_sic = col_names.get("final_sic")
     code_name = col_names.get("code_name", "code")
+    threshold = float(col_names.get("threshold", 0))  # default no pruning
 
     if final_sic and final_sic not in input_df.columns:
         logger.warning(
@@ -83,11 +116,14 @@ def prep_dataframe(
     # Extract the codes from the model's alt_sic_candidates if ambiguous
     input_df["initial_code_combined"] = input_df[initial_code_col]
     fill_alternatives = input_df[initial_code_col].isna() | (
-        input_df[initial_code_col] == ""
+        input_df[initial_code_col].isin(INVALID_VALUES)
+    )
+    logger.info(
+        "Filling initial codes from alternatives for %d rows.", fill_alternatives.sum()
     )
     input_df.loc[fill_alternatives, "initial_code_combined"] = input_df.loc[
         fill_alternatives, initial_alt_codes_col
-    ].apply(lambda x: [y[code_name] for y in x])
+    ].apply(lambda x: [y[code_name] for y in prune_alt_candidates(x, threshold)])
     input_df["sa_initial_codes"] = input_df["initial_code_combined"].apply(
         get_clean_n_digit_codes, n=digits
     )
@@ -97,10 +133,8 @@ def prep_dataframe(
         input_df.loc[~fill_alternatives, final_sic] = input_df.loc[
             ~fill_alternatives, initial_code_col
         ]
-        input_df["sa_final_codes"] = (
-            input_df[final_sic]
-            .apply(parse_clerical_code)
-            .apply(get_clean_n_digit_codes, n=digits)
+        input_df["sa_final_codes"] = input_df[final_sic].apply(
+            get_clean_n_digit_codes, n=digits
         )
 
     return input_df
@@ -141,14 +175,23 @@ if __name__ == "__main__":
     # Load final-stage output DataFrame
     try:
         my_dataframe = pd.read_parquet(args.evaluation_data)
+        logger.info(
+            "Loaded %d rows from %s for evaluation.",
+            len(my_dataframe),
+            args.evaluation_data,
+        )
     except FileNotFoundError as e:
-        logger.error(f"Could not read file: {args.evaluation_data}")
+        logger.error("Could not read file: %s", args.evaluation_data)
         raise e
 
     # Remove rows with no usable clerical code (if specified)
     if args.neglect_four_plus:
         my_dataframe = my_dataframe[~my_dataframe["Four_Or_More"]].reset_index(
             drop=True
+        )
+        logger.info(
+            "Removed entries with 4 or more clerical codes. %d rows remain for evaluation.",
+            len(my_dataframe),
         )
 
     column_names = (
@@ -165,10 +208,16 @@ if __name__ == "__main__":
             "initial_code_col": "final_sic_code",
             "initial_alt_codes_col": "sic_candidates",
             "code_name": "sic_code",
+            "threshold": "0.7",
         }
     )
 
     # Prepare the DataFrame for evaluation
+    logger.info(
+        "Calculating evaluation metrics with %s match. Using following columns: %s",
+        args.match_digits,
+        column_names,
+    )
     my_dataframe = prep_dataframe(
         my_dataframe,
         digits=5 if args.match_digits == "full" else int(args.match_digits[0]),
@@ -177,4 +226,4 @@ if __name__ == "__main__":
 
     evaluation_metrics = calc_simple_metrics(my_dataframe)
 
-    evaluation_metrics.print_metrics()
+    logger.info(evaluation_metrics.report_metrics())
