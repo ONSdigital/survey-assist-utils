@@ -19,7 +19,7 @@ from survey_assist_utils.data_cleaning.sic_codes import (
     INVALID_VALUES,
     extract_alt_sic_candidates,
     get_clean_n_digit_codes,
-    parse_clerical_code,
+    parse_numerical_code,
 )
 from survey_assist_utils.evaluation.metrics import (
     calc_simple_metrics,
@@ -81,7 +81,7 @@ def prep_dataframe(
     # Parse clerical coder column to actual list of strings
     input_df["clerical_codes"] = (
         input_df[clerical_codes_col]
-        .apply(parse_clerical_code)
+        .apply(parse_numerical_code)
         .apply(get_clean_n_digit_codes, n=digits)
     )
 
@@ -99,9 +99,10 @@ def prep_dataframe(
         input_df.loc[fill_alternatives, "initial_code_combined"] = input_df.loc[
             fill_alternatives, initial_alt_codes_col
         ].apply(extract_alt_sic_candidates, code_name=code_name, threshold=threshold)
-        input_df["sa_initial_codes"] = input_df["initial_code_combined"].apply(
-            get_clean_n_digit_codes, n=digits
-        )
+
+    input_df["sa_initial_codes"] = input_df["initial_code_combined"].apply(
+        get_clean_n_digit_codes, n=digits
+    )
 
     if final_sic is not None:
         # Parse the final sic code from the model output

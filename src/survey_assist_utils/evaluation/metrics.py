@@ -5,7 +5,10 @@ import logging
 import pandas as pd
 from pydantic import BaseModel
 
-from survey_assist_utils.evaluation.code_comparison import compare_codes
+from survey_assist_utils.evaluation.code_comparison import (
+    cast_code_to_str,
+    compare_codes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +125,7 @@ class SimpleMetrics(BaseModel):
 
 def calc_ambiguity_metrics(
     df: pd.DataFrame,
-    model_ambiguous_col: str = "sa_initial_ambiguous",
+    model_ambiguous_col: str = "initial_ambiguous",
     truth_ambiguous_col: str = "clerical_ambiguous",
 ) -> AmbiguityMetrics:
     """Calculate ambiguity detection metrics: precision, recall, F1-score.
@@ -215,6 +218,8 @@ def calc_accuracy_metrics(
     Args:
         df: DataFrame containing model and clerical code columns.
         model_col: Column name for model predicted codes (string or list/set).
+        model_ambiguous_col: Column name for model ambiguity predictions (boolean).
+        truth_ambiguous_col: Column name for true (clerical) ambiguity labels (boolean
         truth_col: Column name for true (clerical) codes (string or list/set).
 
     Returns:
@@ -231,11 +236,12 @@ def calc_accuracy_metrics(
     for method in ["OO", "OM", "MO", "MM"]:
         matches[method] = sum(df.apply(compare_row, method=method, axis=1))
 
+    unambiguous_om = sum(~df[truth_col].apply(lambda x: cast_code_to_str(x) is None))
+    unambiguous_mo = sum(~df[model_col].apply(lambda x: cast_code_to_str(x) is None))
     unambiguous_oo = sum(
-        (df[truth_col].apply(len) == 1) & (df[model_col].apply(len) == 1)
+        (~df[truth_col].apply(lambda x: cast_code_to_str(x) is None))
+        & (~df[model_col].apply(lambda x: cast_code_to_str(x) is None))
     )
-    unambiguous_om = sum(df[truth_col].apply(len) == 1)
-    unambiguous_mo = sum(df[model_col].apply(len) == 1)
     accuracy_oo_unambiguous = (
         matches["OO"] / unambiguous_oo if unambiguous_oo > 0 else 0.0
     )
@@ -287,10 +293,14 @@ def calc_simple_metrics(
     df = df[
         [initial_model_col, truth_col] + ([final_model_col] if final_model_col else [])
     ].copy()
-    df["truth_ambiguous"] = df[truth_col].apply(lambda x: len(x) != 1)
-    df["initial_ambiguous"] = df[initial_model_col].apply(lambda x: len(x) != 1)
+    df["truth_ambiguous"] = df[truth_col].apply(lambda x: cast_code_to_str(x) is None)
+    df["initial_ambiguous"] = df[initial_model_col].apply(
+        lambda x: cast_code_to_str(x) is None
+    )
     if final_model_col:
-        df["final_ambiguous"] = df[final_model_col].apply(lambda x: len(x) != 1)
+        df["final_ambiguous"] = df[final_model_col].apply(
+            lambda x: cast_code_to_str(x) is None
+        )
 
     # Calculate ambiguity metrics
     ambig_metrics = calc_ambiguity_metrics(

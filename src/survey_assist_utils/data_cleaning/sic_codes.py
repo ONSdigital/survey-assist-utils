@@ -6,10 +6,23 @@ from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
-INVALID_VALUES = ("-9", "4+", "", None, "NAN", "NaN", "nan", "None", "Null", "<NA>")
+INVALID_VALUES = (
+    "-9",
+    "4+",
+    "",
+    ".",
+    " ",
+    None,
+    "NAN",
+    "NaN",
+    "nan",
+    "None",
+    "Null",
+    "<NA>",
+)
 
 
-def parse_clerical_code(candidates_str: str) -> list[str]:
+def parse_numerical_code(candidates_str: str) -> list[str]:
     """Converts the clerical coder responses from a
     stringified list to a proper list of strings.
     """
@@ -26,7 +39,7 @@ def parse_clerical_code(candidates_str: str) -> list[str]:
 
         return matches
     except re.error as e:
-        logger.warning("Error parsing clerical codes: %s \n %s", candidates_str, e)
+        logger.warning("Error parsing numerical codes: %s \n %s", candidates_str, e)
         return []
 
 
@@ -43,7 +56,7 @@ def expand_to_n_digit_str(input_str: str, n: int) -> set[str]:
 
 def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
     """Converts a n-digit string to either a valid SIC code format
-    or an empty string. E.g. '86011' -> '86011'; '86xxx' -> ''.
+    or an empty string. E.g. '860112' -> {'86011'}; '86xxx' -> {'86000', ..., '86999'}.
     """
     # cut x's from the back if they are there
     input_str = input_str.rstrip("xX")
@@ -81,7 +94,7 @@ def extract_alt_sic_candidates(
     code_name: str,
     score_name="likelihood",
     threshold: float = 0,
-) -> list[dict]:
+) -> list[str]:
     """Extracts alternative sic codes from the model predictions
     and prunes them based on the threshold (i.e. if there is one entry
     with score above the threshold, keep only that one.).
