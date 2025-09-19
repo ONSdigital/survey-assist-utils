@@ -280,8 +280,7 @@ def calc_simple_metrics(
     """
     if final_model_col and (final_model_col not in df.columns):
         logger.warning(
-            "Final model column '%s' not found in DataFrame.",
-            final_model_col,
+            "No final classification stats available (final code column not found).",
         )
         final_model_col = None
 

@@ -1,11 +1,15 @@
 """Helper functions for cleaning sic code data before evaluation."""
 
+import logging
 import re
+from collections.abc import Iterable
 
-INVALID_VALUES = ("-9", "4+", "", None, "NAN", "NaN", "nan")
+logger = logging.getLogger(__name__)
+
+INVALID_VALUES = ("-9", "4+", "", None, "NAN", "NaN", "nan", "None", "Null", "<NA>")
 
 
-def parse_clerical_code(candidates_str: str):
+def parse_clerical_code(candidates_str: str) -> list[str]:
     """Converts the clerical coder responses from a
     stringified list to a proper list of strings.
     """
@@ -21,10 +25,9 @@ def parse_clerical_code(candidates_str: str):
         matches = re.findall(pattern, candidates_str)
 
         return matches
-    except Exception as e:
-        raise ValueError(
-            f"Error parsing clerical codes: {candidates_str} \n {e}"
-        ) from e
+    except re.error as e:
+        logger.warning("Error parsing clerical codes: %s \n %s", candidates_str, e)
+        return []
 
 
 def expand_to_n_digit_str(input_str: str, n: int) -> set[str]:
@@ -57,14 +60,49 @@ def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
 def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> set[str]:
     """Converts a list of possible codes to a list containing only
     valid n-digit SIC codes.
-    E.g. ['86011', '86012', '85xxx'] -> ['86011', '86012'].
+    E.g. ['86011', '86012', '85xxx'] -> ['86011', '86012', '85000', ..., '85999'].
     """
     if isinstance(input_list, str):
         input_list = [input_list]
     if not isinstance(input_list, (set, list)):
-        raise ValueError("input_list must be a list of strings.")
+        logger.warning(
+            "Expected a list or set of strings for input_list, got %s", type(input_list)
+        )
+        return set()
 
     cleaned_list = [get_clean_n_digit_one_code(i, n) for i in input_list]
     # Flatten the sets and deduplicate
     pruned_list = set().union(*cleaned_list)
     return pruned_list
+
+
+def extract_alt_sic_candidates(
+    alt_candidates: list[dict],
+    code_name: str,
+    score_name="likelihood",
+    threshold: float = 0,
+) -> list[dict]:
+    """Extracts alternative sic codes from the model predictions
+    and prunes them based on the threshold (i.e. if there is one entry
+    with score above the threshold, keep only that one.).
+
+    If threshold is 0 or negative, no pruning is done.
+
+    Args:
+        alt_candidates: List of alternative candidate dictionaries.
+        code_name: Key name to extract codes from alternative predictions.
+        score_name: Key name to extract score from alternative predictions.
+        threshold: Score threshold for pruning alternative candidates.
+    """
+    if not isinstance(alt_candidates, Iterable):
+        logger.warning(
+            "Expected a list of dicts for alt_candidates, got %s", type(alt_candidates)
+        )
+        return []
+
+    if threshold >= 0:
+        pruned = [x for x in alt_candidates if x.get(score_name, 0) >= threshold]
+        if len(pruned) == 1:
+            alt_candidates = pruned
+
+    return [x.get(code_name, "-9") for x in alt_candidates]

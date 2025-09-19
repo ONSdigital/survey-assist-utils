@@ -17,6 +17,7 @@ import pandas as pd
 
 from survey_assist_utils.data_cleaning.sic_codes import (
     INVALID_VALUES,
+    extract_alt_sic_candidates,
     get_clean_n_digit_codes,
     parse_clerical_code,
 )
@@ -28,33 +29,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-
-def prune_alt_candidates(
-    alt_candidates: list[dict],
-    threshold: float = 0.7,
-    score_name: str = "likelihood",
-) -> list[dict]:
-    """Prunes the alternative candidates based on a likelihood threshold.
-    If there is one entry above the threshold, keep only that one.
-
-    Args:
-        alt_candidates: List of dictionaries with alternative code predictions.
-        threshold: Minimum likelihood score to keep a candidate.
-        code_name: Key name to extract codes from alternative predictions.
-        score_name: Key name to extract likelihood scores from alternative predictions.
-
-    Returns:
-        List of pruned alternative codes.
-    """
-    if threshold <= 0:
-        return alt_candidates
-
-    pruned = [x for x in alt_candidates if x.get(score_name, 0) >= threshold]
-    if len(pruned) == 1:
-        return pruned
-
-    return alt_candidates
 
 
 def prep_dataframe(
@@ -83,9 +57,7 @@ def prep_dataframe(
     """
     clerical_codes_col = col_names.get("clerical_codes_col", "All_Clerical_codes")
     initial_code_col = col_names.get("initial_code_col", "sa_initial_codes")
-    initial_alt_codes_col = col_names.get(
-        "initial_alt_codes_col", "sa_initial_alt_codes"
-    )
+    initial_alt_codes_col = col_names.get("initial_alt_codes_col")
     final_sic = col_names.get("final_sic")
     code_name = col_names.get("code_name", "code")
     threshold = float(col_names.get("threshold", 0))  # default no pruning
@@ -118,17 +90,20 @@ def prep_dataframe(
     fill_alternatives = input_df[initial_code_col].isna() | (
         input_df[initial_code_col].isin(INVALID_VALUES)
     )
-    logger.info(
-        "Filling initial codes from alternatives for %d rows.", fill_alternatives.sum()
-    )
-    input_df.loc[fill_alternatives, "initial_code_combined"] = input_df.loc[
-        fill_alternatives, initial_alt_codes_col
-    ].apply(lambda x: [y[code_name] for y in prune_alt_candidates(x, threshold)])
-    input_df["sa_initial_codes"] = input_df["initial_code_combined"].apply(
-        get_clean_n_digit_codes, n=digits
-    )
 
-    if final_sic:
+    if initial_alt_codes_col is not None:
+        logger.info(
+            "Filling initial codes from alternatives for %d rows.",
+            fill_alternatives.sum(),
+        )
+        input_df.loc[fill_alternatives, "initial_code_combined"] = input_df.loc[
+            fill_alternatives, initial_alt_codes_col
+        ].apply(extract_alt_sic_candidates, code_name=code_name, threshold=threshold)
+        input_df["sa_initial_codes"] = input_df["initial_code_combined"].apply(
+            get_clean_n_digit_codes, n=digits
+        )
+
+    if final_sic is not None:
         # Parse the final sic code from the model output
         input_df.loc[~fill_alternatives, final_sic] = input_df.loc[
             ~fill_alternatives, initial_code_col
