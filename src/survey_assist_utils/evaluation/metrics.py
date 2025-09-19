@@ -218,8 +218,6 @@ def calc_accuracy_metrics(
     Args:
         df: DataFrame containing model and clerical code columns.
         model_col: Column name for model predicted codes (string or list/set).
-        model_ambiguous_col: Column name for model ambiguity predictions (boolean).
-        truth_ambiguous_col: Column name for true (clerical) ambiguity labels (boolean
         truth_col: Column name for true (clerical) codes (string or list/set).
 
     Returns:

@@ -43,7 +43,7 @@ def test_cast_code_to_str():
     assert cast_code_to_str(None) is None, "None input"
     assert cast_code_to_str("") is None, "Empty string input"
     assert cast_code_to_str(-9) is None, "Invalid integer -9 input"
-    assert cast_code_to_str(43) == "43", "Invalid string '43' input"
+    assert cast_code_to_str(42) == "42", "Convert integer input to '42'"
     assert cast_code_to_str("86011") == "86011", "Single valid string input"
     assert cast_code_to_str(["86011"]) == "86011", "List with single valid string"
     assert cast_code_to_str({"86011"}) == "86011", "Set with single valid string"

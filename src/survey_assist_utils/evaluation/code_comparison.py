@@ -41,7 +41,7 @@ def compare_codes(
 def cast_code_to_set(
     input_data: str | Iterable[str] | None,
 ) -> set[str]:
-    """Cast input data to a set of strings."""
+    """Cast input codes to a set of strings."""
     if input_data is None:
         return set()
     if isinstance(input_data, str) or not isinstance(input_data, Iterable):
@@ -52,22 +52,19 @@ def cast_code_to_set(
 def cast_code_to_str(
     input_data: str | Iterable[str] | None,
 ) -> str | None:
-    """Cast input data to a string."""
-    # if it is already a string, return it if valid
-    if isinstance(input_data, str):
-        return input_data if input_data not in INVALID_VALUES else None
+    """Cast input codes to a string if unique code is presented.
 
-    if isinstance(input_data, Iterable):
-        # convert to set to enable len calculation and to remove duplicates
-        if len(set(input_data)) != 1:
-            return None
-        out_str = str(next(iter(input_data)))
-    elif isinstance(input_data, (int, float)):
-        out_str = str(input_data)
-    else:
-        out_str = None
+    Args:
+        input_data: Input data which can be a string, an iterable of strings.
 
-    return out_str if out_str not in INVALID_VALUES else None
+    Returns:
+        A single string if input_data contains exactly one valid code string,
+        None otherwise.
+    """
+    # convert to set to enable len calculation and to remove duplicates
+    input_set = cast_code_to_set(input_data)
+
+    return next(iter(input_set)) if len(input_set) == 1 else None
 
 
 def compare_oo(
