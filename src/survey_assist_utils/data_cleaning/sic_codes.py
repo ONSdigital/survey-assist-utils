@@ -21,26 +21,39 @@ INVALID_VALUES = (
     "<NA>",
 )
 
+EXPECTED_CODE_LENGTH = 5
 
-def parse_numerical_code(candidates_str: str) -> list[str]:
+
+def parse_numerical_code(
+    candidates_str: str,
+    code_regex_pattern: str = r"([0-9]+x*X*)",
+    padding: int = EXPECTED_CODE_LENGTH,
+) -> set[str]:
     """Converts the clerical coder responses from a
     stringified list to a proper list of strings.
+    E.g. "[8601x, 1410, nan]" -> {'8601x', '01410'}.
+
+    Args:
+        candidates_str: String containing the clerical coder responses.
+        code_regex_pattern: Regex pattern to extract codes from the string.
+        padding: Number of digits to which the codes should be zero-padded.
+
+    Returns:
+        List of cleaned and zero-padded code strings.
+
     """
     candidates_str = str(candidates_str).strip()
     if candidates_str in INVALID_VALUES:
-        return []
-
+        return set()
     try:
         # remove -9 and 4+ from the string
         candidates_str = candidates_str.replace("-9", "").replace("4+", "")
         # Extract all RagCandidate entries using regex
-        pattern = r"([0-9]+x*X*)"
-        matches = re.findall(pattern, candidates_str)
-
-        return matches
+        matches = re.findall(code_regex_pattern, candidates_str)
+        return {matches.zfill(padding) for matches in matches}
     except re.error as e:
         logger.warning("Error parsing numerical codes: %s \n %s", candidates_str, e)
-        return []
+        return set()
 
 
 def expand_to_n_digit_str(input_str: str, n: int) -> set[str]:
