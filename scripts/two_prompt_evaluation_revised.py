@@ -346,6 +346,7 @@ def compare_row(row: pd.Series) -> bool:
 
 my_dataframe["results_column"] = my_dataframe.apply(compare_row, axis=1)
 matches = my_dataframe["results_column"].sum()
+my_dataframe.to_parquet("two_prompt_eval.parquet", index=False)
 
 # Handle CC recording '4+' etc. by neglecting impossible to match CC values in accuracy calc.
 if args.neglect_impossible:

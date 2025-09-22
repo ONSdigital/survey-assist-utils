@@ -23,10 +23,12 @@ INVALID_VALUES = (
 
 EXPECTED_CODE_LENGTH = 5
 
+SIC_REGEX_PATTERN = r"([0-9]+x*X*)"
+
 
 def parse_numerical_code(
     candidates_str: str,
-    code_regex_pattern: str = r"([0-9]+x*X*)",
+    code_regex_pattern: str = SIC_REGEX_PATTERN,
     padding: int = EXPECTED_CODE_LENGTH,
 ) -> set[str]:
     """Converts the clerical coder responses from a
