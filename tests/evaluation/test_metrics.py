@@ -57,8 +57,8 @@ def test_calc_accuracy_metrics_basic():
     """Basic test for accuracy metrics calculation."""
     df = pd.DataFrame(
         {
-            "sa_initial_codes": [["A"], ["B", "C"], ["C"], ["D"]],
-            "clerical_codes": [["A"], ["B"], ["C"], ["E"]],
+            "sa_initial_codes": [{"A"}, {"B", "C"}, {"C"}, {"D"}],
+            "clerical_codes": [{"A"}, {"B"}, {"C"}, {"E"}],
         }
     )
     accuracy_metrics = calc_accuracy_metrics(df)
@@ -73,8 +73,8 @@ def test_calc_simple_metrics_basic():
     """Basic test for simple metrics calculation."""
     df = pd.DataFrame(
         {
-            "clerical_codes": ["A", "B", "-9", "E"],
-            "sa_initial_codes": ["A", ["B", "C"], None, "D"],
+            "clerical_codes": ["A", "B", -9, "E"],
+            "sa_initial_codes": ["A", ["B", "C"], None, {"D"}],
             "sa_final_codes": [["A"], ["B"], ["C"], ["D"]],
         }
     )

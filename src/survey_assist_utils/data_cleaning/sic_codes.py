@@ -63,6 +63,13 @@ def expand_to_n_digit_str(input_str: str, n: int) -> set[str]:
     !!NOT IMPLEMENTED YET FOR REAL HIERARCHY!!
     For now it returns all numerically posssible subcodes.
     E.g. '86' -> {'86000', '86100', ..., '86999'} for n=5.
+
+    Args:
+        input_str: String containing a possible code.
+        n: Number of digits to which the code should be expanded.
+
+    Returns:
+        Set of expanded n-digit SIC code strings.
     """
     fill_digits = n - len(input_str)
 
@@ -72,6 +79,13 @@ def expand_to_n_digit_str(input_str: str, n: int) -> set[str]:
 def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
     """Converts a n-digit string to either a valid SIC code format
     or an empty string. E.g. '860112' -> {'86011'}; '86xxx' -> {'86000', ..., '86999'}.
+
+    Args:
+        input_str: String containing a possible code.
+        n: Number of digits to which the code should be cleaned/expanded.
+
+    Returns:
+        Set of cleaned n-digit SIC code strings.
     """
     # cut x's from the back if they are there
     input_str = input_str.rstrip("xX")
@@ -89,6 +103,13 @@ def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> s
     """Converts a list of possible codes to a list containing only
     valid n-digit SIC codes.
     E.g. ['86011', '86012', '85xxx'] -> ['86011', '86012', '85000', ..., '85999'].
+
+    Args:
+        input_list: List or set of strings containing possible codes.
+        n: Number of digits to which the codes should be cleaned/expanded.
+
+    Returns:
+        Set of cleaned n-digit SIC code strings.
     """
     if isinstance(input_list, str):
         input_list = [input_list]
@@ -121,6 +142,9 @@ def extract_alt_sic_candidates(
         code_name: Key name to extract codes from alternative predictions.
         score_name: Key name to extract score from alternative predictions.
         threshold: Score threshold for pruning alternative candidates.
+
+    Returns:
+        List of extracted and pruned alternative sic code strings.
     """
     if not isinstance(alt_candidates, Iterable):
         logger.warning(

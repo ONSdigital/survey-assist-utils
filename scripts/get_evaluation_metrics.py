@@ -134,4 +134,4 @@ if __name__ == "__main__":
 
     evaluation_metrics = calc_simple_metrics(combined_dataframe)
 
-    logger.info(evaluation_metrics.report_metrics())
+    print(evaluation_metrics.report_metrics())
