@@ -4,6 +4,11 @@ import logging
 import re
 from collections.abc import Iterable
 
+from survey_assist_utils.data_cleaning.sic_code_section_list import (
+    SECTION_LOOKUP,
+    VALID_SIC_CODES,
+)
+
 logger = logging.getLogger(__name__)
 
 INVALID_VALUES = (
@@ -88,7 +93,7 @@ def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
         Set of cleaned n-digit SIC code strings.
     """
     # cut x's from the back if they are there
-    input_str = input_str.rstrip("xX")
+    input_str = str(input_str).rstrip("xX")
     # check the rest is numeric
     if not input_str.isdigit():
         return set()
@@ -119,10 +124,39 @@ def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> s
         )
         return set()
 
-    cleaned_list = [get_clean_n_digit_one_code(i, n) for i in input_list]
+    cleaned_list = [
+        get_clean_n_digit_one_code(i, 2 if n == 0 else n) for i in input_list
+    ]
     # Flatten the sets and deduplicate
     pruned_list = set().union(*cleaned_list)
+
+    if n == 0:
+        pruned_list = {
+            SECTION_LOOKUP.get(code, "")
+            for code in pruned_list
+            if code in SECTION_LOOKUP
+        }
+
     return pruned_list
+
+
+def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
+    """Validate if the input code is a valid SIC code.
+
+    Args:
+        input_set: A string representing the SIC code to validate.
+
+    Returns:
+        A set of valid SIC codes.
+    """
+    if isinstance(input_set, str):
+        input_set = {input_set}
+    if not isinstance(input_set, (set, list)):
+        logger.warning(
+            "Expected a list or set of strings for input_list, got %s", type(input_set)
+        )
+        return set()
+    return {str(x) for x in input_set}.intersection(VALID_SIC_CODES)
 
 
 def extract_alt_sic_candidates(

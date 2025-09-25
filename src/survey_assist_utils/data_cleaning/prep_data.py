@@ -22,7 +22,7 @@ def prep_clerical_codes(
     clerical_col: str = "sic_ind_occ",
     out_col: str = "clerical_codes",
     digits: int = 5,
-) -> pd.Series:
+) -> pd.DataFrame:
     """Extract and clean clerical codes from the DataFrame.
 
     Args:
@@ -37,7 +37,7 @@ def prep_clerical_codes(
             Defaults to 5.
 
     Returns:
-        pd.Series: Series with cleaned clerical codes.
+        DataFrame with cleaned clerical codes.
     """
     clerical_3cols = [clerical_col + str(i) for i in range(1, 4)]
 

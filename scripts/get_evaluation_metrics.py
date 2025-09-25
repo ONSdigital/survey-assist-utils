@@ -58,7 +58,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.match_digits.startswith(
-        ("full", "1-digit", "2-digit", "3-digit", "4-digit", "5-digit")
+        ("full", "0-digit", "1-digit", "2-digit", "3-digit", "4-digit", "5-digit")
     ):
         raise ValueError("illegal value passed for match_digits")
     DIGITS = 5 if args.match_digits == "full" else int(args.match_digits[0])
