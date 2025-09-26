@@ -2,20 +2,7 @@
 
 from collections.abc import Iterable
 
-INVALID_VALUES = (
-    "-9",
-    "4+",
-    "",
-    ".",
-    " ",
-    None,
-    "NAN",
-    "NaN",
-    "nan",
-    "None",
-    "Null",
-    "<NA>",
-)
+from survey_assist_utils.data_cleaning.sic_codes import INVALID_VALUES
 
 
 def cast_code_to_set(
