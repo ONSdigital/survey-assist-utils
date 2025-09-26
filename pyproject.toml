@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "survey-assist-utils"
-version = "0.0.4"
+version = "0.0.5"
 description = "Utility module for Survey Assist"
 authors = ["Steve Gibbard <steve.gibbard@ons.gov.uk>"]
 license = "MIT"
@@ -26,7 +26,7 @@ fsspec = "^2025.3.2"
 gcsfs = "^2025.3.2"
 langchain-google-vertexai = "^2.0.27"
 google-cloud-iam = "^2.19.1"
-pyarrow = "^21.0.0"
+pyarrow = ">=19.0.1,<20.0.0"
 langchain = "^0.3.0"
 
 [tool.poetry.group.dev.dependencies]
