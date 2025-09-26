@@ -4,7 +4,7 @@
 
 from survey_assist_utils.data_cleaning.sic_codes import (
     expand_to_n_digit_str,
-    extract_alt_sic_candidates,
+    extract_alt_candidates_n_digit_codes,
     get_clean_n_digit_codes,
     get_clean_n_digit_one_code,
     parse_numerical_code,
@@ -13,10 +13,10 @@ from survey_assist_utils.data_cleaning.sic_codes import (
 
 
 def test_parse_numerical_code_basic():
-    assert parse_numerical_code("86011") == {"86011"}
-    assert parse_numerical_code("[86011, 86012]") == {"86011", "86012"}
-    assert parse_numerical_code("86011;8602x;4+") == {"86011", "8602x"}
-    assert parse_numerical_code(86011) == {"86011"}
+    assert parse_numerical_code("86101") == {"86101"}
+    assert parse_numerical_code("[86101, 86210]") == {"86101", "86210"}
+    assert parse_numerical_code("86101;8602x;4+") == {"86101", "8602x"}
+    assert parse_numerical_code(86101) == {"86101"}
 
 
 def test_parse_numerical_code_empty():
@@ -34,7 +34,7 @@ def test_parse_numerical_code_logs(caplog):
 
 
 def test_expand_to_n_digit_str():
-    assert expand_to_n_digit_str("86011", 2) == {"86011"}
+    assert expand_to_n_digit_str("86101", 2) == {"86101"}
     assert expand_to_n_digit_str("", 1) == {str(x) for x in range(10)}
     result = expand_to_n_digit_str("86", 5)
     assert "86000" in result
@@ -43,21 +43,23 @@ def test_expand_to_n_digit_str():
 
 
 def test_get_clean_n_digit_one_code():
-    assert get_clean_n_digit_one_code("860112", 5) == {"86011"}
-    assert get_clean_n_digit_one_code("86011", 5) == {"86011"}
-    assert get_clean_n_digit_one_code("86xxx", 5) == expand_to_n_digit_str("86", 5)
-    assert get_clean_n_digit_one_code("86", 5) == expand_to_n_digit_str("86", 5)
-    assert get_clean_n_digit_one_code("860112", 3) == {"860"}
-    assert get_clean_n_digit_one_code("86011", 0) == {"Q"}
+    print(get_clean_n_digit_one_code("86", 5))
+    assert get_clean_n_digit_one_code("861012", 5) == {"86101"}
+    assert get_clean_n_digit_one_code("86101", 5) == {"86101"}
+    group86 = {"86100", "86102", "86230", "86220", "86900", "86101", "86210"}
+    assert get_clean_n_digit_one_code("86xxx", 5) == group86
+    assert get_clean_n_digit_one_code("86", 5) == group86
+    assert get_clean_n_digit_one_code("861012", 3) == {"861"}
+    assert get_clean_n_digit_one_code("86101", 0) == {"Q"}
 
 
 def test_get_clean_n_digit_codes_5d():
-    codes = ["86011", "86012", "85xxx"]
+    codes = ["86101", "86210", "85xxx"]
     result = get_clean_n_digit_codes(codes, 5)
-    assert "86011" in result
-    assert "86012" in result
-    assert "85000" in result
-    assert "85999" in result
+    assert "86101" in result
+    assert "86210" in result
+    assert "85100" in result
+    assert "85590" in result
     assert isinstance(result, set)
 
 
@@ -69,7 +71,7 @@ def test_get_clean_n_digit_codes_logs(caplog):
 
 def test_get_clean_n_digit_codes_section():
     assert get_clean_n_digit_codes("2xxxx", 0) == {"C"}
-    codes = ["86011", "86012", "2xxxx"]
+    codes = ["86101", "86210", "2xxxx"]
     assert get_clean_n_digit_codes(codes, 0) == {"Q", "C"}
 
 
@@ -87,24 +89,17 @@ def test_validate_sic_codes_logs(caplog):
     assert any("set of strings" in record.message.lower() for record in caplog.records)
 
 
-def test_extract_alt_sic_candidates():
+def test_extract_alt_candidates_n_digit_codes():
     candidates = [
-        {"code": "86011", "likelihood": 0.8},
-        {"code": "86012", "likelihood": 0.6},
+        {"code": "86101", "likelihood": 0.8},
+        {"code": "86210", "likelihood": 0.6},
     ]
-    result = extract_alt_sic_candidates(
+    result = extract_alt_candidates_n_digit_codes(
         candidates, code_name="code", score_name="likelihood", threshold=0.7
     )
-    assert "86011" in result
-    assert "86012" not in result or len(result) == 1
+    assert result == {"86101"}
     # No pruning
-    result2 = extract_alt_sic_candidates(
+    result2 = extract_alt_candidates_n_digit_codes(
         candidates, code_name="code", score_name="likelihood", threshold=0
     )
-    assert "86011" in result2 and "86012" in result2
-
-
-def test_extract_alt_sic_candidates_logs(caplog):
-    with caplog.at_level("WARNING"):
-        extract_alt_sic_candidates("86012", "code")
-    assert any("expected a list" in record.message.lower() for record in caplog.records)
+    assert result2 == {"86101", "86210"}
