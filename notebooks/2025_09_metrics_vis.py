@@ -18,7 +18,7 @@ import plotly.express as px
 
 from survey_assist_utils.data_cleaning.prep_data import (
     prep_clerical_codes,
-    prep_model_dataframe,
+    prep_model_codes,
 )
 from survey_assist_utils.evaluation.metrics import (
     calc_simple_metrics,
@@ -61,19 +61,6 @@ model_prompt1_file = (
 prompt2_df = pd.read_parquet(model_prompt2_file)
 prompt1_df = pd.read_parquet(model_prompt1_file)
 
-col_names_prompt2 = {
-    "initial_code_col": "initial_code",
-    "initial_alt_codes_col": "alt_sic_candidates",
-    "final_sic": "final_sic",
-    "code_name": "code",
-}
-col_names_prompt1 = {
-    "initial_code_col": "final_sic_code",
-    "initial_alt_codes_col": "sic_candidates",
-    "code_name": "sic_code",
-    "threshold": "0.7",
-}
-
 
 # %%
 # convert semantic distance to confidence
@@ -108,12 +95,6 @@ def semantic_distance_to_confidence(
 
 
 prompt2_df["semantic_codes"] = None
-col_names_semantic = {
-    "initial_code_col": "semantic_codes",
-    "initial_alt_codes_col": "semantic_candidates",
-    "code_name": "code",
-    "threshold": "0.6",
-}
 
 # top = prompt2_df["semantic_candidates"].apply(lambda x: x[0].get("likelihood") if x else None)
 # px.histogram(top)
@@ -124,34 +105,49 @@ col_names_semantic = {
 eval_metrics = {}
 for DIGITS in [5, 4, 3, 2, 1, 0]:
     print(f"--- Evaluating {DIGITS}-digit match ---")
+    clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
+
     clerical_codes_it1 = prep_clerical_codes(
         cc_it1_df, cc_it1_4plus_df, digits=DIGITS
     ).rename(columns={"clerical_codes": "sa_initial_codes"})
-    clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
-    model_prompt1 = prep_model_dataframe(
-        prompt1_df, digits=DIGITS, col_names=col_names_prompt1
-    )
-    model_prompt2 = prep_model_dataframe(
-        prompt2_df, digits=DIGITS, col_names=col_names_prompt2
-    )
-    prompt2_df["semantic_candidates"] = prompt2_df["semantic_search_results"].apply(
-        lambda x, digits=DIGITS: semantic_distance_to_confidence(x, digits=digits)
-    )
-    model_semantic = prep_model_dataframe(
-        prompt2_df, digits=DIGITS, col_names=col_names_semantic
-    )
     combined_dataframe_cc = clerical_codes_it1.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )
     eval_metrics[(DIGITS, "cc_it1")] = calc_simple_metrics(combined_dataframe_cc)
+
+    model_prompt1 = prep_model_codes(
+        prompt1_df,
+        digits=DIGITS,
+        out_col="sa_initial_codes",
+        codes_col="final_sic_code",
+        alt_codes_col="sic_candidates",
+        alt_codes_name="sic_code",
+        threshold=0.7,
+    )
     combined_dataframe_m1 = model_prompt1.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )
     eval_metrics[(DIGITS, "m_1p")] = calc_simple_metrics(combined_dataframe_m1)
+
+    model_prompt2 = prep_model_codes(
+        prompt2_df, digits=DIGITS, out_col="sa_initial_codes"
+    )
     combined_dataframe_m2 = model_prompt2.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )
     eval_metrics[(DIGITS, "m_2p")] = calc_simple_metrics(combined_dataframe_m2)
+
+    prompt2_df["semantic_candidates"] = prompt2_df["semantic_search_results"].apply(
+        lambda x, digits=DIGITS: semantic_distance_to_confidence(x, digits=digits)
+    )
+    model_semantic = prep_model_codes(
+        prompt2_df,
+        digits=DIGITS,
+        out_col="sa_initial_codes",
+        codes_col="semantic_codes",
+        alt_codes_col="semantic_candidates",
+        threshold=0.6,
+    )
     combined_dataframe_sem = model_semantic.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )

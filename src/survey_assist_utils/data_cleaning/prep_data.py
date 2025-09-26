@@ -5,8 +5,7 @@ import logging
 import pandas as pd
 
 from survey_assist_utils.data_cleaning.sic_codes import (
-    INVALID_VALUES,
-    extract_alt_sic_candidates,
+    extract_alt_candidates_n_digit_codes,
     get_clean_n_digit_codes,
     parse_numerical_code,
 )
@@ -68,23 +67,27 @@ def prep_clerical_codes(
     return df[[ID_COL, out_col]]
 
 
-def prep_model_dataframe(
+# allow more arguments than 5
+# pylint: disable=R0913, R0917
+def prep_model_codes(  # noqa:PLR0913
     input_df: pd.DataFrame,
-    col_names: dict,
+    codes_col: str | None = "initial_code",
+    alt_codes_col: str | None = "alt_sic_candidates",
+    out_col: str = "model_codes",
+    alt_codes_name: str = "code",
+    threshold: float = 0,
     digits: int = 5,
 ) -> pd.DataFrame:
     """Prepares the input DataFrame for evaluation by ensuring necessary columns exist.
 
     Args:
         input_df: Input DataFrame to be prepared.
+        codes_col: Column name for initial model predicted code (string).
+        alt_codes_col: Column name for alternative codes (list of dicts).
+        out_col: Column name for the output cleaned model codes.
+        alt_codes_name: Key name to extract codes from alternative predictions.
+        threshold: Likelihood threshold for pruning alternative candidates.
         digits: Number of digits to which SIC codes should be cleaned/expanded.
-        col_names: Dictionary with column names:
-            clerical_codes_col: Column name for clerical codes (string or list).
-            initial_code_col: Column name for initial model predicted code (string).
-            initial_alt_codes_col: Column name for alternative codes (list of dicts).
-            final_sic: Column name for final model predicted code (string), if available.
-            code_name: Key name to extract codes from alternative predictions.
-            threshold: Likelihood threshold for pruning alternative candidates.
 
     Returns:
         Prepared DataFrame with necessary columns.
@@ -92,54 +95,40 @@ def prep_model_dataframe(
     Raises:
         ValueError: If required columns are missing in the input DataFrame.
     """
-    initial_code_col = col_names.get("initial_code_col", "sa_initial_codes")
-    initial_alt_codes_col = col_names.get("initial_alt_codes_col")
-    final_sic = col_names.get("final_sic")
-    code_name = col_names.get("code_name", "code")
-    threshold = float(col_names.get("threshold", 0))  # default no pruning
+    if ID_COL not in input_df.columns:
+        raise ValueError(f"Input DataFrame must contain a column '{ID_COL}'")
+    if codes_col not in input_df.columns:
+        codes_col = None
+    if alt_codes_col not in input_df.columns:
+        alt_codes_col = None
 
-    if final_sic and final_sic not in input_df.columns:
-        logger.warning(
-            "No column for final code assignment provided. Evaluation"
-            "of codability gain and final accuracy won't be possible."
+    if codes_col is None and alt_codes_col is None:
+        raise ValueError(
+            "At least one of 'codes_col' or 'alt_codes_col' must be provided."
         )
-        final_sic = None
 
-    required_columns = [
-        ID_COL,
-        initial_code_col,
-        initial_alt_codes_col,
-    ] + ([final_sic] if final_sic else [])
-    if miss := set(required_columns) - set(input_df.columns):
-        raise ValueError(f"Input DataFrame is missing required columns: {miss}")
-    input_df = input_df[required_columns].copy()
+    out_df = input_df[[ID_COL]].copy()
+    out_df[out_col] = [{} for _ in range(len(input_df))]
+    if codes_col is not None:
+        out_df[out_col] = (
+            input_df[codes_col]
+            .apply(parse_numerical_code)
+            .apply(get_clean_n_digit_codes, n=digits)
+        )
 
     # Extract the codes from the model's alt_sic_candidates if ambiguous
-    input_df["initial_code_combined"] = input_df[initial_code_col]
-    fill_alternatives = input_df[initial_code_col].isna() | (
-        input_df[initial_code_col].isin(INVALID_VALUES)
-    )
-
-    if initial_alt_codes_col is not None:
+    if alt_codes_col is not None:
+        miss_msk = out_df[out_col].apply(lambda x: not x)
         logger.info(
             "Filling initial codes from alternatives for %d rows.",
-            fill_alternatives.sum(),
+            miss_msk.sum(),
         )
-        input_df.loc[fill_alternatives, "initial_code_combined"] = input_df.loc[
-            fill_alternatives, initial_alt_codes_col
-        ].apply(extract_alt_sic_candidates, code_name=code_name, threshold=threshold)
-
-    input_df["sa_initial_codes"] = input_df["initial_code_combined"].apply(
-        get_clean_n_digit_codes, n=digits
-    )
-
-    if final_sic is not None:
-        # Parse the final sic code from the model output
-        input_df.loc[~fill_alternatives, final_sic] = input_df.loc[
-            ~fill_alternatives, initial_code_col
-        ]
-        input_df["sa_final_codes"] = input_df[final_sic].apply(
-            get_clean_n_digit_codes, n=digits
+        alternatives = input_df.loc[miss_msk, alt_codes_col].apply(
+            extract_alt_candidates_n_digit_codes,
+            code_name=alt_codes_name,
+            n=digits,
+            threshold=threshold,
         )
+        out_df.loc[miss_msk, out_col] = alternatives
 
-    return input_df
+    return out_df

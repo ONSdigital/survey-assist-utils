@@ -18,7 +18,7 @@ import pandas as pd
 
 from survey_assist_utils.data_cleaning.prep_data import (
     prep_clerical_codes,
-    prep_model_dataframe,
+    prep_model_codes,
 )
 from survey_assist_utils.evaluation.metrics import (
     calc_simple_metrics,
@@ -100,37 +100,41 @@ if __name__ == "__main__":
 
     clerical_codes = prep_clerical_codes(clerical_df, clerical_4plu_df, digits=DIGITS)
 
-    column_names = (
-        {
-            "initial_code_col": "initial_code",
-            "initial_alt_codes_col": "alt_sic_candidates",
-            "final_sic": "final_sic",
-            "code_name": "code",
-        }
-        if not args.old_one_prompt
-        else {
-            "initial_code_col": "final_sic_code",
-            "initial_alt_codes_col": "sic_candidates",
-            "code_name": "sic_code",
-            "threshold": "0.7",
-        }
+    model_codes = (
+        prep_model_codes(
+            my_dataframe,
+            codes_col="final_sic_code",
+            alt_codes_col="sic_candidates",
+            out_col="sa_initial_codes",
+            alt_codes_name="sic_code",
+            threshold=0.7,
+            digits=DIGITS,
+        )
+        if args.old_one_prompt
+        else prep_model_codes(
+            my_dataframe,
+            codes_col="initial_code",
+            alt_codes_col="alt_sic_candidates",
+            out_col="sa_initial_codes",
+            alt_codes_name="code",
+            threshold=0,
+            digits=DIGITS,
+        )
     )
 
-    # Prepare the DataFrame for evaluation
-    logger.info(
-        "Calculating evaluation metrics with %s match. Using following columns: %s",
-        args.match_digits,
-        column_names,
-    )
-    model_dataframe = prep_model_dataframe(
-        my_dataframe,
-        digits=DIGITS,
-        col_names=column_names,
-    )
+    combined_dataframe = model_codes.merge(clerical_codes, on="unique_id", how="inner")
 
-    combined_dataframe = model_dataframe.merge(
-        clerical_codes, on="unique_id", how="inner"
-    )
+    if not args.old_one_prompt:
+        final_codes = prep_model_codes(
+            my_dataframe,
+            codes_col="initial_code",
+            alt_codes_col="final_sic",
+            out_col="sa_final_codes",
+            digits=DIGITS,
+        )
+        combined_dataframe = combined_dataframe.merge(
+            final_codes, on="unique_id", how="left"
+        )
 
     evaluation_metrics = calc_simple_metrics(combined_dataframe)
 

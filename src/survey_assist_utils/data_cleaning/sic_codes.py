@@ -76,6 +76,9 @@ def expand_to_n_digit_str(input_str: str, n: int) -> set[str]:
     Returns:
         Set of expanded n-digit SIC code strings.
     """
+    if n <= len(input_str):
+        return {input_str}
+
     fill_digits = n - len(input_str)
 
     return {input_str + str(x).zfill(fill_digits) for x in range(10**fill_digits)}
@@ -98,10 +101,20 @@ def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
     if not input_str.isdigit():
         return set()
 
-    if len(input_str) < n:
-        return expand_to_n_digit_str(input_str, n)
+    n_digits = n if n > 0 else 2  # for section assignment
 
-    return {input_str[:n]}
+    prep_set = (
+        {input_str[:n_digits]}
+        if len(input_str) >= n_digits
+        else expand_to_n_digit_str(input_str, n_digits)
+    )
+
+    if n == 0:
+        prep_set = {
+            SECTION_LOOKUP.get(code, "") for code in prep_set if code in SECTION_LOOKUP
+        }
+
+    return validate_sic_codes(prep_set)
 
 
 def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> set[str]:
@@ -124,20 +137,11 @@ def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> s
         )
         return set()
 
-    cleaned_list = [
-        get_clean_n_digit_one_code(i, 2 if n == 0 else n) for i in input_list
-    ]
+    cleaned_list = [get_clean_n_digit_one_code(i, n) for i in input_list]
     # Flatten the sets and deduplicate
-    pruned_list = set().union(*cleaned_list)
+    cleaned_set = set().union(*cleaned_list)
 
-    if n == 0:
-        pruned_list = {
-            SECTION_LOOKUP.get(code, "")
-            for code in pruned_list
-            if code in SECTION_LOOKUP
-        }
-
-    return pruned_list
+    return cleaned_set
 
 
 def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
@@ -159,12 +163,13 @@ def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
     return {str(x) for x in input_set}.intersection(VALID_SIC_CODES)
 
 
-def extract_alt_sic_candidates(
+def extract_alt_candidates_n_digit_codes(
     alt_candidates: list[dict],
     code_name: str,
-    score_name="likelihood",
+    n: int = EXPECTED_CODE_LENGTH,
+    score_name: str = "likelihood",
     threshold: float = 0,
-) -> list[str]:
+) -> set[str]:
     """Extracts alternative sic codes from the model predictions
     and prunes them based on the threshold (i.e. if there is one entry
     with score above the threshold, keep only that one.).
@@ -174,21 +179,34 @@ def extract_alt_sic_candidates(
     Args:
         alt_candidates: List of alternative candidate dictionaries.
         code_name: Key name to extract codes from alternative predictions.
+        n: Number of digits to which the codes should be considered equivalent for pruning.
         score_name: Key name to extract score from alternative predictions.
         threshold: Score threshold for pruning alternative candidates.
 
     Returns:
         List of extracted and pruned alternative sic code strings.
     """
+    if isinstance(alt_candidates, str):
+        return get_clean_n_digit_codes(parse_numerical_code(alt_candidates), n)
+
     if not isinstance(alt_candidates, Iterable):
         logger.warning(
             "Expected a list of dicts for alt_candidates, got %s", type(alt_candidates)
         )
-        return []
+        return {}
 
-    if threshold >= 0:
-        pruned = [x for x in alt_candidates if x.get(score_name, 0) >= threshold]
-        if len(pruned) == 1:
-            alt_candidates = pruned
+    cleaned: dict[str, float] = {}
+    for item in alt_candidates:
+        codes = get_clean_n_digit_one_code(item.get(code_name, None), n)
+        score = item.get(score_name, 0)
+        for code in codes:
+            if code in cleaned:
+                cleaned[code] = max(cleaned[code], score)
+            else:
+                cleaned[code] = score
 
-    return [x.get(code_name, "-9") for x in alt_candidates]
+    pruned = {code for code, score in cleaned.items() if score >= threshold}
+    if len(pruned) == 1:
+        return pruned
+
+    return set(cleaned)

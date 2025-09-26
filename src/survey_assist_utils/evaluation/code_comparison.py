@@ -2,9 +2,7 @@
 
 from collections.abc import Iterable
 
-from survey_assist_utils.data_cleaning.sic_codes import (
-    INVALID_VALUES,
-)
+from survey_assist_utils.data_cleaning.sic_codes import INVALID_VALUES
 
 
 def cast_code_to_set(
