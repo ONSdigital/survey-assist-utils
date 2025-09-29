@@ -10,7 +10,6 @@ Allows parsing --filter_unambiguous, --filter_ambiguous, and
 Use:
     -h, --help to show help message.
 """
-
 import re
 from argparse import ArgumentParser as AP
 
@@ -141,6 +140,7 @@ parser.add_argument(
     default=False,
     help="ignore rows where no n-digit clerical code is available when calculating accuracy",
 )
+
 args = parser.parse_args()
 
 assert args.test_type in [  # noqa: S101
@@ -346,7 +346,6 @@ def compare_row(row: pd.Series) -> bool:
 
 my_dataframe["results_column"] = my_dataframe.apply(compare_row, axis=1)
 matches = my_dataframe["results_column"].sum()
-my_dataframe.to_parquet("two_prompt_eval.parquet", index=False)
 
 # Handle CC recording '4+' etc. by neglecting impossible to match CC values in accuracy calc.
 if args.neglect_impossible:
@@ -376,7 +375,7 @@ if args.neglect_impossible:
     )
 
 print(f"\ntest type: {args.test_type}")
-print(f"accuracy {args.match_type}: {100 * matches / usable_count:.4f}%")
+print(f"accuracy {args.match_type}: {100*matches/usable_count:.4f}%")
 print(f"matches {args.match_type}: {matches}")
-print(f"non_matches {args.match_type}: {usable_count - matches}")
+print(f"non_matches {args.match_type}: {usable_count-matches}")
 print(f"total considered: {usable_count}")
