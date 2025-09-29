@@ -1,7 +1,8 @@
 """Work in progress notebook to visualize metrics for different models.
 
 It loads specific clerical coding data and model outputs from bucket.
-The bucket name and folder needs to be set in the .env file as
+The bucket name and folder (on line 32) can be manually entered or it is read from
+the .env file, where it should be stored as BUCKET_PREFIX variable, i.e.:
 BUCKET_PREFIX = "gs://<bucket-name>/<folder>/"
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)

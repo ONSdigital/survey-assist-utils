@@ -19,10 +19,11 @@ Where:
 - `scripts/get_evaluation_metrics.py`: relative path to the script.
 - `<data_path>`: relative path to the parquet dataset (could be local or gs bucket).
 - `<num-digit>`: number of digits to match between CC and SA choices (accepts "full", "1-digit", "2-digit", ..., "5-digit").
-- `-o` (optional): `old_one_prompt`, default *False*, expect data in a fromat from the old one-prompt pipeline.
-- `-n` (optional): `neglect_four_plus`, default *False*, ignore rows where what CC marked as "4+", meaning there is more than four possible SIC codes for the response.
+- `-o` (optional): `--old_one_prompt`, default *False*, expect data in a fromat from the old one-prompt pipeline.
+- `-c` (optional): `--clerical_file <clerical_file>` Path to the clerically coded file (ground truth).
+        If not provided, the main data file is expected to include clerical columns.
 
-Input data as prepared by the two prompt pileline (`STG5.parquet`) contain final code based on synthetic answer to follow up question. While the data prepared by the one prompt pileline (`STG2_oneprompt.parquet`) includes only initial SIC code and follow slightly different formats, therefore make sure to use the `-o` flag in that case.
+If input data used has been prepared by the two prompt pileline (`STG5.parquet`) then it contains final code based on synthetic answer to follow up question. While the data prepared by the one prompt pileline (`STG2_oneprompt.parquet`) includes only initial SIC code and follow slightly different formats, therefore make sure to use the `-o` flag in that case. Use the `-c` flag only if the clerical coding data is stored in a separate file, for example to point to newer iteration of clerical codes. The `unique_id` column is used to match the records between the two files.
 
 
 ---
@@ -61,19 +62,13 @@ The output will include information about which records were considered/filtered
 ---
 ## Additional notes on running the evaluation pipeline
 
-This section provides additional context on setting up the environment and running evaluation pilelines from `sic-classification-utils` repo.
+This section provides additional information on preparing the data for metrics calculation. It also includes context on running the evaluation pipelines within `sic-classification-utils` repo.
 
-
-### Prerequsites
-This project uses Poetry for dependency management. Please ensure you have Poetry installed.
+### Prerequisites
 - Python 3.12
-- Poetry
+- Poetry (This project uses Poetry for dependency management)
 - Google Cloud SDK
 
-Once Poetry is installed, set up the project by running
-``` bash
-poetry install
-```
 ### Data
 To access the data, use the TLFS data. You can find it in the GCP bucket.
 1. Start up the vector store (`sic-classification-vector-store` repo, run `make run-vector-store`).
