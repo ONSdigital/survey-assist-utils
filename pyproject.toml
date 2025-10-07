@@ -115,3 +115,4 @@ disable = ["E0401"]
 
 [tool.pylint]
 ignore = [".venv"]
+ignore-paths = ["notebooks/temp/"]
