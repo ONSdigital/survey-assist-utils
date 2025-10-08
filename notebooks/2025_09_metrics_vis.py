@@ -51,16 +51,14 @@ cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
 
 # %%
 # load model outputs
-model_prompt2_file = (
-    f"{bucket_prefix}two_prompt_pipeline/stage_5_get_final_sic/"
-    + "updated_full_2k_processed_results/STG5.parquet"
-)
-model_prompt1_file = (
-    f"{bucket_prefix}one_prompt_pipeline/"
-    + "updated_full_2k_processed_results_oneprompt/STG2_oneprompt.parquet"
-)
-prompt2_df = pd.read_parquet(model_prompt2_file)
-prompt1_df = pd.read_parquet(model_prompt1_file)
+model_files = {
+    "m_1p_g2.0": f"{bucket_prefix}one_prompt_pipeline/2028_08_full_2k_oneprompt/STG2_oneprompt.parquet",
+    "m_2p_g2.0": f"{bucket_prefix}two_prompt_pipeline/2025_08_full_2k_gemini20/STG5.parquet",
+    "m_2p_g2.5": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
+    "m_semantic": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
+}
+
+model_dfs = {name: pd.read_parquet(path) for name, path in model_files.items()}
 
 
 # %%
@@ -95,8 +93,6 @@ def semantic_distance_to_confidence(
     return pruned
 
 
-prompt2_df["semantic_codes"] = None
-
 # top = prompt2_df["semantic_candidates"].apply(lambda x: x[0].get("likelihood") if x else None)
 # px.histogram(top)
 
@@ -106,8 +102,11 @@ prompt2_df["semantic_codes"] = None
 eval_metrics = {}
 for DIGITS in [5, 4, 3, 2, 1, 0]:
     print(f"--- Evaluating {DIGITS}-digit match ---")
+
+    # clerical coding (2nd iteration, ground truth):
     clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
 
+    # initial clerical codes for comparison with ground truth (it2):
     clerical_codes_it1 = prep_clerical_codes(
         cc_it1_df, cc_it1_4plus_df, digits=DIGITS
     ).rename(columns={"clerical_codes": "sa_initial_codes"})
@@ -116,8 +115,19 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
     )
     eval_metrics[(DIGITS, "cc_it1")] = calc_simple_metrics(combined_dataframe_cc)
 
+    # standard model outputs (2 prompt):
+    for model_name in ["m_2p_g2.0", "m_2p_g2.5"]:
+        model_prompt2 = prep_model_codes(
+            model_dfs[model_name], digits=DIGITS, out_col="sa_initial_codes"
+        )
+        combined_dataframe_m2 = model_prompt2.merge(
+            clerical_codes_it2, on="unique_id", how="inner"
+        )
+        eval_metrics[(DIGITS, model_name)] = calc_simple_metrics(combined_dataframe_m2)
+
+    # one prompt model (with thresholding on the likelihood):
     model_prompt1 = prep_model_codes(
-        prompt1_df,
+        model_dfs["m_1p_g2.0"],
         digits=DIGITS,
         out_col="sa_initial_codes",
         codes_col="final_sic_code",
@@ -128,31 +138,24 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
     combined_dataframe_m1 = model_prompt1.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )
-    eval_metrics[(DIGITS, "m_1p")] = calc_simple_metrics(combined_dataframe_m1)
+    eval_metrics[(DIGITS, "m_1p_g2.0")] = calc_simple_metrics(combined_dataframe_m1)
 
-    model_prompt2 = prep_model_codes(
-        prompt2_df, digits=DIGITS, out_col="sa_initial_codes"
-    )
-    combined_dataframe_m2 = model_prompt2.merge(
-        clerical_codes_it2, on="unique_id", how="inner"
-    )
-    eval_metrics[(DIGITS, "m_2p")] = calc_simple_metrics(combined_dataframe_m2)
-
-    prompt2_df["semantic_candidates"] = prompt2_df["semantic_search_results"].apply(
-        lambda x, digits=DIGITS: semantic_distance_to_confidence(x, digits=digits)
-    )
+    # semantic search model (with thresholding on the likelihood calculated from distance):
+    model_dfs["m_semantic"]["semantic_candidates"] = model_dfs["m_semantic"][
+        "semantic_search_results"
+    ].apply(lambda x, digits=DIGITS: semantic_distance_to_confidence(x, digits=digits))
     model_semantic = prep_model_codes(
-        prompt2_df,
+        model_dfs["m_semantic"],
         digits=DIGITS,
         out_col="sa_initial_codes",
-        codes_col="semantic_codes",
+        codes_col=None,
         alt_codes_col="semantic_candidates",
         threshold=0.6,
     )
     combined_dataframe_sem = model_semantic.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )
-    eval_metrics[(DIGITS, "m_sem")] = calc_simple_metrics(combined_dataframe_sem)
+    eval_metrics[(DIGITS, "m_semantic")] = calc_simple_metrics(combined_dataframe_sem)
 
 # %%
 plot_df_f1 = pd.DataFrame(
@@ -223,14 +226,14 @@ F1: The harmonic mean of precision and recall.
     xref="paper",
     yref="paper",
     x=-0.08,
-    y=-0.5,
+    y=-0.42,
     showarrow=False,
     font={"size": 10},
 )
 fig.update_layout(height=500, width=770)
 
 fig.show()
-fig.write_html("data/2025-09_metrics_ambiguity_all_methods.html")
+fig.write_html("data/temp/2025-09_metrics_ambiguity_all_methods.html")
 
 
 # %%
@@ -290,14 +293,14 @@ MM: Many-to-Many match on the full set. (Is there any overlap between the true l
     xref="paper",
     yref="paper",
     x=-0.08,
-    y=-0.5,
+    y=-0.42,
     showarrow=False,
     font={"size": 10},
 )
 fig.update_layout(height=500, width=770)
 
 fig.show()
-fig.write_html("data/2025-09_metrics_accuracy_all_methods.html")
+fig.write_html("data/temp/2025-09_metrics_accuracy_all_methods.html")
 
 # %%
 # create confusion matrix for section (0-digit)
@@ -340,7 +343,7 @@ for lab, msk in subset.items():
     fig.show()
 
     fig.write_html(
-        f"data/2025-09_metrics_vis_prompt2_{lab.lower().replace('-', '_')}_confusion_matrix.html"
+        f"data/temp/2025-09_metrics_vis_prompt2_{lab.lower().replace('-', '_')}_confusion_matrix.html"
     )
 
 # %%
