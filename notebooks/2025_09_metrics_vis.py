@@ -347,3 +347,14 @@ for lab, msk in subset.items():
     )
 
 # %%
+# inspect sample of questions
+sample_ids = cc_it2_df.sample(20, random_state=1).unique_id
+for uid in sample_ids:
+    print(f"Unique ID: {uid}")
+    for model in ["m_2p_g2.0", "m_2p_g2.5"]:
+        question = model_dfs[model][
+            model_dfs[model].unique_id == uid
+        ].followup_question.iloc[0]
+        print(f"{model}: {question}")
+
+# %%
