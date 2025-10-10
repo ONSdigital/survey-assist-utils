@@ -52,7 +52,7 @@ cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
 # %%
 # load model outputs
 model_files = {
-    "m_1p_g2.0": f"{bucket_prefix}one_prompt_pipeline/2028_08_full_2k_oneprompt/STG2_oneprompt.parquet",
+    "m_1p_g2.0": f"{bucket_prefix}one_prompt_pipeline/2025_08_full_2k_oneprompt_g20/STG2_oneprompt.parquet",
     "m_2p_g2.0": f"{bucket_prefix}two_prompt_pipeline/2025_08_full_2k_gemini20/STG5.parquet",
     "m_2p_g2.5": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
     "m_semantic": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
