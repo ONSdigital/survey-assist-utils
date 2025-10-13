@@ -106,7 +106,7 @@ def generate_jwt(
     adc, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
 
     # Use the official client to call signJwt
-    client = iam_credentials_v1.IAMCredentialsClient(credentials=adc)
+    client = iam_credentials_v1.IAMCredentialsClient(credentials=adc, transport="rest")
     name = f"projects/-/serviceAccounts/{sa_email}"
 
     resp = client.sign_jwt(

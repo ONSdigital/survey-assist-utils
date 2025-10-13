@@ -140,7 +140,7 @@ class _IamClientSpy:  # pylint: disable=too-few-public-methods
     # Keep reference to last constructed instance for assertions.
     last_instance: _IamClientSpy | None = None
 
-    def __init__(self, *, credentials: Any) -> None:
+    def __init__(self, *, credentials: Any, **kwargs) -> None:
         self.credentials = credentials
         self.last_request: dict[str, Any] | None = None
         _IamClientSpy.last_instance = self

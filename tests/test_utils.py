@@ -136,7 +136,7 @@ def test_generate_jwt_iam_api_error(monkeypatch: MonkeyPatch) -> None:
     """Bubble up underlying IAMCredentials API errors."""
 
     class _Client:
-        def __init__(self, *, credentials: Any) -> None:
+        def __init__(self, *, credentials: Any, transport="rest") -> None:
             self.credentials = credentials
 
         def sign_jwt(self, *, request: dict[str, Any]) -> Any:
