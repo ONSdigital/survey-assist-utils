@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "survey-assist-utils"
-version = "0.0.5"
+version = "0.0.6"
 description = "Utility module for Survey Assist"
 authors = ["Steve Gibbard <steve.gibbard@ons.gov.uk>"]
 license = "MIT"
