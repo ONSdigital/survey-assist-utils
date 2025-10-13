@@ -35,12 +35,21 @@ Ensure you have the following installed on your local machine:
     cd survey-assist-utils
     ```
 
-2.  **Install Dependencies**
+2. **Create and activate a virtual environment**
+
+    Using `pyenv` and `pyenv-virtualenv`:
+
+    ```bash
+    python3.12 -m venv .venv
+    source .venv/bin/activate
+    ```
+
+3.  **Install Dependencies**
     ```bash
     poetry install
     ```
 
-3. **Generate an API Token**
+4. **Generate an API Token**
 
     The API uses Application Default Credentials to generate and authenticate tokens.
 
@@ -115,31 +124,22 @@ Pytest is used for testing.
     make all-tests
     ```
 
+### Pre-commit Hooks
+
+Pre-commit hooks are set up to run code quality checks before each commit. They will call `make check-python` under the hood as well.
+To install the hooks, run:
+
+```bash
+pre-commit install
+```
 
 # Methodology for evaluating alignment between clerical coders and Survey Assist outputs
 
-## Overview
-
-This repository provides a framework for processing batches of survey data through the Survey Assist system and evaluating the quality of the LLM's SIC code classifications. The process starts with a labelled set of survey data and ends with a detailed performance analysis.
-
-## The Data
-The source of the data is TLFS sets of labelled data that have been annotated by expert coders. 
-The annotation isn't required for the processing, only for the evaluation.
-
 ## The Evaluation Workflow
 
-The end-to-end process is handled by a series of scripts that form a data pipeline:
-* to do * 
-Refactoring - DataCleaner moved to own module
+See [`scripts/evaluation_metrics.md`](./scripts/evaluation_metrics.md) for details on running the evaluation scripts.
 
-### DataCleaner
-This can be run using the script 
-example_data_runner.py
-
-The output for this will be the input to the next stage which is work in progress.
-
-
-
+**Legacy notes on the evaluation process:**
 
 1.  **Stage 1: Batch Processing (`process_tlfs_evaluation_data.py`)**
     * **Input:** A CSV file containing survey responses (e.g., job title, industry description).
@@ -155,19 +155,15 @@ The output for this will be the input to the next stage which is work in progres
     * Before analysis, the data file needs to be cleaned weith this module
 
 5.  **Stage 5: JSON merging**
-    This is a work in progress and will be added later    
+    This is a work in progress and will be added later
 
 6.  **Stage 6: Performance Analysis (`coder_alignment.py`)**
     * **Input:** A merged DataFrame containing both the raw LLM output from Stage 1 and the enriched human-coded data from Stage 2.
     * **Process:** The `LabelAccuracy` class takes this combined data and calculates a suite of metrics to measure the alignment between the LLM's suggestions and the human-provided ground truth.
     * **Output:** Quantitative metrics and visualisations (e.g., heatmaps, charts) that summarise the model's performance.
 
-## Human Coder Alignment
 
-* **Dataset:** The evaluation is performed against a 2,000-record sample from across all SIC sections, containing expert SIC assignments.
-* **Unambiguous Subset:** A key part of the analysis focuses on "Unambiguous" responses, where a human coder provided only a single, complete 5-digit SIC code. This provides a clean baseline for model performance and can be enabled via a flag in the `ColumnConfig`.
-
-## Core Evaluation Metrics
+**Core Evaluation Metrics**
 
 The `coder_alignment` module provides several key metrics to assess performance from different angles:
 
