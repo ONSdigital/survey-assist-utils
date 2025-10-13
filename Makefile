@@ -10,11 +10,6 @@ clean: ## Clean the temporary files.
 	rm -rf .mypy_cache
 	rm -rf .ruff_cache	
 
-API_JWT_CMD=poetry run python ./scripts/generate_api_token.py
-
-generate-token:
-	$(API_JWT_CMD)
-
 run-docs: ## Run the mkdocs
 	poetry run mkdocs serve
 
