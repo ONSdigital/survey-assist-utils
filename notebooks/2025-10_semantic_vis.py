@@ -1,4 +1,4 @@
-"""Work in progress notebook to visualize metrics for different models.
+"""Work in progress notebook to visualize metrics for different embeddings.
 
 It loads specific clerical coding data and model outputs from bucket.
 The bucket name and folder (on line 32) can be manually entered or it is read from
@@ -117,7 +117,7 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
     # clerical coding (2nd iteration, ground truth):
     clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
 
-    # semantic search model (with thresholding on the likelihood calculated from distance):
+    # semantic search models (for different length of candidate shortlist):
     for shortlist_size in [5, 10, None]:
         for sem_name, sem_df in semantic_dfs.items():
             semantic_dfs[sem_name]["semantic_candidates"] = sem_df[
@@ -207,8 +207,9 @@ fig.update_layout(height=500, width=770)
 fig.show()
 fig.write_html("data/temp/2025-09_metrics_accuracy_semantic_methods.html")
 
+
 # %%
-# top candidate likelihood threshold (proportion vs accuracy)
+# top candidate performance by threshold on distance
 top_match_metrics = {}
 for DIGITS in [5, 0]:
     logger.info("--- Evaluating %d-digit match ---", DIGITS)
@@ -218,26 +219,21 @@ for DIGITS in [5, 0]:
 
     # semantic search model (with thresholding on the likelihood calculated from distance):
     for sem_name, sem_df in semantic_dfs.items():
-        semantic_dfs[sem_name]["semantic_candidates"] = sem_df[
-            "semantic_search_results"
-        ].apply(
-            lambda x, digits=DIGITS: semantic_distance_to_confidence(x, digits=digits)
-        )
-
         combined_dataframe_sem = sem_df.merge(
             clerical_codes_it2, on="unique_id", how="inner"
         )
 
+        # get top candidate with its distance and whether it is in clerical shortlist
+        combined_dataframe_sem["top_distance"] = combined_dataframe_sem[
+            "semantic_search_results"
+        ].apply(lambda x: x[0]["distance"] if len(x) > 0 else None)
         combined_dataframe_sem["top_candidate"] = combined_dataframe_sem[
-            "semantic_candidates"
+            "semantic_search_results"
         ].apply(
             lambda x, digits=DIGITS: (
-                get_clean_n_digit_one_code(x[0]["code"], digits) if x else None
+                get_clean_n_digit_one_code(x[0]["code"], digits) if len(x) > 0 else None
             )
         )
-        combined_dataframe_sem["top_distance"] = combined_dataframe_sem[
-            "semantic_candidates"
-        ].apply(lambda x: x[0]["distance"] if x else None)
         combined_dataframe_sem["top_in_cc"] = combined_dataframe_sem.apply(
             lambda row: next(iter(row["top_candidate"])) in row["clerical_codes"],
             axis=1,
@@ -260,6 +256,8 @@ for DIGITS in [5, 0]:
         combined_dataframe_sem = combined_dataframe_sem.drop_duplicates(
             subset=["top_distance"], keep="last"
         )
+
+        # store for plotting
         top_match_metrics[(DIGITS, sem_name)] = combined_dataframe_sem[
             ["top_distance", "codability", "accuracy"]
         ].copy()
