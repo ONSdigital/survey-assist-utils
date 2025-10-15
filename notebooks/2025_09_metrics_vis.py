@@ -8,7 +8,7 @@ BUCKET_PREFIX = "gs://<bucket-name>/<folder>/"
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103
+# pylint: disable=C0301,C0103,R0801
 
 # %%
 import logging
@@ -52,56 +52,22 @@ cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
 # %%
 # load model outputs
 model_files = {
-    "m_1p_g2.0": f"{bucket_prefix}one_prompt_pipeline/2025_08_full_2k_oneprompt_g20/STG2_oneprompt.parquet",
+    "m_1p_old_g2.0": f"{bucket_prefix}one_prompt_pipeline/2025_08_full_2k_oneprompt_g20/STG2_oneprompt.parquet",
+    "m_1p_old_g2.5": f"{bucket_prefix}one_prompt_pipeline/2025_10_with_codable_gemini25/STG2.parquet",
+    "m_1p_g2.5": f"{bucket_prefix}one_prompt_pipeline/2025_10_full_2k_gemini25/STG5.parquet",
+    "m_1p_g2.0": f"{bucket_prefix}one_prompt_pipeline/2025_10_full_2k_gemini20/STG5.parquet",
     "m_2p_g2.0": f"{bucket_prefix}two_prompt_pipeline/2025_08_full_2k_gemini20/STG5.parquet",
     "m_2p_g2.5": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
-    "m_semantic": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
 }
 
 model_dfs = {name: pd.read_parquet(path) for name, path in model_files.items()}
 
 
 # %%
-# convert semantic distance to confidence
-def semantic_distance_to_confidence(
-    sem_dist: list[dict], digits: int
-) -> list[dict] | None:
-    """Convert semantic distance to confidence score."""
-    sem_dist = list(sem_dist)
-    if len(sem_dist) == 0:
-        return None
-    if len(sem_dist) == 1:
-        sem_dist[0]["likelihood"] = 1.0
-        return sem_dist
-    # normalize to [0, 1]
-    eps = 0.00001
-    pruned: list[dict] = []
-    for item in sem_dist:
-        code = item["code"][: (digits if digits > 0 else 2)]
-        if code not in [x["code"] for x in pruned] and item["distance"] < 1 - 0.05:
-            pruned.append({"code": code, "distance": item["distance"]})
-
-    top_two = sum(sorted(x["distance"] for x in pruned[:2])) + eps
-
-    for ind, item in enumerate(pruned):
-        item["likelihood"] = max(
-            0, 1 - item["distance"] / top_two - item["distance"] * 0.4 - ind * 0.1
-        )
-
-    # if pruned[0]['distance']<0.1:  # Clasiffai threshold implementation
-    #    return pruned[:1]
-    return pruned
-
-
-# top = prompt2_df["semantic_candidates"].apply(lambda x: x[0].get("likelihood") if x else None)
-# px.histogram(top)
-
-
-# %%
 # calculate metrics
 eval_metrics = {}
 for DIGITS in [5, 4, 3, 2, 1, 0]:
-    print(f"--- Evaluating {DIGITS}-digit match ---")
+    logger.info("--- Evaluating %d-digit match ---", DIGITS)
 
     # clerical coding (2nd iteration, ground truth):
     clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
@@ -116,9 +82,12 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
     eval_metrics[(DIGITS, "cc_it1")] = calc_simple_metrics(combined_dataframe_cc)
 
     # standard model outputs (2 prompt):
-    for model_name in ["m_2p_g2.0", "m_2p_g2.5"]:
+    for model_name in set(model_dfs.keys()) - {"m_1p_old_g2.0"}:
         model_prompt2 = prep_model_codes(
-            model_dfs[model_name], digits=DIGITS, out_col="sa_initial_codes"
+            model_dfs[model_name],
+            digits=DIGITS,
+            out_col="sa_initial_codes",
+            threshold=0.7,
         )
         combined_dataframe_m2 = model_prompt2.merge(
             clerical_codes_it2, on="unique_id", how="inner"
@@ -127,7 +96,7 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
 
     # one prompt model (with thresholding on the likelihood):
     model_prompt1 = prep_model_codes(
-        model_dfs["m_1p_g2.0"],
+        model_dfs["m_1p_old_g2.0"],
         digits=DIGITS,
         out_col="sa_initial_codes",
         codes_col="final_sic_code",
@@ -138,24 +107,7 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
     combined_dataframe_m1 = model_prompt1.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )
-    eval_metrics[(DIGITS, "m_1p_g2.0")] = calc_simple_metrics(combined_dataframe_m1)
-
-    # semantic search model (with thresholding on the likelihood calculated from distance):
-    model_dfs["m_semantic"]["semantic_candidates"] = model_dfs["m_semantic"][
-        "semantic_search_results"
-    ].apply(lambda x, digits=DIGITS: semantic_distance_to_confidence(x, digits=digits))
-    model_semantic = prep_model_codes(
-        model_dfs["m_semantic"],
-        digits=DIGITS,
-        out_col="sa_initial_codes",
-        codes_col=None,
-        alt_codes_col="semantic_candidates",
-        threshold=0.6,
-    )
-    combined_dataframe_sem = model_semantic.merge(
-        clerical_codes_it2, on="unique_id", how="inner"
-    )
-    eval_metrics[(DIGITS, "m_semantic")] = calc_simple_metrics(combined_dataframe_sem)
+    eval_metrics[(DIGITS, "m_1p_old_g2.0")] = calc_simple_metrics(combined_dataframe_m1)
 
 # %%
 plot_df_f1 = pd.DataFrame(
@@ -303,48 +255,73 @@ fig.show()
 fig.write_html("data/temp/2025-09_metrics_accuracy_all_methods.html")
 
 # %%
-# create confusion matrix for section (0-digit)
-df = combined_dataframe_m2
+# create confusion matrix for section (0-digit) and subset of 5-digit
 col1 = "clerical_codes"
 col2 = "sa_initial_codes"
-labels = sorted(df[col1].explode().dropna().unique())
-subset = {}
-subset["Unambiguously coded cases only"] = (df[col1].map(len) == 1) & (
-    df[col2].map(len) == 1
-)
-# for semi-unambiguous, keep only cases where there is small set on either side
-n = 3
-subset["Subset of ambiguous cases with only two candidates"] = (
-    (df[col1].map(len) < n) & (df[col2].map(len) < n) & ~next(iter(subset.values()))
-)
 
-for lab, msk in subset.items():
-    df = combined_dataframe_m2[msk].copy()
-    df = df.explode(col1).explode(col2)
-    plot_df = df.groupby([col1, col2]).size().unstack(fill_value="")
-    fig = px.imshow(
-        plot_df,
-        text_auto=True,
-        aspect="equal",
-        color_continuous_scale="Blues",
-        title=f"Confusion matrix for SIC section, Clerical vs SurveyAssist (2 prompt model)<br><b>{lab}</b>",
-        template="simple_white",
+for DIGITS in [0, 5]:
+    clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
+    model_prompt2 = prep_model_codes(
+        model_dfs["m_2p_g2.5"], digits=DIGITS, out_col="sa_initial_codes"
     )
-    # reorder x axis values
-    fig.update_xaxes(
-        title="Model Initial Code", categoryorder="array", categoryarray=labels
+    df = model_prompt2.merge(clerical_codes_it2, on="unique_id", how="inner")
+
+    subset = {}
+    subset["Unambiguously coded cases only"] = (df[col1].map(len) == 1) & (
+        df[col2].map(len) == 1
     )
-    fig.update_yaxes(
-        title="Clerical Initial Code", categoryorder="array", categoryarray=labels
+    # for semi-unambiguous, keep only cases where there is small set on either side
+    n = 3
+    subset["Subset of ambiguous cases with only two candidates"] = (
+        (df[col1].map(len) < n) & (df[col2].map(len) < n) & ~next(iter(subset.values()))
     )
 
-    fig.update_layout(height=700, width=770)
+    for lab, msk in subset.items():
+        df2 = df[msk].copy().explode(col1).explode(col2)
+        if DIGITS > 1:
+            # find the most frequent off diagonal entries in plot_df
+            df3 = (
+                df2[df2[col1] != df2[col2]]
+                .groupby([col1, col2])
+                .size()
+                .sort_values(ascending=False)
+            )
+            cutoff = df3.iloc[min(10, len(df3) - 1)]
+            df3 = df3[df3 > cutoff].reset_index()
+            labels = sorted(set(df3[col1]).union(df3[col2]))
+            plot_df = (
+                df2[df2[col1].isin(labels) & df2[col2].isin(labels)]
+                .groupby([col1, col2])
+                .size()
+                .unstack(fill_value="")
+            )
+        else:
+            labels = sorted(df[col1].explode().dropna().unique())
+            plot_df = df2.groupby([col1, col2]).size().unstack(fill_value="")
 
-    fig.show()
+        fig = px.imshow(
+            plot_df,
+            text_auto=True,
+            aspect="equal",
+            color_continuous_scale="Blues",
+            title=f"Confusion matrix for SIC section, Clerical vs SurveyAssist (2 prompt model)<br><b>{lab}</b>",
+            template="simple_white",
+        )
+        # reorder x axis values
+        fig.update_xaxes(
+            title="Model Initial Code", categoryorder="array", categoryarray=labels
+        )
+        fig.update_yaxes(
+            title="Clerical Initial Code", categoryorder="array", categoryarray=labels
+        )
 
-    fig.write_html(
-        f"data/temp/2025-09_metrics_vis_prompt2_{lab.lower().replace('-', '_')}_confusion_matrix.html"
-    )
+        fig.update_layout(height=700, width=770)
+
+        fig.show()
+
+        fig.write_html(
+            f"data/temp/2025-09_metrics_vis_prompt2_{lab.lower().replace('-', '_')}_confusion_matrix.html"
+        )
 
 # %%
 # inspect sample of questions
