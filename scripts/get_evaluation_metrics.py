@@ -1,16 +1,19 @@
 """Script that calculates accuracy metrics for survey assist evaluation model.
 
-Takes evaluation_data and match_digits as positional arguments.
+Takes evaluation_data file as positional arguments.
 
 Optional arguments:
+    -n <number_of_digits>, --number_of_digits <number_of_digits> Required number of digits
+        Expected one of 0 / 1 / 2 / 3 / 4 / 5.
     -c <clerical_file>, --clerical_file <clerical_file> Path to the clerical codes file.
         If not provided, the main data file is expected to include clerical columns.
-    -o, --old_one_prompt to expect data format from one_prompt pipeline.
+    -w, --write_output If set, writes the evaluation metrics to a JSON file.
 
 Use:
     -h, --help to show help message.
 """
 
+import json
 import logging
 from argparse import ArgumentParser as AP
 
@@ -37,7 +40,13 @@ if __name__ == "__main__":
         "evaluation_data", type=str, help="relative path to the parquet dataset"
     )
 
-    parser.add_argument("match_digits", type=str, help="match type: full / n-digit")
+    parser.add_argument(
+        "-n",
+        "--number_of_digits",
+        type=str,
+        default=None,
+        help="Number of digits:  0 / 1 / 2 / 3 / 4 / 5",
+    )
 
     parser.add_argument(
         "-c",
@@ -48,20 +57,26 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--old_one_prompt",
-        "-o",
+        "-w",
+        "--write_output",
         action="store_true",
         default=False,
-        help="expect data format from one_prompt pipeline (column names)",
+        help="If set, writes the evaluation metrics to a JSON file.",
     )
 
     args = parser.parse_args()
 
-    if not args.match_digits.startswith(
-        ("full", "0-digit", "1-digit", "2-digit", "3-digit", "4-digit", "5-digit")
+    if args.number_of_digits is not None and args.number_of_digits not in (
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
     ):
-        raise ValueError("illegal value passed for match_digits")
-    DIGITS = 5 if args.match_digits == "full" else int(args.match_digits[0])
+        raise ValueError("illegal value passed for number_of_digits")
+
+    DIGITS = int(args.number_of_digits) if args.number_of_digits else 5
 
     # Load final-stage output DataFrame
     try:
@@ -100,31 +115,19 @@ if __name__ == "__main__":
 
     clerical_codes = prep_clerical_codes(clerical_df, clerical_4plu_df, digits=DIGITS)
 
-    model_codes = (
-        prep_model_codes(
-            my_dataframe,
-            codes_col="final_sic_code",
-            alt_codes_col="sic_candidates",
-            out_col="sa_initial_codes",
-            alt_codes_name="sic_code",
-            threshold=0.7,
-            digits=DIGITS,
-        )
-        if args.old_one_prompt
-        else prep_model_codes(
-            my_dataframe,
-            codes_col="initial_code",
-            alt_codes_col="alt_sic_candidates",
-            out_col="sa_initial_codes",
-            alt_codes_name="code",
-            threshold=0,
-            digits=DIGITS,
-        )
+    model_codes = prep_model_codes(
+        my_dataframe,
+        codes_col="initial_code",
+        alt_codes_col="alt_sic_candidates",
+        out_col="sa_initial_codes",
+        alt_codes_name="code",
+        threshold=0,
+        digits=DIGITS,
     )
 
     combined_dataframe = model_codes.merge(clerical_codes, on="unique_id", how="inner")
 
-    if not args.old_one_prompt:
+    try:
         final_codes = prep_model_codes(
             my_dataframe,
             codes_col="initial_code",
@@ -132,10 +135,29 @@ if __name__ == "__main__":
             out_col="sa_final_codes",
             digits=DIGITS,
         )
+
         combined_dataframe = combined_dataframe.merge(
             final_codes, on="unique_id", how="left"
+        )
+    except KeyError:
+        logger.warning(
+            "Final codes not found in the data. Skipping final code metrics."
         )
 
     evaluation_metrics = calc_simple_metrics(combined_dataframe)
 
     print(evaluation_metrics.report_metrics())
+
+    if args.write_output:
+        out_file = args.evaluation_data.replace(".parquet", f"_metrics_{DIGITS}d.json")
+        if out_file.startswith("gs://"):
+            # optional dependency on gsfs
+            from gcsfs import GCSFileSystem
+
+            fs = GCSFileSystem()
+            with fs.open(out_file, "w") as f:
+                json.dump(evaluation_metrics.__dict__, f, indent=2)
+        else:
+            with open(out_file, "w", encoding="utf-8") as f:
+                json.dump(evaluation_metrics.__dict__, f, indent=2)
+        logger.info("Wrote evaluation metrics to %s", out_file)

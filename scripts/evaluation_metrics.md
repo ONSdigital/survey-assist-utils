@@ -6,6 +6,8 @@ The individual scripts are designed to handle different data pre-processing step
 
 The input data are expected to be in a parquet format, created by evaluation pipeline scripts in the `sic-classification-utils` repo, see notes at the end of this document.
 
+Additionally, examples of visualizations of the evaluation metrics are available in the `notebooks/2025-10_semantic_vis.py` notebook.
+
 ## Usage
 
 In general, the scripts can be run from the command line and takes several arguments. The evaluation metrics will be printed to the console.
@@ -13,52 +15,29 @@ In general, the scripts can be run from the command line and takes several argum
 ---
 For the `get_evaluation_metrics.py` script, use:
 ```{shell}
-python scripts/get_evaluation_metrics.py <data_path> <num-digit> [-o] [-n]
+python scripts/get_evaluation_metrics.py <data_path> [-n <number-of-digits>] [-c <clerical_file>] [-w]
 ```
 Where:
 - `scripts/get_evaluation_metrics.py`: relative path to the script.
 - `<data_path>`: relative path to the parquet dataset (could be local or gs bucket).
-- `<num-digit>`: number of digits to match between CC and SA choices (accepts "full", "1-digit", "2-digit", ..., "5-digit").
-- `-o` (optional): `--old_one_prompt`, default *False*, expect data in a fromat from the old one-prompt pipeline.
-- `-c` (optional): `--clerical_file <clerical_file>` Path to the clerically coded file (ground truth).
+- `-n <number-of-digits>` (optional): `--number-of-digits <number-of-digits>` number of digits to match between CC and SA choices, default *5* (full match). Accepts values: "0", "1", "2", "3", "4", "5".
+- `-c <clerical_file>` (optional): `--clerical_file <clerical_file>` Path to the clerically coded file (ground truth).
         If not provided, the main data file is expected to include clerical columns.
+- `-w` (optional): `--write_output`, default *False*. If set, writes the evaluation metrics to a JSON file.
 
-If input data used has been prepared by the two prompt pileline (`STG5.parquet`) then it contains final code based on synthetic answer to follow up question. While the data prepared by the one prompt pileline (`STG2_oneprompt.parquet`) includes only initial SIC code and follow slightly different formats, therefore make sure to use the `-o` flag in that case. Use the `-c` flag only if the clerical coding data is stored in a separate file, for example to point to newer iteration of clerical codes. The `unique_id` column is used to match the records between the two files.
 
+Use the `-c` flag if the clerical coding data is stored in a separate file, for example to point to newer iteration of clerical codes. The `unique_id` column is used to match the records between the two files.
 
----
-For the `one_prompt_evaluation_revised.py` and `two_prompt_evaluation_revised.py` scripts, use:
-```{shell}
-python scripts/one_prompt_evaluation_revised.py data/STG2_oneprompt.parquet <OO / MM / OM / MO> <full / 2-digit> <-fua / -fa> -n
-
-python scripts/two_prompt_evaluation_revised.py data/STG5.parquet <OO / MM / OM / MO> <full / 2-digit> <-fua / -fa> -n
-```
-Arguments:
-- `scripts/one_prompt_evaluation_revised.py`, `scripts/two_prompt_evaluation_revised.py`: relative path to the script, corresponding to the evaluation type.
-- `data/STG2_oneprompt.parquet`, `data/STG5.parquet`: relative path to the parquet dataset.
-- `<OO / MM / OM / MO>`: test type, where *M* stnads for Many, *O* stands for One. Represents the number of matches to be found. Format: Clerical Coder - Survey Assist:
-    - `OO`: Clerical Coder and Survey Assist model agree exactly.
-    - `MM`: Any of the Clerical Coder's choices is in the Survey Assist's choices.
-    - `OM`: Clerical Coder's choice is one of the choices made by Survey Assist model.
-    - `MO`: Any of the Clerical Coder's choices match one of the choices by Survey Assist model.
-- `<full / 2-digit>`: match type; the length of code to match between CC and SA choices.
-    - `full`: match full, 5-digit code, e.g. CC code \`12345\` matches SA code \`12345\`, but CC code \`12345\` does not match SA code \`12333\`.
-    - `2-digit`: match first two digits form the SIC code, e.g. CC code \`12345\` matches SA code \`12345\`, and CC code \`12345\` matches SA code \`12333\`, but CC code \`12345\` does not match SA code \`11111\`.
-- `<-fua / -fa>` (optional): boolean filters, default *False*:
-    - `-fua`: \`filter unambiguous\`, considers only those responses that Clerical Coders reported as unambiguously codable.
-    - `-fa`: \`filter ambiguous\`, considers only those responses that Clerical Coders reported as NOT unambiguously codable.
-    - neither \`-fua`\`, nor \`-fa\` present: consideres all responses, regardless of ambiguity.
-- `-n` (optional): \`neglect impossible\`, default *False*, ignore rows that CC marked as \`4+\`, meaning there is more than four possible SIC codes for the response.
-
-## Metrics
-The output will include information about which records were considered/filtered and what type of test and match was performed. The accuracy is calculated as a percentage of matches divided by the total responses considered in the metric.
 
 ## Abbreviations
 - CC - Clerical Coder
 - SA - Survey Assist
 - SIC - Standard Industrial Classification
+- OO: One-to-One match on a subset where the true label as well as the model's label are not ambiguous.
+- OM: One-to-Many match on a subset where the true label is not ambiguous. (Is the true label in the model's shortlist?)
+- MO: Many-to-One match on a subset where the model is not ambiguous. (Is the model's label in the true label shortlist?)
+- MM: Many-to-Many match on the full set. (Is there any overlap between the true label's and model's shortlists?)
 
----
 ---
 ## Additional notes on running the evaluation pipeline
 
@@ -86,4 +65,4 @@ In the `sic-classification-utils` repo (steps 2-4):
     ```
     bash ./run_full_pipeline.sh 2 TwoPromptOutputs /path/to/tlfs_data.csv /path/to/tlfs_data_metadata.json 20
     ```
-The data will be saved in the specified folder (e.g., OnePromptOutputs, or TwoPromptOutputs) as `STG2_oneprompt.parquet` for one prompt pipeline, or `STG5.parquet` for two prompts pipeline.
+The data will be saved in the specified folder (e.g., OnePromptOutputs, or TwoPromptOutputs) as `STG5.parquet` for both pipelines.
