@@ -25,13 +25,15 @@ from survey_assist_utils.evaluation.metrics import (
     calc_simple_metrics,
 )
 
+# %%
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
-
+if not bucket_prefix:
+    raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
 
 # %%
 # load clerical data
@@ -52,10 +54,10 @@ cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
 # %%
 # load model outputs
 model_files = {
-    "m_1p_old_g2.0": f"{bucket_prefix}one_prompt_pipeline/2025_08_full_2k_oneprompt_g20/STG2_oneprompt.parquet",
-    "m_1p_old_g2.5": f"{bucket_prefix}one_prompt_pipeline/2025_10_with_codable_gemini25/STG2.parquet",
+    # one-prompt survey assist outputs
     "m_1p_g2.5": f"{bucket_prefix}one_prompt_pipeline/2025_10_full_2k_gemini25/STG5.parquet",
     "m_1p_g2.0": f"{bucket_prefix}one_prompt_pipeline/2025_10_full_2k_gemini20/STG5.parquet",
+    # two-prompt survey assist outputs
     "m_2p_g2.0": f"{bucket_prefix}two_prompt_pipeline/2025_08_full_2k_gemini20/STG5.parquet",
     "m_2p_g2.5": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
 }
@@ -82,9 +84,9 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
     eval_metrics[(DIGITS, "cc_it1")] = calc_simple_metrics(combined_dataframe_cc)
 
     # standard model outputs (2 prompt):
-    for model_name in set(model_dfs.keys()) - {"m_1p_old_g2.0"}:
+    for model_name, df in model_dfs.items():
         model_prompt2 = prep_model_codes(
-            model_dfs[model_name],
+            df,
             digits=DIGITS,
             out_col="sa_initial_codes",
             threshold=0.7,
@@ -94,20 +96,6 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
         )
         eval_metrics[(DIGITS, model_name)] = calc_simple_metrics(combined_dataframe_m2)
 
-    # one prompt model (with thresholding on the likelihood):
-    model_prompt1 = prep_model_codes(
-        model_dfs["m_1p_old_g2.0"],
-        digits=DIGITS,
-        out_col="sa_initial_codes",
-        codes_col="final_sic_code",
-        alt_codes_col="sic_candidates",
-        alt_codes_name="sic_code",
-        threshold=0.7,
-    )
-    combined_dataframe_m1 = model_prompt1.merge(
-        clerical_codes_it2, on="unique_id", how="inner"
-    )
-    eval_metrics[(DIGITS, "m_1p_old_g2.0")] = calc_simple_metrics(combined_dataframe_m1)
 
 # %%
 plot_df_f1 = pd.DataFrame(
