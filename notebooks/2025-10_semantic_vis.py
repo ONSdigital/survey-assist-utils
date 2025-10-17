@@ -37,6 +37,8 @@ bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
 if not bucket_prefix:
     raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
 
+output_folder = "data/temp/"  # set to None if no output saving is needed
+
 # %%
 # load clerical data
 clerical_it2_file = f"{bucket_prefix}original_datasets/DSC_Rep_Sample_IT2.csv"
@@ -208,7 +210,8 @@ MM: Many-to-Many match on the full set. (Is there any overlap between the true l
 fig.update_layout(height=500, width=770)
 
 fig.show()
-fig.write_html("data/temp/2025-09_metrics_accuracy_semantic_methods.html")
+if output_folder:
+    fig.write_html(f"{output_folder}/2025-09_metrics_accuracy_semantic_methods.html")
 
 
 # %%
@@ -224,7 +227,7 @@ for DIGITS in [5, 0]:
     for sem_name, sem_df in semantic_dfs.items():
         combined_dataframe_sem = sem_df.merge(
             clerical_codes_it2, on="unique_id", how="inner"
-        )
+        ).copy()
 
         # get top candidate with its distance and whether it is in clerical shortlist
         combined_dataframe_sem["top_distance"] = combined_dataframe_sem[
@@ -242,61 +245,87 @@ for DIGITS in [5, 0]:
             axis=1,
         )
 
-        # calculate proportion and accuracy at different thresholds on distance
         combined_dataframe_sem = combined_dataframe_sem.sort_values(
             by="top_distance", ascending=True
         ).reset_index(drop=True)
-        combined_dataframe_sem["cum_count"] = range(1, len(combined_dataframe_sem) + 1)
-        combined_dataframe_sem["codability"] = combined_dataframe_sem[
-            "cum_count"
-        ] / len(combined_dataframe_sem)
-        combined_dataframe_sem["cum_correct"] = combined_dataframe_sem[
-            "top_in_cc"
-        ].cumsum()
-        combined_dataframe_sem["accuracy"] = (
-            combined_dataframe_sem["cum_correct"] / combined_dataframe_sem["cum_count"]
+
+        # subset to CC unambiguous cases
+        unambig_msk = combined_dataframe_sem["clerical_codes"].apply(
+            lambda x: len(x) == 1
         )
+        unambig_df = combined_dataframe_sem[unambig_msk].reset_index(drop=True).copy()
+
+        # calculate proportion and accuracy at different thresholds on distance
+        for df in [combined_dataframe_sem, unambig_df]:
+            df["subset_total"] = range(1, len(df) + 1)
+            df["codability"] = df["subset_total"] / len(df)
+            df["match_count"] = df["top_in_cc"].cumsum()
+            df["accuracy"] = df["match_count"] / df["subset_total"]
+
         combined_dataframe_sem = combined_dataframe_sem.drop_duplicates(
             subset=["top_distance"], keep="last"
         )
+        unambig_df = unambig_df.drop_duplicates(subset=["top_distance"], keep="last")
+
+        df = combined_dataframe_sem[
+            ["top_distance", "codability", "accuracy", "match_count", "subset_total"]
+        ].merge(
+            unambig_df[
+                [
+                    "top_distance",
+                    "codability",
+                    "accuracy",
+                    "match_count",
+                    "subset_total",
+                ]
+            ],
+            on="top_distance",
+            how="inner",
+            suffixes=("_MO", "_OO"),
+        )
 
         # store for plotting
-        top_match_metrics[(DIGITS, sem_name)] = combined_dataframe_sem[
-            ["top_distance", "codability", "accuracy"]
-        ].copy()
+        top_match_metrics[(DIGITS, sem_name)] = df.copy()
 
 # %%
-plot_df_top = pd.DataFrame(
-    [
-        {
-            "digits": digits,
-            "method": method,
-            "codability": row.codability,
-            "distance_threshold": row.top_distance,
-            "Subset Accuracy (within CC shortlist)": row.accuracy,
-        }
-        for (digits, method), df in top_match_metrics.items()
-        for _, row in df.iterrows()
-    ]
-)
-fig = px.line(
-    plot_df_top[
-        plot_df_top["codability"] > 1 / 20
-    ],  # remove initial small sample variation
-    x="codability",
-    y="Subset Accuracy (within CC shortlist)",
-    color="method",
-    facet_col="digits",
-    title="Accuracy vs Codability of top candidates (above parametrised threshold)",
-    template="simple_white",
-    hover_data={"distance_threshold": True},
-)
+for subset in ["MO", "OO"]:
+    plot_df = pd.DataFrame(
+        [
+            {
+                "digits": digits,
+                "method": method,
+                "codability": row[f"codability_{subset}"],
+                "distance_threshold": row.top_distance,
+                f"Subset Accuracy ({subset})": row[f"accuracy_{subset}"],
+                "match_count": row[f"match_count_{subset}"],
+                "subset_total": row[f"subset_total_{subset}"],
+            }
+            for (digits, method), df in top_match_metrics.items()
+            for _, row in df.iterrows()
+        ]
+    )
+    fig = px.line(
+        plot_df[
+            plot_df["codability"] > 1 / 10
+        ],  # remove initial small sample variation
+        x="codability",
+        y=f"Subset Accuracy ({subset})",
+        color="method",
+        facet_col="digits",
+        title=f"Accuracy vs Codability of top candidates (above parametrised threshold) - {subset}",
+        template="simple_white",
+        hover_data={
+            "distance_threshold": True,
+            "match_count": True,
+            "subset_total": True,
+        },
+    )
 
-# display y axes as percentages and remove axis title
-fig.update_yaxes(tickformat=".0%")
-fig.update_xaxes(tickformat=".0%", title_text="Codability (prop. above threshold)")
+    # display y axes as percentages and remove axis title
+    fig.update_yaxes(tickformat=".0%")
+    fig.update_xaxes(tickformat=".0%", title_text="Codability (prop. above threshold)")
 
+    fig.update_layout(height=500, width=770)
+    fig.show()
 
-fig.update_layout(height=500, width=770)
-fig.show()
 # %%

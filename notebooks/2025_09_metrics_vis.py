@@ -35,6 +35,8 @@ bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
 if not bucket_prefix:
     raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
 
+output_folder = "data/temp/"  # set to None if no output saving is needed
+
 # %%
 # load clerical data
 clerical_it1_file = f"{bucket_prefix}original_datasets/DSC_Rep_Sample.csv"
@@ -173,7 +175,9 @@ F1: The harmonic mean of precision and recall.
 fig.update_layout(height=500, width=770)
 
 fig.show()
-fig.write_html("data/temp/2025-09_metrics_ambiguity_all_methods.html")
+
+if output_folder:
+    fig.write_html(f"{output_folder}/2025-09_metrics_ambiguity_all_methods.html")
 
 
 # %%
@@ -240,7 +244,8 @@ MM: Many-to-Many match on the full set. (Is there any overlap between the true l
 fig.update_layout(height=500, width=770)
 
 fig.show()
-fig.write_html("data/temp/2025-09_metrics_accuracy_all_methods.html")
+if output_folder:
+    fig.write_html(f"{output_folder}/2025-09_metrics_accuracy_all_methods.html")
 
 # %%
 # create confusion matrix for section (0-digit) and subset of 5-digit
@@ -307,9 +312,10 @@ for DIGITS in [0, 5]:
 
         fig.show()
 
-        fig.write_html(
-            f"data/temp/2025-09_metrics_vis_prompt2_{lab.lower().replace('-', '_')}_confusion_matrix.html"
-        )
+        if output_folder:
+            fig.write_html(
+                f"{output_folder}/2025-09_metrics_vis_prompt2_{lab.lower().replace('-', '_')}_confusion_matrix.html"
+            )
 
 # %%
 # inspect sample of questions
