@@ -152,7 +152,7 @@ fig = px.line(
 for i in fig.layout.annotations:
     i.text = i.text.split("=")[-1].capitalize()
 # display y axes as percentages and remove axis title
-fig.update_yaxes(tickformat=".0%", title_text="")
+fig.update_yaxes(tickformat=".0%", title_text="", showgrid=True, gridcolor="lightgrey")
 fig.update_xaxes(
     tickvals=plot_df_f1["digits"].unique(),
     ticktext=["S" if i == 0 else str(i) for i in plot_df_f1["digits"].unique()],
@@ -221,7 +221,7 @@ fig = px.line(
 for i in fig.layout.annotations:
     i.text = i.text.split("=")[1]
 # display y axes as percentages and remove axis title
-fig.update_yaxes(tickformat=".0%", title_text="")
+fig.update_yaxes(tickformat=".0%", title_text="", showgrid=True, gridcolor="lightgrey")
 fig.update_xaxes(
     tickvals=plot_df_accu["digits"].unique(),
     ticktext=["S" if i == 0 else str(i) for i in plot_df_accu["digits"].unique()],
@@ -307,10 +307,30 @@ for DIGITS in [0, 5]:
         )
         # reorder x axis values
         fig.update_xaxes(
-            title="Model Initial Code", categoryorder="array", categoryarray=labels
+            title="Model Initial Code",
+            categoryorder="array",
+            categoryarray=labels,
+            showgrid=True,
+            gridcolor="lightgrey",
+            ticks="outside",
+            showline=True,
+            mirror=True,
+            zeroline=False,
+            dtick=1,
+            tickson="boundaries",  # show grid between ticks
         )
         fig.update_yaxes(
-            title="Clerical Initial Code", categoryorder="array", categoryarray=labels
+            title="Clerical Initial Code",
+            categoryorder="array",
+            categoryarray=labels,
+            showgrid=True,
+            gridcolor="lightgrey",
+            ticks="outside",
+            showline=True,
+            mirror=True,
+            zeroline=False,
+            dtick=1,
+            tickson="boundaries",
         )
 
         fig.update_layout(height=700, width=770)

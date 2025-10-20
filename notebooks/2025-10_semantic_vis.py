@@ -188,7 +188,7 @@ fig = px.line(
 for i in fig.layout.annotations:
     i.text = i.text.split("=")[1]
 # display y axes as percentages and remove axis title
-fig.update_yaxes(tickformat=".0%", title_text="")
+fig.update_yaxes(tickformat=".0%", title_text="", showgrid=True, gridcolor="lightgrey")
 fig.update_xaxes(
     tickvals=plot_df_accu["digits"].unique(),
     ticktext=["S" if i == 0 else str(i) for i in plot_df_accu["digits"].unique()],
@@ -379,7 +379,7 @@ for DIGITS in [0, 5]:
         )
 
     # display y axes as percentages and remove axis title
-    fig.update_yaxes(tickformat=".0%")
+    fig.update_yaxes(tickformat=".0%", showgrid=True, gridcolor="lightgrey")
     fig.update_xaxes(tickformat=".0%", title_text="Codability (prop. above threshold)")
 
     # add text to footnote
