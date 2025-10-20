@@ -282,7 +282,10 @@ for DIGITS in [5, 0]:
 model_df = pd.read_parquet(
     f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet"
 )
-
+logger.info(
+    """Starting metrics calculation for current SurveyAssist model...
+    Note that we are not using final code, so this will be reported as missing during metrics calculation."""
+)
 sa_df = pd.DataFrame()
 for DIGITS in [0, 5]:
     clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
@@ -346,7 +349,7 @@ for DIGITS in [0, 5]:
         color="method",
         facet_col="match_type",
         title=f"""Codability vs Accuracy of top candidates <br>(above parametrised threshold, {
-            str(DIGITS)+"-match" if DIGITS>0 else "section"} match)""",
+            str(DIGITS)+"-digits" if DIGITS>0 else "Section level"} match)""",
         template="simple_white",
         hover_data={
             "distance_threshold": True,
@@ -404,7 +407,7 @@ for DIGITS in [0, 5]:
 
     if output_folder:
         fig.to_html(
-            f"{output_folder}/2025-10_semantic_top_candidate_accuracy_codability_{DIGITS}-match.html"
+            f"{output_folder}/2025-10_semantic_top_candidate_accuracy_codability_{DIGITS}-digits.html"
         )
 
 # %%
