@@ -12,6 +12,7 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 
 # %%
 import logging
+import os
 
 import dotenv
 import pandas as pd
@@ -38,6 +39,9 @@ if not bucket_prefix:
     raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
 
 output_folder = "data/temp/"  # set to None if no output saving is needed
+
+if output_folder:
+    os.makedirs(output_folder, exist_ok=True)
 
 # %%
 # load clerical data
@@ -217,6 +221,7 @@ if output_folder:
 # %%
 # top candidate performance by threshold on distance
 top_match_metrics = {}
+cc_codable = {}
 for DIGITS in [5, 0]:
     logger.info("--- Evaluating %d-digit match ---", DIGITS)
 
@@ -254,6 +259,7 @@ for DIGITS in [5, 0]:
             lambda x: len(x) == 1
         )
         unambig_df = combined_dataframe_sem[unambig_msk].reset_index(drop=True).copy()
+        cc_codable[DIGITS] = len(unambig_df) / clerical_codes_it2.shape[0]
 
         # calculate proportion and accuracy at different thresholds on distance
         for df in [combined_dataframe_sem, unambig_df]:
@@ -267,52 +273,80 @@ for DIGITS in [5, 0]:
         )
         unambig_df = unambig_df.drop_duplicates(subset=["top_distance"], keep="last")
 
-        df = combined_dataframe_sem[
-            ["top_distance", "codability", "accuracy", "match_count", "subset_total"]
-        ].merge(
-            unambig_df[
-                [
-                    "top_distance",
-                    "codability",
-                    "accuracy",
-                    "match_count",
-                    "subset_total",
-                ]
-            ],
-            on="top_distance",
-            how="inner",
-            suffixes=("_MO", "_OO"),
-        )
-
         # store for plotting
-        top_match_metrics[(DIGITS, sem_name)] = df.copy()
+        top_match_metrics[(DIGITS, sem_name, "OO")] = unambig_df.copy()
+        top_match_metrics[(DIGITS, sem_name, "MO")] = combined_dataframe_sem.copy()
 
 # %%
-for subset in ["MO", "OO"]:
-    plot_df = pd.DataFrame(
-        [
-            {
-                "digits": digits,
-                "method": method,
-                "codability": row[f"codability_{subset}"],
-                "distance_threshold": row.top_distance,
-                f"Subset Accuracy ({subset})": row[f"accuracy_{subset}"],
-                "match_count": row[f"match_count_{subset}"],
-                "subset_total": row[f"subset_total_{subset}"],
-            }
-            for (digits, method), df in top_match_metrics.items()
-            for _, row in df.iterrows()
-        ]
+# get survey assist model metrics for comparison (one point, not a curve)
+model_df = pd.read_parquet(
+    f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet"
+)
+
+sa_df = pd.DataFrame()
+for DIGITS in [0, 5]:
+    clerical_codes_it2 = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
+    model_prompt2 = prep_model_codes(
+        model_df,
+        digits=DIGITS,
+        out_col="sa_initial_codes",
+        threshold=0.7,
     )
+    combined_dataframe_m2 = model_prompt2.merge(
+        clerical_codes_it2, on="unique_id", how="inner"
+    )
+    eval_metr = calc_simple_metrics(combined_dataframe_m2)
+    sa_df = pd.concat(
+        [
+            sa_df,
+            pd.DataFrame(
+                {
+                    "digits": [DIGITS] * 2,
+                    "method": ["SurveyAssist"] * 2,
+                    "match_type": ["OO", "MO"],
+                    "accuracy": [
+                        eval_metr.initial_accuracy_metrics.accuracy_oo_unambiguous,
+                        eval_metr.initial_accuracy_metrics.accuracy_mo_unambiguous,
+                    ],
+                    "codability": [eval_metr.codability_metrics.initial_codable_prop]
+                    * 2,
+                }
+            ),
+        ],
+        ignore_index=True,
+    ).reset_index(drop=True)
+
+
+# %%
+# prepare data for plotting codability vs accuracy curves
+plot_df = pd.DataFrame(
+    [
+        {
+            "digits": key[0],
+            "method": key[1],
+            "match_type": key[2],
+            "codability": row["codability"],
+            "distance_threshold": round(row.top_distance, 3),
+            "accuracy": row["accuracy"],
+            "match_count": row["match_count"],
+            "subset_total": row["subset_total"],
+        }
+        for key, df in top_match_metrics.items()
+        for _, row in df.iterrows()
+    ]
+)
+
+for DIGITS in [0, 5]:
     fig = px.line(
         plot_df[
-            plot_df["codability"] > 1 / 10
+            (plot_df["codability"] > 1 / 10) & (plot_df["digits"] == DIGITS)
         ],  # remove initial small sample variation
         x="codability",
-        y=f"Subset Accuracy ({subset})",
+        y="accuracy",
         color="method",
-        facet_col="digits",
-        title=f"Accuracy vs Codability of top candidates (above parametrised threshold) - {subset}",
+        facet_col="match_type",
+        title=f"""Codability vs Accuracy of top candidates <br>(above parametrised threshold, {
+            str(DIGITS)+"-match" if DIGITS>0 else "section"} match)""",
         template="simple_white",
         hover_data={
             "distance_threshold": True,
@@ -320,12 +354,57 @@ for subset in ["MO", "OO"]:
             "subset_total": True,
         },
     )
+    # Add vline to all subplots/facets
+    fig.add_vline(
+        x=cc_codable[DIGITS],
+        line={"color": "navy", "width": 2},
+        line_dash="dot",
+        annotation_text="Clerical codability",
+        annotation_position="bottom right",
+        annotation_font_size=10,
+    )
+
+    # add dots for SA model by facets
+    for fac, match_type in enumerate(["OO", "MO"]):
+        msk = (sa_df["digits"] == DIGITS) & (sa_df["match_type"] == match_type)
+        fig.add_scatter(
+            x=sa_df[msk]["codability"],
+            y=sa_df[msk]["accuracy"],
+            mode="markers",
+            marker={"size": 10, "color": "navy", "symbol": "x"},
+            name="SurveyAssist",
+            col=fac + 1,
+            row=1,
+            showlegend=fac == 0,
+        )
 
     # display y axes as percentages and remove axis title
     fig.update_yaxes(tickformat=".0%")
     fig.update_xaxes(tickformat=".0%", title_text="Codability (prop. above threshold)")
 
+    # add text to footnote
+    fig.update_layout(margin={"b": 100})
+    fig.add_annotation(
+        text=(
+            """
+    OO: One-to-One match on a subset where the true label as well as the model's label are not ambiguous.<br>
+    MO: Many-to-One match on a subset where the model is not ambiguous. (Is the model's label in the true label shortlist?)<br>
+    """
+        ),
+        align="left",
+        xref="paper",
+        yref="paper",
+        x=-0.08,
+        y=-0.34,
+        showarrow=False,
+        font={"size": 10},
+    )
     fig.update_layout(height=500, width=770)
     fig.show()
+
+    if output_folder:
+        fig.to_html(
+            f"{output_folder}/2025-10_semantic_top_candidate_accuracy_codability_{DIGITS}-match.html"
+        )
 
 # %%

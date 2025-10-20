@@ -12,6 +12,7 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 
 # %%
 import logging
+import os
 
 import dotenv
 import pandas as pd
@@ -36,6 +37,10 @@ if not bucket_prefix:
     raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
 
 output_folder = "data/temp/"  # set to None if no output saving is needed
+
+if output_folder:
+    os.makedirs(output_folder, exist_ok=True)
+
 
 # %%
 # load clerical data
