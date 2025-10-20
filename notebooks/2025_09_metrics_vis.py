@@ -75,6 +75,10 @@ model_dfs = {name: pd.read_parquet(path) for name, path in model_files.items()}
 # %%
 # calculate metrics
 eval_metrics = {}
+logger.info(
+    """Starting metrics calculation...
+    Note that we are not using final code, so this will be reported as missing during metrics calculation."""
+)
 for DIGITS in [5, 4, 3, 2, 1, 0]:
     logger.info("--- Evaluating %d-digit match ---", DIGITS)
 
