@@ -120,6 +120,11 @@ def semantic_distance_to_confidence(
 # %%
 # calculate metrics
 eval_metrics = {}
+logger.info(
+    """Starting metrics calculation for semantic search methods...
+    Note that we are not using final code, so this will be reported as missing during metrics calculation."""
+)
+
 for DIGITS in [5, 4, 3, 2, 1, 0]:
     logger.info("--- Evaluating %d-digit match ---", DIGITS)
 
