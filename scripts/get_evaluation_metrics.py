@@ -1,10 +1,11 @@
+#!/usr/bin/env python
 """Script that calculates accuracy metrics for survey assist evaluation model.
 
 Takes evaluation_data file as positional arguments.
 
 Optional arguments:
     -n <number_of_digits>, --number_of_digits <number_of_digits> Required number of digits
-        Expected one of 0 / 1 / 2 / 3 / 4 / 5.
+        Expected one of S / 0 / 1 / 2 / 3 / 4 / 5.
     -c <clerical_file>, --clerical_file <clerical_file> Path to the clerical codes file.
         If not provided, the main data file is expected to include clerical columns.
     -w, --write_output If set, writes the evaluation metrics to a JSON file.
@@ -45,7 +46,7 @@ if __name__ == "__main__":
         "--number_of_digits",
         type=str,
         default=None,
-        help="Number of digits:  0 / 1 / 2 / 3 / 4 / 5",
+        help="Number of digits:  0 / 1 / 2 / 3 / 4 / 5 / S. Optional.",
     )
 
     parser.add_argument(
@@ -73,10 +74,15 @@ if __name__ == "__main__":
         "3",
         "4",
         "5",
+        "S",
     ):
         raise ValueError("illegal value passed for number_of_digits")
 
-    DIGITS = int(args.number_of_digits) if args.number_of_digits else 5
+    DIGITS = (
+        (0 if args.number_of_digits == "S" else int(args.number_of_digits))
+        if args.number_of_digits
+        else 5
+    )
 
     # Load final-stage output DataFrame
     try:
@@ -156,8 +162,8 @@ if __name__ == "__main__":
 
             fs = GCSFileSystem()
             with fs.open(out_file, "w") as f:
-                json.dump(evaluation_metrics.__dict__, f, indent=2)
+                json.dump(evaluation_metrics.as_dict(), f, indent=2)
         else:
             with open(out_file, "w", encoding="utf-8") as f:
-                json.dump(evaluation_metrics.__dict__, f, indent=2)
+                json.dump(evaluation_metrics.as_dict(), f, indent=2)
         logger.info("Wrote evaluation metrics to %s", out_file)

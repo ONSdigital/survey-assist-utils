@@ -124,6 +124,19 @@ class SimpleMetrics(BaseModel):
             lines.append(self.final_accuracy_metrics.report_metrics("Final"))
         return "\n".join(lines)
 
+    def as_dict(self):
+        """Return simple metrics as a dictionary."""
+        return {
+            "ambiguity_metrics": self.ambiguity_metrics.__dict__,
+            "codability_metrics": self.codability_metrics.__dict__,
+            "initial_accuracy_metrics": self.initial_accuracy_metrics.__dict__,
+            "final_accuracy_metrics": (
+                self.final_accuracy_metrics.__dict__
+                if self.final_accuracy_metrics
+                else None
+            ),
+        }
+
 
 def calc_ambiguity_metrics(
     df: pd.DataFrame,
