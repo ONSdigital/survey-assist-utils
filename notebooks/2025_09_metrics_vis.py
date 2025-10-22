@@ -119,6 +119,7 @@ plot_df_f1 = pd.DataFrame(
             "f1": v.ambiguity_metrics.f1,
             "precision": v.ambiguity_metrics.precision,
             "recall": v.ambiguity_metrics.recall,
+            "accuracy": v.ambiguity_metrics.accuracy,
         }
         for k, v in eval_metrics.items()
     ]
@@ -139,10 +140,16 @@ plot_df_f1 = pd.concat([plot_df_f1, true_codablity], ignore_index=True)
 # melt for easier plotting
 plot_df_f1 = plot_df_f1.melt(
     id_vars=["digits", "method"],
-    value_vars=["codability", "precision", "recall", "f1"],
+    value_vars=["codability", "precision", "recall", "f1", "accuracy"],
     var_name="metrics",
     value_name="value",
 )
+
+# add wald CI for codability
+n = cc_it2_df.shape[0]
+plot_df_f1["ci"] = 1.96 * (plot_df_f1["value"] * (1 - plot_df_f1["value"]) / n).pow(0.5)
+plot_df_f1.loc[~plot_df_f1["metrics"].isin(["codability", "accuracy"]), "ci"] = None
+
 fig = px.line(
     plot_df_f1,
     x="digits",
@@ -152,6 +159,7 @@ fig = px.line(
     title="Ambiguity Decision Metrics by Number of Digits and Method",
     markers=True,
     template="simple_white",
+    # error_y="ci",
 )
 # drop first part of facet annotation
 for i in fig.layout.annotations:
@@ -160,25 +168,26 @@ for i in fig.layout.annotations:
 fig.update_yaxes(tickformat=".0%", title_text="", showgrid=True, gridcolor="lightgrey")
 
 # add text to footnote
-fig.update_layout(margin={"b": 125})
+fig.update_layout(margin={"b": 130})
 fig.add_annotation(
     text=(
         """
 Codability: Percentage of records identified as unambiguous by either the model or clerical coders.<br>
 Precision: Among cases flagged as ambiguous by the model, the percentage that are truly ambiguous.<br>
 Recall: Among all truly ambiguous cases, the percentage correctly identified by the model.<br>
-F1: The harmonic mean of precision and recall.
+F1: The harmonic mean of precision and recall.<br>
+Accuracy: Overall percentage of correct codability/ambiguity decisions.
 """
     ),
     align="left",
     xref="paper",
     yref="paper",
     x=-0.08,
-    y=-0.42,
+    y=-0.45,
     showarrow=False,
     font={"size": 10},
 )
-fig.update_layout(height=500, width=770)
+fig.update_layout(height=500, width=1000)
 
 fig.show()
 

@@ -21,6 +21,7 @@ class AmbiguityMetrics(BaseModel):
     precision: float
     recall: float
     f1: float
+    accuracy: float
     TP: int
     FP: int
     FN: int
@@ -33,6 +34,7 @@ class AmbiguityMetrics(BaseModel):
             f" F1-score: {100 * self.f1:.2f}%",
             f" Precision: {100 * self.precision:.2f}%",
             f" Recall: {100 * self.recall:.2f}%",
+            f" Accuracy: {100 * self.accuracy:.2f}%",
             f" Confusion matrix counts: TP={self.TP}, FP={self.FP}, FN={self.FN}, TN={self.TN}",
         ]
         return "\n".join(lines)
@@ -150,11 +152,13 @@ def calc_ambiguity_metrics(
         if precision + recall == 0
         else 2 * (precision * recall) / (precision + recall)
     )
+    accuracy = (true_pos + true_neg) / len(df) if len(df) > 0 else 0.0
 
     return AmbiguityMetrics(
         precision=precision,
         recall=recall,
         f1=f1,
+        accuracy=accuracy,
         TP=true_pos,
         FP=false_pos,
         FN=false_neg,
