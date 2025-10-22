@@ -125,7 +125,7 @@ logger.info(
     Note that we are not using final code, so this will be reported as missing during metrics calculation."""
 )
 
-for DIGITS in [5, 4, 3, 2, 1, 0]:
+for DIGITS in [0, 2, 3, 4, 5]:
     logger.info("--- Evaluating %d-digit match ---", DIGITS)
 
     # clerical coding (2nd iteration, ground truth):
@@ -152,9 +152,9 @@ for DIGITS in [5, 4, 3, 2, 1, 0]:
             combined_dataframe_sem = model_semantic.merge(
                 clerical_codes_it2, on="unique_id", how="inner"
             )
-            eval_metrics[(DIGITS, sem_name, shortlist_size)] = calc_simple_metrics(
-                combined_dataframe_sem
-            )
+            eval_metrics[
+                (str(DIGITS) if DIGITS > 0 else "S", sem_name, shortlist_size)
+            ] = calc_simple_metrics(combined_dataframe_sem)
 
 
 # %%
@@ -264,7 +264,9 @@ for DIGITS in [5, 0]:
             lambda x: len(x) == 1
         )
         unambig_df = combined_dataframe_sem[unambig_msk].reset_index(drop=True).copy()
-        cc_codable[DIGITS] = len(unambig_df) / clerical_codes_it2.shape[0]
+        cc_codable[str(DIGITS) if DIGITS > 0 else "S"] = (
+            len(unambig_df) / clerical_codes_it2.shape[0]
+        )
 
         # calculate proportion and accuracy at different thresholds on distance
         for df in [combined_dataframe_sem, unambig_df]:
@@ -279,8 +281,12 @@ for DIGITS in [5, 0]:
         unambig_df = unambig_df.drop_duplicates(subset=["top_distance"], keep="last")
 
         # store for plotting
-        top_match_metrics[(DIGITS, sem_name, "OO")] = unambig_df.copy()
-        top_match_metrics[(DIGITS, sem_name, "MO")] = combined_dataframe_sem.copy()
+        top_match_metrics[(str(DIGITS) if DIGITS > 0 else "S", sem_name, "OO")] = (
+            unambig_df.copy()
+        )
+        top_match_metrics[(str(DIGITS) if DIGITS > 0 else "S", sem_name, "MO")] = (
+            combined_dataframe_sem.copy()
+        )
 
 # %%
 # get survey assist model metrics for comparison (one point, not a curve)
@@ -309,7 +315,7 @@ for DIGITS in [0, 5]:
             sa_df,
             pd.DataFrame(
                 {
-                    "digits": [DIGITS] * 2,
+                    "digits": [str(DIGITS) if DIGITS > 0 else "S"] * 2,
                     "method": ["SurveyAssist"] * 2,
                     "match_type": ["OO", "MO"],
                     "accuracy": [
@@ -344,7 +350,7 @@ plot_df = pd.DataFrame(
     ]
 )
 
-for DIGITS in [0, 5]:
+for DIGITS in plot_df["digits"].unique():
     fig = px.line(
         plot_df[
             (plot_df["codability"] > 1 / 10) & (plot_df["digits"] == DIGITS)
@@ -353,8 +359,8 @@ for DIGITS in [0, 5]:
         y="accuracy",
         color="method",
         facet_col="match_type",
-        title=f"""Codability vs Accuracy of top candidates <br>(above parametrised threshold, {
-            str(DIGITS)+"-digits" if DIGITS>0 else "Section level"} match)""",
+        title=f"""Codability vs Accuracy of top candidates <br>(above parametrised threshold, <b>{
+            str(DIGITS)+"-digits" if DIGITS!='S' else "Section level"}</b> match)""",
         template="simple_white",
         hover_data={
             "distance_threshold": True,
@@ -364,7 +370,7 @@ for DIGITS in [0, 5]:
     )
     # Add vline to all subplots/facets
     fig.add_vline(
-        x=cc_codable[DIGITS],
+        x=cc_codable[str(DIGITS)],
         line={"color": "navy", "width": 2},
         line_dash="dot",
         annotation_text="Clerical codability",
