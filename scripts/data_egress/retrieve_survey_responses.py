@@ -28,7 +28,10 @@ def setup_logger():
 
 def setup_parser() -> AP:
     """Sets up a CLI parser."""
-    parser = AP("Utility to retrieve survey responses from a Firestore database.")
+    parser = AP(
+        "Utility to retrieve survey responses from a Firestore database.\n"
+        "python retrieve_survey_responses.py"
+    )
     parser.add_argument("project_id", type=str, help="The Google Cloud project ID.")
     parser.add_argument("database_id", type=str, help="The Firestore database ID.")
     parser.add_argument("collection_name", type=str, help="The collection_name.")
@@ -46,7 +49,7 @@ def setup_parser() -> AP:
         "--chunk_size",
         "-c",
         type=int,
-        default=1000,
+        default=500,
         help="The number of documents to process in each chunk.",
     )
     return parser
@@ -82,6 +85,20 @@ def apply_custom_adjustments_results(flattened_dict: dict | MutableMapping):
             ]
             del flattened_dict[key]
             del flattened_dict[attribute_value]
+        # If a column *ends with* '_select_options', it has no children and can be pruned
+        if key.endswith("_select_options"):
+            del flattened_dict[key]
+        # We don't need to keep columns stating the 'type' of question:
+        # text/0/f1.1 is always open, select/1/f1.2 is always closed
+        if any(
+            (
+                key.endswith("follow_up_questions_0_type"),
+                key.endswith("follow_up_questions_1_type"),
+                key.endswith("follow_up_questions_0_id"),
+                key.endswith("follow_up_questions_1_id"),
+            )
+        ):
+            del flattened_dict[key]
     return flattened_dict
 
 
@@ -184,7 +201,9 @@ def connect_to_firestore(
     return db.collection(collection_name)
 
 
-def chunker(db_collection, chunk_size: int = 1000) -> Generator[list[dict], None, None]:
+def chunker(
+    db_collection, chunk_size: int = 1000, collection_name: str = "survey_results"
+) -> Generator[list[dict], None, None]:
     """Yields batches of documents from a Firestore collection.
 
     This generator function fetches documents from a Firestore collection in batches,
@@ -195,6 +214,9 @@ def chunker(db_collection, chunk_size: int = 1000) -> Generator[list[dict], None
         db_collection: The Firestore collection reference to query.
         chunk_size (int): The number of documents to retrieve in each chunk.
             Defaults to 1000.
+        collection_name (str): the name of the collection being processed.
+            Used to determine which adjustments / reformatting heuristics to apply.
+            Defaults to 'survey_results'.
 
     Yields:
         list[dict]: A list of flattened dictionaries, where each dictionary
@@ -224,10 +246,13 @@ def chunker(db_collection, chunk_size: int = 1000) -> Generator[list[dict], None
 
         last_doc = docs[-1]
         flattened_dicts = [flatten_dict({"id": doc.id} | doc.to_dict()) for doc in docs]
-        yield [
-            apply_custom_adjustments_results(flattened_dict)
-            for flattened_dict in flattened_dicts
-        ]
+        if collection_name == "survey_results":
+            yield [
+                apply_custom_adjustments_results(flattened_dict)
+                for flattened_dict in flattened_dicts
+            ]
+        else:
+            yield flattened_dicts
 
 
 def prepare_output_directory(output_base: str, gcp: bool = False):
@@ -279,7 +304,7 @@ def process_and_save_survey_results(  # noqa: PLR0913 # pylint: disable=R0913,R0
     logger_tool.debug("Beggining to process survey outputs in batches...")
     total_chunks = 0
     for chunk_id, results_chunk in enumerate(
-        chunker(survey_results_collection, chunk_size)
+        chunker(survey_results_collection, chunk_size, collection_name)
     ):
         logger_tool.debug(f"Processing batch {chunk_id}...")
         total_chunks += 1
@@ -307,7 +332,9 @@ def process_and_save_survey_results(  # noqa: PLR0913 # pylint: disable=R0913,R0
             last_most_recent_chunk_structure_df = pd.read_csv(
                 f"{output_base}_intermediate_files/chunk_{chunk_id-1}.csv", nrows=0
             )
-            df = pd.concat([last_most_recent_chunk_structure_df, df], ignore_index=True)
+            df = pd.concat(
+                [last_most_recent_chunk_structure_df, df], ignore_index=True, sort=False
+            )
             df.to_csv(
                 f"{output_base}_intermediate_files/chunk_{chunk_id}.csv",
                 index=False,
@@ -330,7 +357,7 @@ def process_and_save_survey_results(  # noqa: PLR0913 # pylint: disable=R0913,R0
                 f"{output_base}_intermediate_files/chunk_{chunk_id}.csv"
             )
             collated_output_df = pd.concat(
-                [collated_output_df, current_chunk_df], ignore_index=True
+                [collated_output_df, current_chunk_df], ignore_index=True, sort=False
             )
         collated_output_df.to_csv(f"{output_base}.csv", index=False)
         logger_tool.debug(
@@ -352,7 +379,9 @@ def process_and_save_survey_results(  # noqa: PLR0913 # pylint: disable=R0913,R0
                 f"{output_base}_intermediate_files/chunk_{chunk_id}.csv"
             )
             current_chunk_df = pd.concat(
-                [final_chunk_structure_df, current_chunk_df], ignore_index=True
+                [final_chunk_structure_df, current_chunk_df],
+                ignore_index=True,
+                sort=False,
             )
             current_chunk_df.to_csv(
                 f"{output_base}.csv", index=False, mode="a", header=not chunk_id
