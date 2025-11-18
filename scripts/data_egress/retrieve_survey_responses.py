@@ -38,7 +38,7 @@ def setup_parser() -> AP:
     parser.add_argument("database_id", type=str, help="The Firestore database ID.")
     parser.add_argument("collection_name", type=str, help="The collection_name.")
     parser.add_argument(
-        "output_name", type=str, help="The name of the output CSV file."
+        "output_name", type=str, help="The base of the name of the output folder."
     )
     parser.add_argument(
         "--timeout",
@@ -97,6 +97,11 @@ def apply_custom_adjustments_results(  # noqa: C901
         (
             "survey_assist_interactions_0_type" not in flattened_dict,
             "survey_assist_interactions_0_response_found" not in flattened_dict,
+            "survey_assist_interactions_0_input_2_org_description"
+            not in flattened_dict,
+            "survey_assist_interactions_0_input_1_job_description"
+            not in flattened_dict,
+            "survey_assist_interactions_0_input_0_job_title" not in flattened_dict,
         )
     ):
         flattened_dict["valid_response"] = False
@@ -304,7 +309,7 @@ def prepare_output_directory(output_base: str, gcp: bool = False) -> str:
     """Creates the (local) output directory if it doesn't exist.
 
     Args:
-        output_base (str): The base name of the output CSV file.
+        output_base (str): The base name of the output folder.
         gcp (bool): Whether a GCP Bucket is used for output storage.
             Defaults to False.
 
@@ -329,10 +334,10 @@ def process_and_save_survey_results(  # noqa: PLR0913 # pylint: disable=R0913,R0
     timeout: int | float = 30,
     chunk_size: int = 1000,
 ) -> dict:
-    """Connects to Firestore, processes survey results, and saves them to a CSV.
+    """Connects to Firestore, processes survey results, and saves them to parquet files.
 
     This function orchestrates the full process of fetching survey data in
-    chunks, flattening each document, and appending the results to a CSV file.
+    chunks, flattening each document, and saving them to parquet files in batches.
 
     Args:
         project_id (str): The Google Cloud project ID.
@@ -364,7 +369,7 @@ def process_and_save_survey_results(  # noqa: PLR0913 # pylint: disable=R0913,R0
         )
         logger_tool.debug(f"Saved processed batch {chunk_id} to intermediate file.")
     survey_collection_metadata = {
-        "number of chunks": total_chunks,
+        "number_of_chunks": total_chunks,
         "chunk_size": chunk_size,
         "final_row_id": df.iloc[-1]["id"],
     }
