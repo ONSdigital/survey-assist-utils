@@ -66,6 +66,18 @@ sankey_df = combined_df.groupby([left_col, right_col]).size().reset_index()
 label_list = list(pd.unique(sankey_df[[left_col, right_col]].values.ravel("K")))
 # sort the list by value of number contained in the string
 label_list.sort(key=lambda x: -int(re.sub(r"\D", "", "0" + x)))
+
+# add proportion to label list
+label_list2 = [
+    lab
+    + f" {100 * sankey_df[sankey_df[left_col] == lab][0].sum() / sankey_df[0].sum():.1f}%"
+    for lab in label_list
+] + [
+    lab
+    + f" {100 * sankey_df[sankey_df[right_col] == lab][0].sum() / sankey_df[0].sum():.1f}%"
+    for lab in label_list
+]
+
 label_colors = ["#1a9641"] + ["#a6d96a"] * (len(label_list) - 2) + ["#fdae61"]
 link = {
     "source": sankey_df[left_col].apply(label_list.index).tolist(),
@@ -76,9 +88,13 @@ link = {
 }
 link["color"] = [
     (
-        "rgba(253,174,97,0.2)"
+        "rgba(253,174,97,0.3)"
         if (link["target"][i] - len(label_list) > link["source"][i])
-        else "rgba(166,217,106,0.2)"
+        else (
+            "rgba(166,217,106,0.3)"
+            if (link["target"][i] - len(label_list) < link["source"][i])
+            else "rgba(180,180,180,0.3)"
+        )
     )
     for i in range(len(link["value"]))
 ]
@@ -92,7 +108,7 @@ sankey_fig = go.Figure(
                 "thickness": 20,
                 "line": {"color": "black", "width": 0.5},
                 "color": label_colors * 2,
-                "label": label_list * 2,
+                "label": label_list2,
                 "hovertemplate": "Count %{value}<extra></extra>",
             },
             link=link,
