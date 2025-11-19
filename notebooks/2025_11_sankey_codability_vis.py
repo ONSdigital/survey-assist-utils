@@ -10,10 +10,7 @@ import dotenv
 import pandas as pd
 import plotly.graph_objects as go
 
-from survey_assist_utils.data_cleaning.prep_data import (
-    prep_clerical_codes,
-    prep_model_codes,
-)
+from survey_assist_utils.data_cleaning.prep_data import prep_model_codes
 from survey_assist_utils.data_cleaning.sic_codes import get_codability_level
 
 # %%
@@ -34,34 +31,33 @@ if output_folder:
 
 # %%
 # load data and preprocess
-DIGITS = 5
-
-clerical_it2_file = f"{bucket_prefix}original_datasets/DSC_Rep_Sample_IT2.csv"
-clerical_it2_4plus_file = (
-    f"{bucket_prefix}original_datasets/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
-)
-cc_it2_df = pd.read_csv(clerical_it2_file)
-cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
-
-clerical_codes = prep_clerical_codes(cc_it2_df, cc_it2_4plus_df, digits=DIGITS)
-
 model_file = f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet"
-
 model_df = pd.read_parquet(model_file)
-model_codes = prep_model_codes(
+
+DIGITS = 5
+initial_codes = prep_model_codes(
     model_df,
     digits=DIGITS,
+    codes_col="initial_code",
+    alt_codes_col="alt_sic_candidates",
     out_col="sa_initial_codes",
-    threshold=0.7,
+)
+final_codes = prep_model_codes(
+    model_df,
+    digits=DIGITS,
+    codes_col="final_sic",
+    alt_codes_col="higher_level_final_sic",
+    out_col="sa_final_codes",
 )
 
-combined_df = model_codes.merge(clerical_codes, on="unique_id", how="inner")
+combined_df = initial_codes.merge(final_codes, on="unique_id", how="inner")
 
 # %%
-left_col = "Clerical Codes"
-right_col = "SurveyAssist"
-combined_df[left_col] = combined_df["clerical_codes"].apply(get_codability_level)
-combined_df[right_col] = combined_df["sa_initial_codes"].apply(get_codability_level)
+
+left_col = "SA Initial Codes"
+right_col = "SA Final Codes"  # "clerical_codes"
+combined_df[left_col] = combined_df["sa_initial_codes"].apply(get_codability_level)
+combined_df[right_col] = combined_df["sa_final_codes"].apply(get_codability_level)
 
 sankey_df = combined_df.groupby([left_col, right_col]).size().reset_index()
 
@@ -87,6 +83,7 @@ link["color"] = [
     for i in range(len(link["value"]))
 ]
 link["hovertemplate"] = "Count: %{value}<extra></extra>"
+
 sankey_fig = go.Figure(
     data=[
         go.Sankey(
@@ -104,14 +101,14 @@ sankey_fig = go.Figure(
 )
 # label the left and right sides
 sankey_fig.add_annotation(
-    x=-0.05, y=1.05, text="Clerical Codes", showarrow=False, font={"size": 12}
+    x=-0.05, y=1.05, text=left_col, showarrow=False, font={"size": 12}
 )
 sankey_fig.add_annotation(
-    x=1.05, y=1.05, text="SurveyAssist", showarrow=False, font={"size": 12}
+    x=1.05, y=1.05, text=right_col, showarrow=False, font={"size": 12}
 )
 
 sankey_fig.update_layout(
-    title_text="Impact of SurveyAssist on Codability Levels",
+    title_text="Impact of SurveyAssist Follow-up Q/A on Codability Levels",
     font_size=10,
     height=600,
     width=600,
