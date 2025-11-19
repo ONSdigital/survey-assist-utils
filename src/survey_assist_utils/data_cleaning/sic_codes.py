@@ -210,3 +210,30 @@ def extract_alt_candidates_n_digit_codes(
         return pruned
 
     return set(cleaned)
+
+
+def get_codability_level(codes: set[str]) -> str:
+    """Determine the codability level of the given SIC codes.
+
+    Args:
+        codes: A set of SIC code strings.
+
+    Returns:
+        A string representing the codability level: 'uncodable', 'section',
+        'division', 'group', or 'class'.
+    """
+    if not codes:
+        return "Uncodable"
+
+    for digits, label in [
+        (5, "Sub-class (5-digits)"),
+        (4, "Class (4-digits)"),
+        (3, "Group (3-digits)"),
+        (2, "Division (2-digits)"),
+        (0, "Section (letter)"),
+    ]:
+        codes = get_clean_n_digit_codes(codes, digits)
+        if len(codes) == 1:
+            return label
+
+    return "Uncodable"

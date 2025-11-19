@@ -2,11 +2,14 @@
 
 # pylint: disable=C0116
 
+import pytest
+
 from survey_assist_utils.data_cleaning.sic_codes import (
     expand_to_n_digit_str,
     extract_alt_candidates_n_digit_codes,
     get_clean_n_digit_codes,
     get_clean_n_digit_one_code,
+    get_codability_level,
     parse_numerical_code,
     validate_sic_codes,
 )
@@ -103,3 +106,20 @@ def test_extract_alt_candidates_n_digit_codes():
         candidates, code_name="code", score_name="likelihood", threshold=0
     )
     assert result2 == {"86101", "86210"}
+
+
+@pytest.mark.parametrize(
+    "codes,expected",
+    [
+        (set(), "Uncodable"),
+        ({"01621", "8610"}, "Uncodable"),
+        ({"01", "02"}, "Section (letter)"),
+        ({"01", "01621"}, "Division (2-digits)"),
+        ({"016"}, "Group (3-digits)"),
+        ({"861"}, "Class (4-digits)"),
+        ({"0162"}, "Class (4-digits)"),
+        ({"01621"}, "Sub-class (5-digits)"),
+    ],
+)
+def test_get_codability_level(codes, expected):
+    assert get_codability_level(codes) == expected
