@@ -57,7 +57,7 @@ def setup_parser() -> AP:
     return parser
 
 
-def apply_custom_adjustments_results(  # noqa: C901
+def apply_custom_adjustments_results(
     flattened_dict: dict | MutableMapping,
 ):
     """Reformats flattened dictionaries based on patterns, targeted towards
@@ -73,9 +73,6 @@ def apply_custom_adjustments_results(  # noqa: C901
         # Handle deletion of dict items as we go
         if key not in flattened_dict:
             continue
-        # We're only doing SIC at the moment, so we don't need these fields.
-        if key.endswith("flavour"):
-            del flattened_dict[key]
         # Restructure 'field: <name>, value: <val>' patterns to 'fieldname: value' pattern.
         if key.endswith("field"):
             attribute_base = key.removesuffix("field")
@@ -86,69 +83,8 @@ def apply_custom_adjustments_results(  # noqa: C901
             ]
             del flattened_dict[key]
             del flattened_dict[attribute_value]
-        # If a column *ends with* '_select_options', it has no children and can be pruned
-        if key.endswith("_select_options"):
-            del flattened_dict[key]
     # Add flag to be False when we detect an issue with the response.
     # E.g. those introduced via page refreshes.
-    flattened_dict["valid_response"] = True
-    # Check for required fields
-    if any(
-        (
-            "survey_assist_interactions_0_type" not in flattened_dict,
-            "survey_assist_interactions_0_response_found" not in flattened_dict,
-            "survey_assist_interactions_0_input_2_org_description"
-            not in flattened_dict,
-            "survey_assist_interactions_0_input_1_job_description"
-            not in flattened_dict,
-            "survey_assist_interactions_0_input_0_job_title" not in flattened_dict,
-        )
-    ):
-        flattened_dict["valid_response"] = False
-    if any(
-        (
-            "survey_assist_interactions_2_time_start" in flattened_dict,
-            "survey_assist_interactions_3_time_start" in flattened_dict,
-            "survey_assist_interactions_4_time_start" in flattened_dict,
-            "survey_assist_interactions_5_time_start" in flattened_dict,
-        )
-    ):
-        flattened_dict["valid_response"] = False
-    if "survey_assist_interactions_0_type" in flattened_dict and any(
-        (flattened_dict["survey_assist_interactions_0_type"] != "lookup",)
-    ):
-        flattened_dict["valid_response"] = False
-    if "survey_assist_interactions_1_type" in flattened_dict and any(
-        (
-            flattened_dict["survey_assist_interactions_1_type"] != "classify",
-            "survey_assist_interactions_1_response_follow_up_questions_0_id"
-            not in flattened_dict,
-            "survey_assist_interactions_1_response_follow_up_questions_1_id"
-            not in flattened_dict,
-            "survey_assist_interactions_1_response_follow_up_questions_2_id"
-            in flattened_dict,
-        )
-    ):
-        flattened_dict["valid_response"] = False
-    if (
-        "survey_assist_interactions_1_response_follow_up_questions_0_id"
-        in flattened_dict
-        and "survey_assist_interactions_1_response_follow_up_questions_1_id"
-        in flattened_dict
-        and any(
-            (
-                flattened_dict[
-                    "survey_assist_interactions_1_response_follow_up_questions_0_id"
-                ]
-                != "f1.1",
-                flattened_dict[
-                    "survey_assist_interactions_1_response_follow_up_questions_1_id"
-                ]
-                != "f1.2",
-            )
-        )
-    ):
-        flattened_dict["valid_response"] = False
     return flattened_dict
 
 
