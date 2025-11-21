@@ -101,8 +101,26 @@ def _check_always_required(  # noqa: PLR0911 # pylint: disable=too-many-return-s
         row["survey_assist_interactions_4_type"] not in ("", None)
     ):
         return False
-    if "survey_assist_interactions_5_type" in row and (  # noqa: SIM103
+    if "survey_assist_interactions_5_type" in row and (
         row["survey_assist_interactions_5_type"] not in ("", None)
+    ):
+        return False
+    if "survey_assist_interactions_1_response_follow_up_questions_2_id" in row and (
+        row["survey_assist_interactions_1_response_follow_up_questions_2_id"]
+        not in ("", None)
+    ):
+        return False
+    if "survey_assist_interactions_1_response_follow_up_questions_3_id" in row and (
+        row["survey_assist_interactions_1_response_follow_up_questions_3_id"]
+        not in ("", None)
+    ):
+        return False
+    if (  # noqa: SIM103
+        "survey_assist_interactions_1_response_follow_up_questions_4_id" in row
+        and (
+            row["survey_assist_interactions_1_response_follow_up_questions_4_id"]
+            not in ("", None)
+        )
     ):
         return False
     return True
@@ -177,6 +195,10 @@ def _check_case_3(row: pd.Series) -> bool:
             in ("", None),
             row["survey_assist_interactions_1_response_candidates_1_code"]
             in ("", None),
+            row["survey_assist_interactions_1_response_follow_up_questions_0_id"]
+            != "f1.1",
+            row["survey_assist_interactions_1_response_follow_up_questions_1_id"]
+            != "f1.2",
             row["survey_assist_interactions_1_response_follow_up_questions_0_text"]
             in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_1_text"]

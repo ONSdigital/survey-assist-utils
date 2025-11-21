@@ -17,11 +17,11 @@ from datetime import datetime
 
 import pandas as pd
 from google.cloud import storage
-from helper_utilities import (
+
+from survey_assist_utils.data_cleaning.data_egress_validity_utils import (
     assign_response_unique,
     assign_response_valid,
 )
-
 from survey_assist_utils.logging import (
     get_logger,
 )
