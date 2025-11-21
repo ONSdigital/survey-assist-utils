@@ -58,16 +58,45 @@ CC_COLUMNS_MINIMAL = ["id", "user", "org_description", "job_description", "job_t
 
 CC_COLUMNS_EXTRA = [
     *CC_COLUMNS_MINIMAL,
+    "survey_assist_open_question",
+    "survey_assist_open_question_response",
+]
+
+EVALUATION_COLUMNS = [
+    *CC_COLUMNS_EXTRA,
     "direct_lookup_successful",
     "direct_lookup_code",
     "survey_assist_says_codable",
+    "survey_assist_assigned_code",
     "survey_assist_alt_candidate_1_code",
     "survey_assist_alt_candidate_2_code",
     "survey_assist_alt_candidate_3_code",
     "survey_assist_alt_candidate_4_code",
     "survey_assist_alt_candidate_5_code",
-    "survey_assist_open_question",
-    "survey_assist_open_question_response",
+    "survey_assist_closed_question",
+    "survey_assist_closed_question_response",
+    "survey_assist_closed_question_opt_1",
+    "survey_assist_closed_question_opt_2",
+    "survey_assist_closed_question_opt_3",
+    "survey_assist_closed_question_opt_4",
+    "survey_assist_closed_question_opt_5",
+    "survey_assist_closed_question_opt_6",
+]
+
+FEEDBACK_COLUMNS = [
+    "questions_0_response",
+    "questions_1_response",
+    "questions_2_response",
+    "questions_3_response",
+    "questions_4_response",
+]
+
+FEEDBACK_COLUMN_NAMES = [
+    "feedback_age_range",
+    "feedback_survey_ease",
+    "feedback_survey_relevance",
+    "feedback_survey_comfort",
+    "feedback_comments",
 ]
 
 
@@ -81,14 +110,20 @@ def setup_parser() -> AP:
     """Sets up a CLI parser."""
     parser = AP()
     parser.add_argument(
-        "intermediate_files_path",
+        "intermediate_responses_path",
         type=str,
-        help="path to the files output from the data egress process.",
+        help="path to the files output from the response data egress process.",
     )
     parser.add_argument(
         "output_name_base",
         type=str,
         help="The base of the name of the output CSV files.",
+    )
+    parser.add_argument(
+        "--intermediate_feedback_path",
+        type=str,
+        default="",
+        help="path to the files output from the feedback data egress process.",
     )
     parser.add_argument(
         "--only_after",
@@ -141,14 +176,47 @@ def load_metadata(path_to_folder: str, use_gcp=False) -> dict:
         return json.load(f)
 
 
+def get_feedback(row: pd.Series, f_df: pd.DataFrame) -> dict:
+    """Extracts the corresponding feedback for a given row.
+    If there is no corresponding feedback, or if there are multiple
+    feedback entries, for a given respondent it returns an empty dict.
+
+    Args:
+        row (pd.Series): a row in the 'responses' dataframe.
+        f_df (pd.DataFrame): a dataframe containing the feedback data.
+
+    Returns:
+        dict: the corresponding row in the 'feedback' dataframe,
+              converted to a dict, or an empty dict if there is
+              no corresponding feedback.
+    """
+    matches = f_df[f_df["person_id"] == row["person_id"]]
+    if len(matches) == 1:
+        return matches.iloc[0].to_dict()
+    return {}
+
+
+def make_extract_feedback_field_func(field):
+    """Generates a mapping function to be applied to the intermediate feedback
+    column to extract a given field.
+
+    Args:
+        field (str): The name of the field to extract.
+
+    """
+    return lambda row: row.get(field, "")
+
+
 if __name__ == "__main__":
     logger = setup_logger()
     cli_parser = setup_parser()
     args = cli_parser.parse_args()
     logger.debug("Parsed the CLI arguments")
-    folder_is_in_gcp_bucket = args.intermediate_files_path.startswith("gs://")
-    logger.debug("Loading the metadata file...")
-    metadata = load_metadata(args.intermediate_files_path, folder_is_in_gcp_bucket)
+    folder_is_in_gcp_bucket = args.intermediate_responses_path.startswith("gs://")
+    logger.debug("Loading the responses metadata file...")
+    responses_metadata = load_metadata(
+        args.intermediate_responses_path, folder_is_in_gcp_bucket
+    )
     logger.debug("Metadata loaded successfully.")
     start_date, start_time = args.only_after.split("__")
     only_after_timestamp = pd.Timestamp(
@@ -163,10 +231,10 @@ if __name__ == "__main__":
         f"restricting output to responses entered after {only_after_timestamp}"
     )
     cc_chunks = []
-    logger.info(f"Processing {metadata['number_of_chunks']} chunks...")
-    for chunk_id in range(metadata["number_of_chunks"]):
+    logger.info(f"Processing {responses_metadata['number_of_chunks']} chunks...")
+    for chunk_id in range(responses_metadata["number_of_chunks"]):
         logger.debug(f"Processing chunk {chunk_id}...")
-        chunk = grab_chunk(args.intermediate_files_path, chunk_id)
+        chunk = grab_chunk(args.intermediate_responses_path, chunk_id)
         chunk = chunk[chunk["time_start"] > only_after_timestamp]
         if len(chunk) == 0:
             logger.debug(f"Chunk {chunk_id} is empty after filtering, skipping.")
@@ -191,13 +259,45 @@ if __name__ == "__main__":
         logger.info("Filtering out duplicated responses...")
         cc_df = cc_df[cc_df["unique_response"]]
         logger.info("Duplicated responses removed")
+
+    if args.intermediate_feedback_path != "":
+        logger.info("Loading the feedback metadata file...")
+        folder_is_in_gcp_bucket = args.intermediate_feedback_path.startswith("gs://")
+        feedback_metadata = load_metadata(
+            args.intermediate_feedback_path, folder_is_in_gcp_bucket
+        )
+        logger.info("Metadata loaded successfully.")
+        feedback_chunks = []
+        logger.info(f"Processing {feedback_metadata['number_of_chunks']} chunks...")
+        for chunk_id in range(feedback_metadata["number_of_chunks"]):
+            logger.debug(f"Processing chunk {chunk_id}...")
+            chunk = grab_chunk(args.intermediate_feedback_path, chunk_id)
+            feedback_chunks.append(chunk)
+        feedback_df = pd.concat(feedback_chunks)
+        logger.info("Merging in the feedback data...")
+        cc_df["intermediate_feedback_column"] = cc_df.apply(
+            lambda row: get_feedback(row, feedback_df), axis=1
+        )
+        for fc_name, fc_raw_name in zip(FEEDBACK_COLUMN_NAMES, FEEDBACK_COLUMNS):
+            extraction_func = make_extract_feedback_field_func(fc_raw_name)
+            cc_df[fc_name] = cc_df["intermediate_feedback_column"].apply(
+                extraction_func
+            )
+        del cc_df["intermediate_feedback_column"]
+        logger.debug("Completed merging the feedback data.")
+        EVALUATION_COLUMNS.extend(FEEDBACK_COLUMN_NAMES)
+
     logger.info("Saving dataframes to CSV files...")
     cc_df[CC_COLUMNS_EXTRA].to_csv(f"{args.output_name_base}_extra.csv", index=False)
     cc_df[CC_COLUMNS_MINIMAL].to_csv(
         f"{args.output_name_base}_minimal.csv", index=False
     )
+    cc_df[EVALUATION_COLUMNS].to_csv(
+        f"{args.output_name_base}_evaluation.csv", index=False
+    )
     logger.info(
-        f"Saved dataframes to {args.output_name_base}_extra.csv "
-        f"and {args.output_name_base}_minimal.csv."
+        f"Saved dataframes to {args.output_name_base}_extra.csv, "
+        f"{args.output_name_base}_minimal.csv and "
+        f"{args.output_name_base}_evaluation.csv"
     )
     logger.info("Survey response reformatting finished.")
