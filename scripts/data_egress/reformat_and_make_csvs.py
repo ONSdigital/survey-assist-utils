@@ -112,7 +112,8 @@ def setup_parser() -> AP:
     parser.add_argument(
         "intermediate_responses_path",
         type=str,
-        help="path to the files output from the response data egress process.",
+        help="path to the folder containing the files output "
+        "from the response data egress process.",
     )
     parser.add_argument(
         "output_name_base",
@@ -123,7 +124,8 @@ def setup_parser() -> AP:
         "--intermediate_feedback_path",
         type=str,
         default="",
-        help="path to the files output from the feedback data egress process.",
+        help="path to the folder containing the files output "
+        "from the feedback data egress process.",
     )
     parser.add_argument(
         "--only_after",
