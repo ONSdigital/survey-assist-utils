@@ -73,7 +73,6 @@ EVALUATION_COLUMNS = [
     "survey_assist_alt_candidate_3_code",
     "survey_assist_alt_candidate_4_code",
     "survey_assist_alt_candidate_5_code",
-    "survey_assist_closed_question",
     "survey_assist_closed_question_response",
     "survey_assist_closed_question_opt_1",
     "survey_assist_closed_question_opt_2",
