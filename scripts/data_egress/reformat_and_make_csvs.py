@@ -5,11 +5,15 @@ clerical coders.
 
 It reads chunked parquet files from a specified directory (local or GCS),
 filters responses based on response validity and a timestamp, renames columns,
-and then outputs two CSV files:
+and then outputs three-four CSV files:
 - A 'minimal' version with only the participant information and 3 TLFS fields.
 - An 'extra' version with the survey-assist questions and responses included as well.
-
+- An 'evaluation' version with all fields included for analysis purposes.
+- An 'invalid' version with responses that were marked as invalid or duplicated,
+  if the --include_invalid flag is not set.
 """
+# pylint: disable=line-too-long,C0103
+
 import json
 import os
 from argparse import ArgumentParser as AP
@@ -28,58 +32,87 @@ from survey_assist_utils.logging import (
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
 
+job_title_col = "job_title"
+job_description_col = "job_description"
+org_description_col = "org_description"
+lookup_classified_col = "direct_lookup_classified"
+lookup_code_col = "direct_lookup_assigned_code"
+survey_assist_classified_col = "survey_assist_classified"
+survey_assist_code_col = "survey_assist_assigned_code"
+survey_assist_alt_code_cols = "survey_assist_alt_candidate_code_"
+open_question_col = "survey_assist_open_question"
+open_question_response_col = "survey_assist_open_question_response"
+closed_question_response_col = "survey_assist_closed_question_response"
+closed_question_opt_cols = "survey_assist_closed_question_option_"
 
 COLUMN_NAME_MAPPING = {
-    "survey_assist_interactions_0_response_found": "direct_lookup_successful",
-    "survey_assist_interactions_0_response_code": "direct_lookup_code",
-    "survey_assist_interactions_0_input_2_org_description": "org_description",
-    "survey_assist_interactions_0_input_1_job_description": "job_description",
-    "survey_assist_interactions_0_input_0_job_title": "job_title",
-    "survey_assist_interactions_1_response_classified": "survey_assist_says_codable",
-    "survey_assist_interactions_1_response_code": "survey_assist_assigned_code",
-    "survey_assist_interactions_1_response_candidates_0_code": "survey_assist_alt_candidate_1_code",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_candidates_1_code": "survey_assist_alt_candidate_2_code",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_candidates_2_code": "survey_assist_alt_candidate_3_code",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_candidates_3_code": "survey_assist_alt_candidate_4_code",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_candidates_4_code": "survey_assist_alt_candidate_5_code",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_0_text": "survey_assist_open_question",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_0_response": "survey_assist_open_question_response",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_text": "survey_assist_closed_question",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_response": "survey_assist_closed_question_response",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_0": "survey_assist_closed_question_opt_1",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_1": "survey_assist_closed_question_opt_2",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_2": "survey_assist_closed_question_opt_3",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_3": "survey_assist_closed_question_opt_4",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_4": "survey_assist_closed_question_opt_5",  # pylint: disable=line-too-long
-    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_5": "survey_assist_closed_question_opt_6",  # pylint: disable=line-too-long
+    "id": "unique_id",
+    "survey_assist_interactions_0_response_found": lookup_classified_col,
+    "survey_assist_interactions_0_response_code": lookup_code_col,
+    "survey_assist_interactions_0_input_2_org_description": org_description_col,
+    "survey_assist_interactions_0_input_1_job_description": job_description_col,
+    "survey_assist_interactions_0_input_0_job_title": job_title_col,
+    "survey_assist_interactions_1_response_classified": survey_assist_classified_col,
+    "survey_assist_interactions_1_response_code": survey_assist_code_col,
+    "survey_assist_interactions_1_response_candidates_0_code": survey_assist_alt_code_cols
+    + "1",
+    "survey_assist_interactions_1_response_candidates_1_code": survey_assist_alt_code_cols
+    + "2",
+    "survey_assist_interactions_1_response_candidates_2_code": survey_assist_alt_code_cols
+    + "3",
+    "survey_assist_interactions_1_response_candidates_3_code": survey_assist_alt_code_cols
+    + "4",
+    "survey_assist_interactions_1_response_candidates_4_code": survey_assist_alt_code_cols
+    + "5",
+    "survey_assist_interactions_1_response_follow_up_questions_0_text": open_question_col,
+    "survey_assist_interactions_1_response_follow_up_questions_0_response": open_question_response_col,
+    "survey_assist_interactions_1_response_follow_up_questions_1_response": closed_question_response_col,
+    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_0": closed_question_opt_cols
+    + "1",
+    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_1": closed_question_opt_cols
+    + "2",
+    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_2": closed_question_opt_cols
+    + "3",
+    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_3": closed_question_opt_cols
+    + "4",
+    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_4": closed_question_opt_cols
+    + "5",
+    "survey_assist_interactions_1_response_follow_up_questions_1_select_options_5": closed_question_opt_cols
+    + "6",
 }
 
-CC_COLUMNS_MINIMAL = ["id", "user", "org_description", "job_description", "job_title"]
+CC_COLUMNS_MINIMAL = [
+    "unique_id",
+    "user",
+    job_title_col,
+    job_description_col,
+    org_description_col,
+]
 
 CC_COLUMNS_EXTRA = [
     *CC_COLUMNS_MINIMAL,
-    "survey_assist_open_question",
-    "survey_assist_open_question_response",
+    open_question_col,
+    open_question_response_col,
 ]
 
 EVALUATION_COLUMNS = [
     *CC_COLUMNS_EXTRA,
-    "direct_lookup_successful",
-    "direct_lookup_code",
-    "survey_assist_says_codable",
-    "survey_assist_assigned_code",
-    "survey_assist_alt_candidate_1_code",
-    "survey_assist_alt_candidate_2_code",
-    "survey_assist_alt_candidate_3_code",
-    "survey_assist_alt_candidate_4_code",
-    "survey_assist_alt_candidate_5_code",
-    "survey_assist_closed_question_response",
-    "survey_assist_closed_question_opt_1",
-    "survey_assist_closed_question_opt_2",
-    "survey_assist_closed_question_opt_3",
-    "survey_assist_closed_question_opt_4",
-    "survey_assist_closed_question_opt_5",
-    "survey_assist_closed_question_opt_6",
+    lookup_classified_col,
+    lookup_code_col,
+    survey_assist_classified_col,
+    survey_assist_code_col,
+    survey_assist_alt_code_cols + "1",
+    survey_assist_alt_code_cols + "2",
+    survey_assist_alt_code_cols + "3",
+    survey_assist_alt_code_cols + "4",
+    survey_assist_alt_code_cols + "5",
+    closed_question_response_col,
+    closed_question_opt_cols + "1",
+    closed_question_opt_cols + "2",
+    closed_question_opt_cols + "3",
+    closed_question_opt_cols + "4",
+    closed_question_opt_cols + "5",
+    closed_question_opt_cols + "6",
 ]
 
 FEEDBACK_COLUMNS = [
@@ -240,26 +273,39 @@ if __name__ == "__main__":
         if len(chunk) == 0:
             logger.debug(f"Chunk {chunk_id} is empty after filtering, skipping.")
             continue
-        if not args.include_invalid:
-            logger.debug(f"Marking valid responses for chunk {chunk_id}.")
-            chunk["valid_response"] = chunk.apply(assign_response_valid, axis=1)
-            logger.debug(f"Filtering out invalid responses for chunk {chunk_id}.")
-            chunk = chunk[chunk["valid_response"]]
         logger.debug(
             f"Filtering chunk {chunk_id} for responses after {only_after_timestamp}."
         )
-        logger.debug(f"Renaming columns for chunk {chunk_id}.")
-        chunk = chunk.rename(columns=COLUMN_NAME_MAPPING)
         cc_chunks.append(chunk)
     cc_df = pd.concat(cc_chunks)
+    logger.info(f"Completed processing all chunks. Number of responses: {len(cc_df)}")
+    invalid_response = pd.DataFrame()
     if not args.include_invalid:
+
+        logger.debug("Marking invalid responses...")
+        cc_df["valid_response"] = cc_df.apply(assign_response_valid, axis=1)
+        if (invalid_msk := ~cc_df["valid_response"]).any():
+            invalid_response = cc_df[invalid_msk]
+            cc_df = cc_df[~invalid_msk].reset_index(drop=True)
+            logger.info(
+                f"Removed {sum(invalid_msk)} invalid responses from the output."
+            )
+
         logger.info("Marking duplicated responses...")
-        cc_df["unique_response"] = cc_df.apply(
-            lambda row: assign_response_unique(cc_df, row), axis=1
-        )
-        logger.info("Filtering out duplicated responses...")
-        cc_df = cc_df[cc_df["unique_response"]]
-        logger.info("Duplicated responses removed")
+        cc_df["unique_response"] = [
+            assign_response_unique(cc_df, row) for _, row in cc_df.iterrows()
+        ]
+        if (duplicated_msk := ~cc_df["unique_response"]).any():
+            invalid_response = pd.concat(
+                [invalid_response, cc_df[duplicated_msk]], ignore_index=True
+            )
+            cc_df = cc_df[~duplicated_msk].reset_index(drop=True)
+            logger.info(
+                f"Removed {sum(duplicated_msk)} duplicated responses from the output."
+            )
+        invalid_response = invalid_response.rename(columns=COLUMN_NAME_MAPPING)
+    logger.debug("Renaming columns...")
+    cc_df = cc_df.rename(columns=COLUMN_NAME_MAPPING)
 
     if args.intermediate_feedback_path != "":
         logger.info("Loading the feedback metadata file...")
@@ -289,13 +335,20 @@ if __name__ == "__main__":
         EVALUATION_COLUMNS.extend(FEEDBACK_COLUMN_NAMES)
 
     logger.info("Saving dataframes to CSV files...")
-    cc_df[CC_COLUMNS_EXTRA].to_csv(f"{args.output_name_base}_extra.csv", index=False)
-    cc_df[CC_COLUMNS_MINIMAL].to_csv(
-        f"{args.output_name_base}_minimal.csv", index=False
-    )
     cc_df[EVALUATION_COLUMNS].to_csv(
         f"{args.output_name_base}_evaluation.csv", index=False
     )
+    cc_df[CC_COLUMNS_MINIMAL].to_csv(
+        f"{args.output_name_base}_minimal.csv", index=False
+    )
+    cc_df.loc[~cc_df["survey_assist_open_question"].isna(), CC_COLUMNS_EXTRA].to_csv(
+        f"{args.output_name_base}_extra.csv", index=False
+    )
+
+    if (not args.include_invalid) and len(invalid_response) > 0:
+        invalid_response.to_csv(f"{args.output_name_base}_invalid.csv", index=False)
+        logger.info(f"Saved invalid responses to {args.output_name_base}_invalid.csv")
+
     logger.info(
         f"Saved dataframes to {args.output_name_base}_extra.csv, "
         f"{args.output_name_base}_minimal.csv and "
