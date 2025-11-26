@@ -282,10 +282,25 @@ if __name__ == "__main__":
     invalid_response = pd.DataFrame()
     if not args.include_invalid:
 
+        logger.debug("Filtering out people not in employment...")
+        cc_df["lookup_used"] = ~cc_df[
+            "survey_assist_interactions_0_response_found"
+        ].isna()
+        if (not_in_employment_msk := ~cc_df["lookup_used"]).any():
+            invalid_response = pd.concat(
+                [invalid_response, cc_df[not_in_employment_msk]], ignore_index=True
+            )
+            cc_df = cc_df[cc_df["lookup_used"]].reset_index(drop=True)
+            logger.info(
+                f"Removed {sum(not_in_employment_msk)} responses from people not in employment (identified by lookup N/A)."
+            )
+
         logger.debug("Marking invalid responses...")
         cc_df["valid_response"] = cc_df.apply(assign_response_valid, axis=1)
         if (invalid_msk := ~cc_df["valid_response"]).any():
-            invalid_response = cc_df[invalid_msk]
+            invalid_response = pd.concat(
+                [invalid_response, cc_df[invalid_msk]], ignore_index=True
+            )
             cc_df = cc_df[~invalid_msk].reset_index(drop=True)
             logger.info(
                 f"Removed {sum(invalid_msk)} invalid responses from the output."
