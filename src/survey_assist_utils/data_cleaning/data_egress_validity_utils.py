@@ -55,6 +55,9 @@ import pandas as pd
 - survey_assist_interactions_1_response_follow_up_questions_1_response should not be missing
 - survey_assist_interactions_1_response_follow_up_questions_1_select_options_0 should not be missing
 - survey_assist_interactions_1_response_follow_up_questions_1_select_options_1 should not be missing
+- survey_assist_interactions_1_response_follow_up_questions_0_id should be f1.1
+- survey_assist_interactions_1_response_follow_up_questions_1_id should be f1.2
+- survey_assist_interactions_1_response_follow_up_questions_2_id should be missing
 """
 
 
@@ -135,12 +138,12 @@ def _check_case_1(row: pd.Series) -> bool:
     Returns:
         True if the response is a valid 'Case 1' response, False otherwise.
     """
-    return not any(
+    return all(
         (
-            row["survey_assist_interactions_1_type"] not in ("", None),
-            row["survey_assist_interactions_1_response_classified"] not in ("", None),
-            row["survey_assist_interactions_0_response_found"] is not True,
-            row["survey_assist_interactions_0_response_code"] in ("", None),
+            row["survey_assist_interactions_1_type"] in ("", None),
+            row["survey_assist_interactions_1_response_classified"] in ("", None),
+            row["survey_assist_interactions_0_response_found"] is True,
+            row["survey_assist_interactions_0_response_code"] not in ("", None),
         )
     )
 
@@ -154,23 +157,23 @@ def _check_case_2(row: pd.Series) -> bool:
     Returns:
         True if the response is a valid 'Case 2' response, False otherwise.
     """
-    return not any(
+    return all(
         (
-            row["survey_assist_interactions_0_response_found"] is not False,
-            row["survey_assist_interactions_0_response_code"] not in ("", None),
-            row["survey_assist_interactions_1_type"] != "classify",
-            row["survey_assist_interactions_1_response_classified"] is not True,
-            row["survey_assist_interactions_1_response_code"] in ("", None),
+            row["survey_assist_interactions_0_response_found"] is False,
+            row["survey_assist_interactions_0_response_code"] in ("", None),
+            row["survey_assist_interactions_1_type"] == "classify",
+            row["survey_assist_interactions_1_response_classified"] is True,
+            row["survey_assist_interactions_1_response_code"] not in ("", None),
             row["survey_assist_interactions_1_response_candidates_0_code"]
-            in ("", None),
+            not in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_0_text"]
-            not in ("", None),
+            in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_1_text"]
-            not in ("", None),
+            in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_0_response"]
-            not in ("", None),
+            in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_1_response"]
-            not in ("", None),
+            in ("", None),
         )
     )
 
@@ -184,29 +187,29 @@ def _check_case_3(row: pd.Series) -> bool:
     Returns:
         True if the response is a valid 'Case 3' response, False otherwise.
     """
-    return not any(
+    return all(
         (
-            row["survey_assist_interactions_0_response_found"] is not False,
-            row["survey_assist_interactions_0_response_code"] not in ("", None),
-            row["survey_assist_interactions_1_type"] != "classify",
-            row["survey_assist_interactions_1_response_classified"] is not False,
-            row["survey_assist_interactions_1_response_code"] not in ("", None),
+            row["survey_assist_interactions_0_response_found"] is False,
+            row["survey_assist_interactions_0_response_code"] in ("", None),
+            row["survey_assist_interactions_1_type"] == "classify",
+            row["survey_assist_interactions_1_response_classified"] is False,
+            row["survey_assist_interactions_1_response_code"] in ("", None),
             row["survey_assist_interactions_1_response_candidates_0_code"]
-            in ("", None),
+            not in ("", None),
             row["survey_assist_interactions_1_response_candidates_1_code"]
-            in ("", None),
+            not in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_0_id"]
-            != "f1.1",
+            == "f1.1",
             row["survey_assist_interactions_1_response_follow_up_questions_1_id"]
-            != "f1.2",
+            == "f1.2",
             row["survey_assist_interactions_1_response_follow_up_questions_0_text"]
-            in ("", None),
+            not in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_1_text"]
-            in ("", None),
+            not in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_0_response"]
-            in ("", None),
+            not in ("", None),
             row["survey_assist_interactions_1_response_follow_up_questions_1_response"]
-            in ("", None),
+            not in ("", None),
         )
     )
 
