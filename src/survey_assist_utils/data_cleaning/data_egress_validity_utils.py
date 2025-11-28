@@ -72,7 +72,7 @@ def _check_always_required(  # noqa: PLR0911 # pylint: disable=too-many-return-s
     Returns:
         True if the response meets the always-required conditions, False otherwise.
     """
-    if all(
+    if not all(
         (
             "survey_assist_interactions_0_type" in row,
             "survey_assist_interactions_0_response_found" in row,
