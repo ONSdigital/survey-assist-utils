@@ -19,6 +19,7 @@ import os
 from argparse import ArgumentParser as AP
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 from google.cloud import storage
 
@@ -44,6 +45,7 @@ open_question_col = "survey_assist_open_question"
 open_question_response_col = "survey_assist_open_question_response"
 closed_question_response_col = "survey_assist_closed_question_response"
 closed_question_opt_cols = "survey_assist_closed_question_option_"
+
 
 COLUMN_NAME_MAPPING = {
     "id": "unique_id",
@@ -277,50 +279,16 @@ if __name__ == "__main__":
             f"Filtering chunk {chunk_id} for responses after {only_after_timestamp}."
         )
         cc_chunks.append(chunk)
-    cc_df = pd.concat(cc_chunks)
-    logger.info(f"Completed processing all chunks. Number of responses: {len(cc_df)}")
-    invalid_response = pd.DataFrame()
-    if not args.include_invalid:
+    merged_df = pd.concat(cc_chunks)
+    merged_df = merged_df.replace({np.nan: None})
+    logger.info(
+        f"Completed processing all chunks. Number of responses: {len(merged_df)}"
+    )
 
-        logger.debug("Filtering out people not in employment...")
-        cc_df["lookup_used"] = ~cc_df[
-            "survey_assist_interactions_0_response_found"
-        ].isna()
-        if (not_in_employment_msk := ~cc_df["lookup_used"]).any():
-            invalid_response = pd.concat(
-                [invalid_response, cc_df[not_in_employment_msk]], ignore_index=True
-            )
-            cc_df = cc_df[cc_df["lookup_used"]].reset_index(drop=True)
-            logger.info(
-                f"Removed {sum(not_in_employment_msk)} responses from people not in employment (identified by lookup N/A)."
-            )
-
-        logger.debug("Marking invalid responses...")
-        cc_df["valid_response"] = cc_df.apply(assign_response_valid, axis=1)
-        if (invalid_msk := ~cc_df["valid_response"]).any():
-            invalid_response = pd.concat(
-                [invalid_response, cc_df[invalid_msk]], ignore_index=True
-            )
-            cc_df = cc_df[~invalid_msk].reset_index(drop=True)
-            logger.info(
-                f"Removed {sum(invalid_msk)} invalid responses from the output."
-            )
-
-        logger.info("Marking duplicated responses...")
-        cc_df["unique_response"] = [
-            assign_response_unique(cc_df, row) for _, row in cc_df.iterrows()
-        ]
-        if (duplicated_msk := ~cc_df["unique_response"]).any():
-            invalid_response = pd.concat(
-                [invalid_response, cc_df[duplicated_msk]], ignore_index=True
-            )
-            cc_df = cc_df[~duplicated_msk].reset_index(drop=True)
-            logger.info(
-                f"Removed {sum(duplicated_msk)} duplicated responses from the output."
-            )
-        invalid_response = invalid_response.rename(columns=COLUMN_NAME_MAPPING)
-    logger.debug("Renaming columns...")
-    cc_df = cc_df.rename(columns=COLUMN_NAME_MAPPING)
+    merged_df["response_valid"] = merged_df.apply(assign_response_valid, axis=1)
+    merged_df["response_unique"] = [
+        assign_response_unique(merged_df, row) for _, row in merged_df.iterrows()
+    ]
 
     if args.intermediate_feedback_path != "":
         logger.info("Loading the feedback metadata file...")
@@ -337,32 +305,43 @@ if __name__ == "__main__":
             feedback_chunks.append(chunk)
         feedback_df = pd.concat(feedback_chunks)
         logger.info("Merging in the feedback data...")
-        cc_df["intermediate_feedback_column"] = cc_df.apply(
+        merged_df["intermediate_feedback_column"] = merged_df.apply(
             lambda row: get_feedback(row, feedback_df), axis=1
         )
         for fc_name, fc_raw_name in zip(FEEDBACK_COLUMN_NAMES, FEEDBACK_COLUMNS):
             extraction_func = make_extract_feedback_field_func(fc_raw_name)
-            cc_df[fc_name] = cc_df["intermediate_feedback_column"].apply(
+            merged_df[fc_name] = merged_df["intermediate_feedback_column"].apply(
                 extraction_func
             )
-        del cc_df["intermediate_feedback_column"]
+        del merged_df["intermediate_feedback_column"]
         logger.debug("Completed merging the feedback data.")
         EVALUATION_COLUMNS.extend(FEEDBACK_COLUMN_NAMES)
 
+    merged_df = merged_df.rename(columns=COLUMN_NAME_MAPPING)
+    if args.include_invalid:
+        valid_and_unique_df = merged_df
+    else:
+        valid_and_unique_df = merged_df[
+            merged_df["response_valid"] & merged_df["response_unique"]
+        ]
+
+    invalid_or_duplicate_df = merged_df[
+        ~merged_df["response_valid"] | ~merged_df["response_unique"]
+    ]
+
     logger.info("Saving dataframes to CSV files...")
-    cc_df[EVALUATION_COLUMNS].to_csv(
+    valid_and_unique_df[EVALUATION_COLUMNS].to_csv(
         f"{args.output_name_base}_evaluation.csv", index=False
     )
-    cc_df[CC_COLUMNS_MINIMAL].to_csv(
+    valid_and_unique_df[CC_COLUMNS_MINIMAL].to_csv(
         f"{args.output_name_base}_minimal.csv", index=False
     )
-    cc_df.loc[~cc_df["survey_assist_open_question"].isna(), CC_COLUMNS_EXTRA].to_csv(
-        f"{args.output_name_base}_extra.csv", index=False
-    )
+    valid_and_unique_df.loc[
+        ~valid_and_unique_df["survey_assist_open_question"].isna(), CC_COLUMNS_EXTRA
+    ].to_csv(f"{args.output_name_base}_extra.csv", index=False)
 
-    if (not args.include_invalid) and len(invalid_response) > 0:
-        invalid_response.to_csv(f"{args.output_name_base}_invalid.csv", index=False)
-        logger.info(f"Saved invalid responses to {args.output_name_base}_invalid.csv")
+    invalid_or_duplicate_df.to_csv(f"{args.output_name_base}_invalid.csv", index=False)
+    logger.info(f"Saved invalid responses to {args.output_name_base}_invalid.csv")
 
     logger.info(
         f"Saved dataframes to {args.output_name_base}_extra.csv, "
