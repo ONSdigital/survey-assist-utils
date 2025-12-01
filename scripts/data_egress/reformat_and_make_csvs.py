@@ -115,6 +115,9 @@ EVALUATION_COLUMNS = [
     closed_question_opt_cols + "4",
     closed_question_opt_cols + "5",
     closed_question_opt_cols + "6",
+    "response_valid",
+    "response_unique",
+    "lookup_used",
 ]
 
 FEEDBACK_COLUMNS = [
@@ -289,6 +292,9 @@ if __name__ == "__main__":
     merged_df["response_unique"] = [
         assign_response_unique(merged_df, row) for _, row in merged_df.iterrows()
     ]
+    merged_df["lookup_used"] = ~merged_df[
+        "survey_assist_interactions_0_response_found"
+    ].isna()
 
     if args.intermediate_feedback_path != "":
         logger.info("Loading the feedback metadata file...")
@@ -322,11 +328,15 @@ if __name__ == "__main__":
         valid_and_unique_df = merged_df
     else:
         valid_and_unique_df = merged_df[
-            merged_df["response_valid"] & merged_df["response_unique"]
+            merged_df["response_valid"]
+            & merged_df["response_unique"]
+            & merged_df["lookup_used"]
         ]
 
     invalid_or_duplicate_df = merged_df[
-        ~merged_df["response_valid"] | ~merged_df["response_unique"]
+        ~merged_df["response_valid"]
+        | ~merged_df["response_unique"]
+        | ~merged_df["lookup_used"]
     ]
 
     logger.info("Saving dataframes to CSV files...")
