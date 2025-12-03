@@ -275,7 +275,6 @@ def assign_response_unique(df: pd.DataFrame, row: pd.Series) -> bool:
             f"row {row.name}'s user ({row['user']}) could not be found in overall dataframe"
         )
     if len(unique_responses) > 1:
-        print("response appears duplicated")
         for duplicate_response in unique_responses.iterrows():
             if duplicate_response[0] == row.name:
                 continue
