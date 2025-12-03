@@ -357,6 +357,9 @@ if __name__ == "__main__":
     valid_unique_employed_df[EVALUATION_COLUMNS].to_csv(
         f"{args.output_name_base}_evaluation.csv", index=False
     )
+    valid_unique_employed_df[EVALUATION_COLUMNS].to_parquet(
+        f"{args.output_name_base}_evaluation.parquet", index=False
+    )
     valid_unique_employed_df[CC_COLUMNS_MINIMAL].to_csv(
         f"{args.output_name_base}_minimal.csv", index=False
     )
@@ -366,17 +369,25 @@ if __name__ == "__main__":
     ].to_csv(f"{args.output_name_base}_extra.csv", index=False)
 
     invalid_or_duplicate_df.to_csv(f"{args.output_name_base}_invalid.csv", index=False)
-    logger.info(f"Saved invalid responses to {args.output_name_base}_invalid.csv")
+    invalid_or_duplicate_df.to_parquet(
+        f"{args.output_name_base}_invalid.parquet", index=False
+    )
+    logger.info(
+        f"Saved invalid responses to {args.output_name_base}_invalid<.csv/.parquet>"
+    )
 
     not_employed_df.to_csv(f"{args.output_name_base}_not_employed.csv", index=False)
+    not_employed_df.to_parquet(
+        f"{args.output_name_base}_not_employed.parquet", index=False
+    )
     logger.info(
-        f"Saved not-employed responses to {args.output_name_base}_not_employed.csv"
+        f"Saved not-employed responses to {args.output_name_base}_not_employed<.csv/.parquet>"
     )
 
     logger.info(
         f"Saved dataframes to {args.output_name_base}_extra.csv, "
         f"{args.output_name_base}_minimal.csv and "
-        f"{args.output_name_base}_evaluation.csv"
+        f"{args.output_name_base}_evaluation<.csv/.parquet>"
     )
     logger.info("Survey response reformatting finished.")
 
