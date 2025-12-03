@@ -117,17 +117,27 @@ def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
     return validate_sic_codes(prep_set)
 
 
-def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> set[str]:
-    """Converts a list of possible codes to a list containing only
-    valid n-digit SIC codes.
-    E.g. ['86011', '86012', '85xxx'] -> ['86011', '86012', '85000', ..., '85999'].
+def get_clean_n_digit_codes(
+    input_list: str | set[str] | list[str], n: int
+) -> tuple[set[str], set[str]]:
+    """Converts a list of possible codes to two sets of strings.
+    The first set contains valid n-digit SIC codes.
+    The second set contains original codes that could not be cleaned.
+
+    Example:
+        ['86011', '86012', '85xxx'] -> (
+            {'86011', '86012', '85000', ..., '85999'},  # valid codes
+            set()  # invalid codes if any
+        )
 
     Args:
-        input_list: List or set of strings containing possible codes.
+        input_list: A string, list, or set of strings containing possible codes.
         n: Number of digits to which the codes should be cleaned/expanded.
 
     Returns:
-        Set of cleaned n-digit SIC code strings.
+        tuple:
+            cleaned_set (set[str]): Set of cleaned n-digit SIC code strings.
+            invalid_set (set[str]): Set of original codes that could not be cleaned.
     """
     if isinstance(input_list, str):
         input_list = [input_list]
@@ -137,11 +147,22 @@ def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> s
         )
         return set()
 
-    cleaned_list = [get_clean_n_digit_one_code(i, n) for i in input_list]
+    # Was an item in the input list invalid?
+
+    cleaned_list = []
+    invalid_set = set()
+
+    for item in input_list:
+        result = get_clean_n_digit_one_code(item, n)
+        if len(result) == 0:
+            logger.warning("Warning: '%s' has no valid codes.", item)
+            invalid_set.add(item)
+        cleaned_list.append(result)
+
     # Flatten the sets and deduplicate
     cleaned_set = set().union(*cleaned_list)
 
-    return cleaned_set
+    return cleaned_set, invalid_set
 
 
 def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
@@ -160,7 +181,12 @@ def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
             "Expected a list or set of strings for input_list, got %s", type(input_set)
         )
         return set()
-    return {str(x) for x in input_set}.intersection(VALID_SIC_CODES)
+
+    # ML changes:
+    codes = {str(x) for x in input_set}
+    valid_codes = codes.intersection(VALID_SIC_CODES)
+
+    return valid_codes
 
 
 def extract_alt_candidates_n_digit_codes(
@@ -232,7 +258,9 @@ def get_codability_level(codes: set[str]) -> str:
         (2, "Division (2-digits)"),
         (0, "Section (letter)"),
     ]:
-        codes = get_clean_n_digit_codes(codes, digits)
+        codes, invalid_codes = get_clean_n_digit_codes(codes, digits)
+        if len(invalid_codes) != 0:
+            logger.warning("Warning: '%s' invalid codes.", invalid_codes)
         if len(codes) == 1:
             return label
 

@@ -2,6 +2,7 @@
 
 ### Change added 03/12/2025 - ML
 Add in warning for incorrect / badly formed codes, eg '38xx', '96060'.
+Added invalid column to dataframe out.
 
 Utilities used as part of Survey Assist API or UI
 

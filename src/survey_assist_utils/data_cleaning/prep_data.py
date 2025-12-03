@@ -58,13 +58,18 @@ def prep_clerical_codes(
         )
         df.loc[msk, clerical_col] = df.loc[msk, f"{clerical_col}_4plus"]
 
-    df[out_col] = (
-        df[clerical_col]
-        .apply(parse_numerical_code)
-        .apply(get_clean_n_digit_codes, n=digits)
+    # To assist in unit testing, if there are no invalid codes, make an empty column
+
+    # Added a check for illegal codes,
+    df["out_col_temp"] = df[clerical_col].apply(parse_numerical_code)
+
+    df[[out_col, "invalid_codes"]] = df["out_col_temp"].apply(
+        lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
     )
 
-    return df[[ID_COL, out_col]]
+    #    df[[out_col, "invalid_codes"]] = df["out_col_temp"].apply(_split_codes)
+
+    return df[[ID_COL, out_col, "invalid_codes"]]
 
 
 # allow more arguments than 5
@@ -109,12 +114,16 @@ def prep_model_codes(  # noqa:PLR0913
 
     out_df = input_df[[ID_COL]].copy()
     out_df[out_col] = [{} for _ in range(len(input_df))]
-    if codes_col is not None:
-        out_df[out_col] = (
-            input_df[codes_col]
-            .apply(parse_numerical_code)
-            .apply(get_clean_n_digit_codes, n=digits)
-        )
+
+    # Added a check for illegal codes,
+    input_df["out_col_temp"] = input_df[codes_col].apply(parse_numerical_code)
+
+    # Whilst the check for invalid codes in the model values may be out of scope,
+    # reusing the sasme code makes sense here.
+
+    input_df[[codes_col, "invalid_codes"]] = input_df["out_col_temp"].apply(
+        lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
+    )
 
     # Extract the codes from the model's alt_sic_candidates if ambiguous
     if alt_codes_col is not None:
