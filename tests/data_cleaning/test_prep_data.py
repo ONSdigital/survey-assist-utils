@@ -96,7 +96,9 @@ def test_prep_clerical_codes_empty_df():
     df = pd.DataFrame(
         columns=["unique_id", "sic_ind_occ1", "sic_ind_occ2", "sic_ind_occ3"]
     )
+    print("=========================================")
     result = prep_clerical_codes(df)
+    print(result)
     assert result.empty
 
 

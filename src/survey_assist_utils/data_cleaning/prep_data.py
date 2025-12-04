@@ -58,16 +58,19 @@ def prep_clerical_codes(
         )
         df.loc[msk, clerical_col] = df.loc[msk, f"{clerical_col}_4plus"]
 
-    # To assist in unit testing, if there are no invalid codes, make an empty column
-
+    # To assist in unit testing, if there are no invalid codes, make an empty column.abs
     # Added a check for illegal codes,
     df["out_col_temp"] = df[clerical_col].apply(parse_numerical_code)
 
-    df[[out_col, "invalid_codes"]] = df["out_col_temp"].apply(
-        lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
-    )
-
-    #    df[[out_col, "invalid_codes"]] = df["out_col_temp"].apply(_split_codes)
+    # But first, check if the entire df is empty:
+    if df.empty:
+        # create the return df
+        df[[out_col, "invalid_codes"]] = pd.Series([], dtype=object)
+    else:
+        # Only run apply if we have a df
+        df[[out_col, "invalid_codes"]] = df["out_col_temp"].apply(
+            lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
+        )
 
     return df[[ID_COL, out_col, "invalid_codes"]]
 
@@ -119,7 +122,7 @@ def prep_model_codes(  # noqa:PLR0913
     input_df["out_col_temp"] = input_df[codes_col].apply(parse_numerical_code)
 
     # Whilst the check for invalid codes in the model values may be out of scope,
-    # reusing the sasme code makes sense here.
+    # reusing the sasme code makes sense here, but we need to check if the df is empty:
 
     input_df[[codes_col, "invalid_codes"]] = input_df["out_col_temp"].apply(
         lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
