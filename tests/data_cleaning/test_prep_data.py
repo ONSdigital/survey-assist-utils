@@ -57,6 +57,7 @@ def sample_cc_four_plus():
 def test_prep_clerical_codes_basic(sample_cc_df):
     result = prep_clerical_codes(sample_cc_df, digits=5)
     assert "clerical_codes" in result.columns, "Output column missing"
+    assert "invalid_codes" in result.columns
     assert len(result) == len(
         sample_cc_df
     ), "Unexpected number of rows after processing"
@@ -68,12 +69,31 @@ def test_prep_clerical_codes_basic(sample_cc_df):
         "01420",
         "86210",
     }, "Incorrect codes for ID A1"
+    # Expect no incorrect codes for A1:
+    assert result.loc[result["unique_id"] == "A1", "invalid_codes"].iloc[0] == set()
     assert (
         result.loc[result["unique_id"] == "A3", "clerical_codes"].iloc[0] == set()
     ), "Incorrect codes for ID A3"
     assert (
         result.loc[result["unique_id"] == "A4", "clerical_codes"].iloc[0] == set()
     ), "Incorrect codes for ID A4"
+
+
+def test_prep_clerical_with_invalid():
+    df = pd.DataFrame(
+        {
+            "unique_id": ["B1"],
+            "sic_ind_occ1": "98765",
+            "sic_ind_occ2": "86101",
+            "sic_ind_occ3": "23456",
+        }
+    )
+    result = prep_clerical_codes(df)
+
+    row = result.loc[result["unique_id"] == "B1"].iloc[0]
+    assert "86101" in row["clerical_codes"]
+    assert "98765" in row["invalid_codes"]
+    assert "23456" in row["invalid_codes"]
 
 
 def test_prep_clerical_codes_with_four_plus(sample_cc_df, sample_cc_four_plus):
@@ -100,6 +120,27 @@ def test_prep_clerical_codes_empty_df():
     result = prep_clerical_codes(df)
     print(result)
     assert result.empty
+
+
+def test_prep_model_codes_with_invalid():
+    df = pd.DataFrame(
+        {
+            "unique_id": ["C1"],
+            "initial_code": ["98765"],
+            # Add alt candidates to ensure they don't overwrite the invalid column
+            "alt_sic_candidates": [[{"code": "86101", "likelihood": 0.9}]],
+        }
+    )
+
+    result = prep_model_codes(df, alt_codes_col="alt_sic_candidates")
+
+    row = result.loc[result["unique_id"] == "C1"].iloc[0]
+
+    # Ensure invalid code was captured
+    assert "98765" in row["invalid_codes"]
+
+    # Ensure valid code from alternatives was still populated
+    assert "86101" in row["model_codes"]
 
 
 def test_prep_model_codes_initial_only():
