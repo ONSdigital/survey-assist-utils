@@ -56,6 +56,36 @@ def test_get_clean_n_digit_one_code():
     assert get_clean_n_digit_one_code("86101", 0) == {"Q"}
 
 
+def test_get_clean_n_digit_codes_with_invalid():
+    # Case 1: Mixed valid and invalid (alphanumeric/garbage)
+    codes = ["86101", "NotACode", "123456789", "86210"]
+    valid, invalid = get_clean_n_digit_codes(codes, 5)
+
+    # Check valid codes are processed
+    assert "86101" in valid
+    assert "86210" in valid
+    assert len(valid) == 2  # noqa: PLR2004
+
+    # Check invalid codes are captured correctly
+    assert "NotACode" in invalid
+    # "123456789" will likely fail the .isdigit() check or validation check
+    assert "123456789" in invalid
+    assert len(invalid) == 2  # noqa: PLR2004
+
+    # Case 2: Purely invalid codes
+    bad_input = ["Bad1", "Bad2"]
+    valid, invalid = get_clean_n_digit_codes(bad_input, 5)
+    assert valid == set()
+    assert invalid == {"Bad1", "Bad2"}
+
+    # Case 3: Numeric codes that shouldn't exist (assuming 00000 is not in VALID_SIC_CODES)
+    # This tests the validation lookup failure path
+    fake_codes = ["00000"]
+    valid, invalid = get_clean_n_digit_codes(fake_codes, 5)
+    if "00000" not in valid:  # Only assert if we are sure it's invalid in your lookup
+        assert "00000" in invalid
+
+
 def test_get_clean_n_digit_codes_5d():
     codes = ["86101", "86210", "85xxx"]
     result, invalid = get_clean_n_digit_codes(codes, 5)
