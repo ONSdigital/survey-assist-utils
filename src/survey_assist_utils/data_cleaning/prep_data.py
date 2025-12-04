@@ -116,8 +116,12 @@ def prep_model_codes(  # noqa:PLR0913
             "At least one of 'codes_col' or 'alt_codes_col' must be provided."
         )
 
+    # Initialise MAIN output column
     out_df = input_df[[ID_COL]].copy()
     out_df[out_col] = [{} for _ in range(len(input_df))]
+
+    # Initialise INVALID column (This prevents the KeyError when codes_col is None)
+    out_df["invalid_codes"] = [set() for _ in range(len(input_df))]
 
     if codes_col:
         # Make a temp col for the partially cleaned codes:
@@ -128,6 +132,7 @@ def prep_model_codes(  # noqa:PLR0913
         )
 
         out_df[out_col] = cleaned_results[0]
+        out_df["invalid_codes"] = cleaned_results[1]
 
     # Extract the codes from the model's alt_sic_candidates if ambiguous
     if alt_codes_col is not None:
@@ -143,5 +148,6 @@ def prep_model_codes(  # noqa:PLR0913
             threshold=threshold,
         )
         out_df.loc[miss_msk, out_col] = alternatives
+        # Note: We are NOT extracting invalid codes from alternatives here
 
-    return out_df
+    return out_df[[ID_COL, out_col, "invalid_codes"]]
