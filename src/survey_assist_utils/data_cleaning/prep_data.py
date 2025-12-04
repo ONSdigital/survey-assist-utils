@@ -65,7 +65,8 @@ def prep_clerical_codes(
     # But first, check if the entire df is empty:
     if df.empty:
         # create the return df
-        df[[out_col, "invalid_codes"]] = pd.Series([], dtype=object)
+        df[out_col] = pd.Series([], dtype=object)
+        df["invalid_codes"] = pd.Series([], dtype=object)
     else:
         # Only run apply if we have a df
         df[[out_col, "invalid_codes"]] = df["out_col_temp"].apply(
