@@ -22,21 +22,35 @@ def prep_clerical_codes(
     out_col: str = "clerical_codes",
     digits: int = 5,
 ) -> pd.DataFrame:
-    """Extract and clean clerical codes from the DataFrame.
+    """Prepare and clean clerical SIC codes from one or two DataFrames.
+
+    This function aggregates clerical codes from multiple columns into a single
+    column, optionally merges additional codes from a secondary DataFrame (for
+    "4+" cases), and cleans all codes to valid n-digit SIC codes. It also identifies
+    invalid codes that cannot be cleaned.
 
     Args:
-        df: Input DataFrame containing clerical codes.
-        df_four_plus: Optional DataFrame containing clerical codes for '4+' cases.
-            If None no extra codes are expected. Defaults to None.
-        clerical_col: Column name where clerical codes are stored.
+        df (pd.DataFrame): Primary DataFrame containing clerical codes.
+            Must include the unique identifier column (ID_COL) and up to three
+            columns for clerical codes (e.g., sic_ind_occ1, sic_ind_occ2, sic_ind_occ3).
+        df_four_plus (pd.DataFrame | None): Optional DataFrame containing additional
+            clerical codes for "4+" cases. If provided, codes from this DataFrame
+            will be merged into the primary DataFrame. Defaults to None.
+        clerical_col (str): Base name for clerical code columns in df.
             Defaults to "sic_ind_occ".
-        out_col: Column name for the output cleaned clerical codes.
-            Defaults to "clerical_codes"
-        digits: Number of digits to which SIC codes should be cleaned/expanded.
+        out_col (str): Name of the output column that will contain cleaned clerical codes.
+            Defaults to "clerical_codes".
+        digits (int): Number of digits to which SIC codes should be cleaned or expanded.
             Defaults to 5.
 
     Returns:
-        DataFrame with cleaned clerical codes.
+        pd.DataFrame: A DataFrame containing:
+            - ID_COL: Unique identifier.
+            - out_col: Set of cleaned SIC codes.
+            - invalid_codes: Set of original codes that could not be cleaned.
+
+    Raises:
+        ValueError: If the input DataFrame is missing the required unique identifier column.
     """
     clerical_3cols = [clerical_col + str(i) for i in range(1, 4)]
 
@@ -58,7 +72,6 @@ def prep_clerical_codes(
         )
         df.loc[msk, clerical_col] = df.loc[msk, f"{clerical_col}_4plus"]
 
-    # To assist in unit testing, if there are no invalid codes, make an empty column.abs
     # Added a check for illegal codes,
     df["out_col_temp"] = df[clerical_col].apply(parse_numerical_code)
 
@@ -88,6 +101,9 @@ def prep_model_codes(  # noqa:PLR0913
     digits: int = 5,
 ) -> pd.DataFrame:
     """Prepares the input DataFrame for evaluation by ensuring necessary columns exist.
+    Processes an input DataFrame containing model-predicted SIC codes and optionally
+    alternative candidate codes. It cleans the codes to valid n-digit SIC codes and
+    identifies invalid codes if any exist. The alternative illegal detection is OOS.
 
     Args:
         input_df: Input DataFrame to be prepared.
@@ -99,7 +115,10 @@ def prep_model_codes(  # noqa:PLR0913
         digits: Number of digits to which SIC codes should be cleaned/expanded.
 
     Returns:
-        Prepared DataFrame with necessary columns.
+        pd.DataFrame: A DataFrame containing:
+            - ID_COL: Unique identifier.
+            - out_col: Set of cleaned model codes.
+            - invalid_codes: Set of original codes that could not be cleaned.
 
     Raises:
         ValueError: If required columns are missing in the input DataFrame.

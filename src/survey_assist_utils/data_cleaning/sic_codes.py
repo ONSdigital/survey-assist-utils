@@ -135,9 +135,16 @@ def get_clean_n_digit_codes(
         n: Number of digits to which the codes should be cleaned/expanded.
 
     Returns:
-        tuple:
-            cleaned_set (set[str]): Set of cleaned n-digit SIC code strings.
-            invalid_set (set[str]): Set of original codes that could not be cleaned.
+        tuple[set[str], set[str]]:
+            - cleaned_set: Set of cleaned n-digit SIC code strings.
+            - invalid_set: Set of original codes that could not be cleaned.
+
+    Raises:
+        None explicitly, but logs a warning if input_list is not a list, set, or string.
+
+    Notes:
+        - If input_list is a single string, it is converted to a list internally.
+        - Invalid codes are logged and returned in the second set.
     """
     if isinstance(input_list, str):
         input_list = [input_list]
@@ -148,7 +155,6 @@ def get_clean_n_digit_codes(
         return set()
 
     # Was an item in the input list invalid?
-
     cleaned_list = []
     invalid_set = set()
 
@@ -182,11 +188,7 @@ def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
         )
         return set()
 
-    # ML changes:
-    codes = {str(x) for x in input_set}
-    valid_codes = codes.intersection(VALID_SIC_CODES)
-
-    return valid_codes
+    return {str(x) for x in input_set}.intersection(VALID_SIC_CODES)
 
 
 def extract_alt_candidates_n_digit_codes(
