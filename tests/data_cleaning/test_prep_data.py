@@ -108,6 +108,7 @@ def test_prep_model_codes_initial_only():
         }
     )
     result = prep_model_codes(df)
+    print(result)
     assert "model_codes" in result.columns
     assert result["model_codes"].apply(lambda x: isinstance(x, set)).all()
 
