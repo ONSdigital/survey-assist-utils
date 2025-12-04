@@ -58,12 +58,16 @@ def test_get_clean_n_digit_one_code():
 
 def test_get_clean_n_digit_codes_5d():
     codes = ["86101", "86210", "85xxx"]
-    result = get_clean_n_digit_codes(codes, 5)
+    result, invalid = get_clean_n_digit_codes(codes, 5)
     assert "86101" in result
     assert "86210" in result
     assert "85100" in result
     assert "85590" in result
     assert isinstance(result, set)
+
+    # Check invalid codes - there should be none
+    assert isinstance(invalid, set)
+    assert invalid == set()
 
 
 def test_get_clean_n_digit_codes_logs(caplog):
@@ -73,9 +77,14 @@ def test_get_clean_n_digit_codes_logs(caplog):
 
 
 def test_get_clean_n_digit_codes_section():
-    assert get_clean_n_digit_codes("2xxxx", 0) == {"C"}
+    cleaned, invalid = get_clean_n_digit_codes("2xxxx", 0)
+    assert cleaned == {"C"}
+    assert invalid == set()
+
     codes = ["86101", "86210", "2xxxx"]
-    assert get_clean_n_digit_codes(codes, 0) == {"Q", "C"}
+    cleaned, invalid = get_clean_n_digit_codes(codes, 0)
+    assert cleaned == {"Q", "C"}
+    assert invalid == set()
 
 
 def test_validate_sic_codes():
