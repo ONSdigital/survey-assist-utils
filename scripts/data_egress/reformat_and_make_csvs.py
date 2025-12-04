@@ -12,7 +12,8 @@ and then outputs three-four CSV files:
 - An 'invalid' version with responses that were marked as invalid or duplicated.
 - A 'not employed' version with responses that were not in employment.
 """
-# pylint: disable=line-too-long,C0103
+# pylint: disable=line-too-long,C0103,C0121
+# ruff: noqa: E712
 
 import json
 import os
@@ -291,7 +292,7 @@ if __name__ == "__main__":
     ].isna()
 
     merged_df["response_valid"] = None
-    employed_mask = merged_df["not_in_employment_proxy"] is False
+    employed_mask = merged_df["not_in_employment_proxy"] == False
     merged_df.loc[employed_mask, "response_valid"] = merged_df[employed_mask].apply(
         assign_response_valid, axis=1
     )
@@ -301,7 +302,7 @@ if __name__ == "__main__":
         if r["response_valid"]:
             duplication_status.append(
                 assign_response_unique(
-                    merged_df[merged_df["response_valid"] is True], r
+                    merged_df[merged_df["response_valid"] == True], r
                 )
             )
         else:
@@ -338,16 +339,16 @@ if __name__ == "__main__":
     merged_df = merged_df.rename(columns=COLUMN_NAME_MAPPING)
 
     valid_unique_employed_mask = (
-        (merged_df["response_valid"] is True)
-        & (merged_df["response_unique"] is True)
-        & (merged_df["not_in_employment_proxy"] is False)
+        (merged_df["response_valid"] == True)
+        & (merged_df["response_unique"] == True)
+        & (merged_df["not_in_employment_proxy"] == False)
     )
     valid_unique_employed_df = merged_df[valid_unique_employed_mask]
 
     invalid_or_duplicated_employed_mask = (
-        merged_df["not_in_employment_proxy"] is False
+        merged_df["not_in_employment_proxy"] == False
     ) & (
-        (merged_df["response_valid"] is False) | (merged_df["response_unique"] is False)
+        (merged_df["response_valid"] == False) | (merged_df["response_unique"] == False)
     )
 
     invalid_or_duplicate_df = merged_df[invalid_or_duplicated_employed_mask]
@@ -399,8 +400,8 @@ total:                   {len(merged_df)}
 --------------------------------
 valid, unique, employed: {len(valid_unique_employed_df)}
 invalid / duplicate:     {len(invalid_or_duplicate_df)}
-invalid:                 {len(invalid_or_duplicate_df[invalid_or_duplicate_df['response_valid'] is False])}
-duplicate:               {len(invalid_or_duplicate_df[invalid_or_duplicate_df['response_unique'] is False])}
+invalid:                 {len(invalid_or_duplicate_df[invalid_or_duplicate_df['response_valid'] == False])}
+duplicate:               {len(invalid_or_duplicate_df[invalid_or_duplicate_df['response_unique'] == False])}
 not employed:            {len(not_employed_df)}
 
 Note: some records may be simultaneously invalid, duplicates,
