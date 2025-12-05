@@ -135,7 +135,7 @@ def get_clean_n_digit_codes(
         n: Number of digits to which the codes should be cleaned/expanded.
 
     Returns:
-        tuple[set[str], set[str]]:
+        A tuple containing:
             - cleaned_set: Set of cleaned n-digit SIC code strings.
             - invalid_set: Set of original codes that could not be cleaned.
 

@@ -102,22 +102,22 @@ def prep_model_codes(  # noqa:PLR0913
     threshold: float = 0,
     digits: int = 5,
 ) -> pd.DataFrame:
-    """Prepares the input DataFrame for evaluation by ensuring necessary columns exist.
-    Processes an input DataFrame containing model-predicted SIC codes and optionally
-    alternative candidate codes. It cleans the codes to valid n-digit SIC codes and
-    identifies invalid codes if any exist. The alternative illegal detection is OOS.
+    """Prepare the input DataFrame containing model-predicted SIC codes.
+
+    Cleans codes to valid n-digit SIC codes and identifies invalid codes.
+    Optionally extracts alternative candidate codes if the primary code is missing.
 
     Args:
         input_df: Input DataFrame to be prepared.
-        codes_col: Column name for initial model predicted code (string).
+        codes_col: Column name for initial model predicted code.
         alt_codes_col: Column name for alternative codes (list of dicts).
         out_col: Column name for the output cleaned model codes.
         alt_codes_name: Key name to extract codes from alternative predictions.
         threshold: Likelihood threshold for pruning alternative candidates.
-        digits: Number of digits to which SIC codes should be cleaned/expanded.
+        digits: Number of digits to which SIC codes should be cleaned.
 
     Returns:
-        pd.DataFrame: A DataFrame containing:
+        A DataFrame containing:
             - ID_COL: Unique identifier.
             - out_col: Set of cleaned model codes.
             - invalid_codes: Set of original codes that could not be cleaned.
