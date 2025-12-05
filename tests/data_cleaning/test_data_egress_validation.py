@@ -46,7 +46,7 @@ def get_relevant_fake_records(request) -> list[pd.DataFrame]:
     dfs = []
     for example in situation_cases.get(situation, []):
         with open(
-            f"data/artificial_data/data_egress_validity_test_cases/{example}",
+            f"tests/data_egress_validity_test_cases/{example}",
             encoding="utf8",
         ) as f:
             example_as_dict = json.load(f)
