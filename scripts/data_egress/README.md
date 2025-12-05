@@ -55,7 +55,7 @@ options:
 ## Usage: `reformat_and_make_csvs.py`
 
 ```text
-reformat_and_make_csvs.py [-h] [--intermediate_feedback_path INTERMEDIATE_FEEDBACK_PATH] [--only_after ONLY_AFTER] [--include_invalid]
+reformat_and_make_csvs.py [-h] [--intermediate_feedback_path INTERMEDIATE_FEEDBACK_PATH] [--only_after ONLY_AFTER]
                           intermediate_responses_path output_name_base
 
 positional arguments:
