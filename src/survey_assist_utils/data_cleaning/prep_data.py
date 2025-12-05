@@ -52,6 +52,8 @@ def prep_clerical_codes(
     Raises:
         ValueError: If the input DataFrame is missing the required unique identifier column.
     """
+    # Set a dynamic invalid col name:
+    invalid_col = f"{out_col}_invalid"
     clerical_3cols = [clerical_col + str(i) for i in range(1, 4)]
 
     df = df[[ID_COL, *clerical_3cols]].copy()
@@ -79,14 +81,14 @@ def prep_clerical_codes(
     if df.empty:
         # create the return df
         df[out_col] = pd.Series([], dtype=object)
-        df["invalid_codes"] = pd.Series([], dtype=object)
+        df[invalid_col] = pd.Series([], dtype=object)
     else:
         # Only run apply if we have a df
-        df[[out_col, "invalid_codes"]] = df["out_col_temp"].apply(
+        df[[out_col, invalid_col]] = df["out_col_temp"].apply(
             lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
         )
 
-    return df[[ID_COL, out_col, "invalid_codes"]]
+    return df[[ID_COL, out_col, invalid_col]]
 
 
 # allow more arguments than 5
@@ -123,6 +125,8 @@ def prep_model_codes(  # noqa:PLR0913
     Raises:
         ValueError: If required columns are missing in the input DataFrame.
     """
+    # Set a dynamic invalid col name:
+    invalid_col = f"{out_col}_invalid"
     if ID_COL not in input_df.columns:
         raise ValueError(f"Input DataFrame must contain a column '{ID_COL}'")
     if codes_col not in input_df.columns:
@@ -140,13 +144,13 @@ def prep_model_codes(  # noqa:PLR0913
     out_df[out_col] = [{} for _ in range(len(input_df))]
 
     # Initialise INVALID column (This prevents the KeyError when codes_col is None)
-    out_df["invalid_codes"] = [set() for _ in range(len(input_df))]
+    out_df[invalid_col] = [set() for _ in range(len(input_df))]
 
     if codes_col:
         # Make a temp col for the partially cleaned codes:
         out_df["out_col_temp"] = input_df[codes_col].apply(parse_numerical_code)
 
-        out_df[[out_col, "invalid_codes"]] = out_df["out_col_temp"].apply(
+        out_df[[out_col, invalid_col]] = out_df["out_col_temp"].apply(
             lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
         )
 
@@ -166,4 +170,4 @@ def prep_model_codes(  # noqa:PLR0913
         out_df.loc[miss_msk, out_col] = alternatives
         # Note: We are NOT extracting invalid codes from alternatives here
 
-    return out_df[[ID_COL, out_col, "invalid_codes"]]
+    return out_df[[ID_COL, out_col, invalid_col]]

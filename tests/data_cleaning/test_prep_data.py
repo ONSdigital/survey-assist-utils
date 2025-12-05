@@ -11,6 +11,12 @@ from survey_assist_utils.data_cleaning.prep_data import (
     prep_model_codes,
 )
 
+# Set some constants for the returned invalid column names:
+CLERICAL_COL = "clerical_codes"
+MODEL_COL = "model_codes"
+INVALID_CLERICAL_COL = f"{CLERICAL_COL}_invalid"
+INVALID_MODEL_COL = f"{MODEL_COL}_invalid"
+
 
 @pytest.fixture
 def sample_cc_df():
@@ -56,26 +62,28 @@ def sample_cc_four_plus():
 
 def test_prep_clerical_codes_basic(sample_cc_df):
     result = prep_clerical_codes(sample_cc_df, digits=5)
-    assert "clerical_codes" in result.columns, "Output column missing"
-    assert "invalid_codes" in result.columns
+    assert CLERICAL_COL in result.columns, "Output column missing"
+    assert INVALID_CLERICAL_COL in result.columns
     assert len(result) == len(
         sample_cc_df
     ), "Unexpected number of rows after processing"
     assert (
-        result["clerical_codes"].apply(lambda x: isinstance(x, set)).all()
+        result[CLERICAL_COL].apply(lambda x: isinstance(x, set)).all()
     )  # All output codes should be sets
-    assert result.loc[result["unique_id"] == "A1", "clerical_codes"].iloc[0] == {
+    assert result.loc[result["unique_id"] == "A1", CLERICAL_COL].iloc[0] == {
         "86101",
         "01420",
         "86210",
     }, "Incorrect codes for ID A1"
     # Expect no incorrect codes for A1:
-    assert result.loc[result["unique_id"] == "A1", "invalid_codes"].iloc[0] == set()
     assert (
-        result.loc[result["unique_id"] == "A3", "clerical_codes"].iloc[0] == set()
+        result.loc[result["unique_id"] == "A1", INVALID_CLERICAL_COL].iloc[0] == set()
+    )
+    assert (
+        result.loc[result["unique_id"] == "A3", CLERICAL_COL].iloc[0] == set()
     ), "Incorrect codes for ID A3"
     assert (
-        result.loc[result["unique_id"] == "A4", "clerical_codes"].iloc[0] == set()
+        result.loc[result["unique_id"] == "A4", CLERICAL_COL].iloc[0] == set()
     ), "Incorrect codes for ID A4"
 
 
@@ -91,9 +99,9 @@ def test_prep_clerical_with_invalid():
     result = prep_clerical_codes(df)
 
     row = result.loc[result["unique_id"] == "B1"].iloc[0]
-    assert "86101" in row["clerical_codes"]
-    assert "98765" in row["invalid_codes"]
-    assert "23456" in row["invalid_codes"]
+    assert "86101" in row[CLERICAL_COL]
+    assert "98765" in row[INVALID_CLERICAL_COL]
+    assert "23456" in row[INVALID_CLERICAL_COL]
 
 
 def test_prep_clerical_codes_with_four_plus(sample_cc_df, sample_cc_four_plus):
@@ -137,10 +145,10 @@ def test_prep_model_codes_with_invalid():
     row = result.loc[result["unique_id"] == "C1"].iloc[0]
 
     # Ensure invalid code was captured
-    assert "98765" in row["invalid_codes"]
+    assert "98765" in row[INVALID_MODEL_COL]
 
     # Ensure valid code from alternatives was still populated
-    assert "86101" in row["model_codes"]
+    assert "86101" in row[MODEL_COL]
 
 
 def test_prep_model_codes_initial_only():
@@ -152,8 +160,8 @@ def test_prep_model_codes_initial_only():
     )
     result = prep_model_codes(df)
     print(result)
-    assert "model_codes" in result.columns
-    assert result["model_codes"].apply(lambda x: isinstance(x, set)).all()
+    assert MODEL_COL in result.columns
+    assert result[MODEL_COL].apply(lambda x: isinstance(x, set)).all()
 
 
 def test_prep_model_codes_alt_only():
@@ -167,8 +175,8 @@ def test_prep_model_codes_alt_only():
         }
     )
     result = prep_model_codes(df, codes_col=None, alt_codes_col="alt_sic_candidates")
-    assert result["model_codes"].apply(lambda x: isinstance(x, set)).all()
-    assert result["model_codes"].all()
+    assert result[MODEL_COL].apply(lambda x: isinstance(x, set)).all()
+    assert result[MODEL_COL].all()
 
 
 def test_prep_model_codes_missing_id():
@@ -214,8 +222,8 @@ def test_prep_model_codes_threshold():
         df, codes_col=None, alt_codes_col="alt_sic_candidates", threshold=0.7
     )
     # Only codes with likelihood >= 0.7 should be present
-    assert result.loc[result["unique_id"] == "A1", "model_codes"].iloc[0] == {"86101"}
-    assert result.loc[result["unique_id"] == "A2", "model_codes"].iloc[0] == {
+    assert result.loc[result["unique_id"] == "A1", MODEL_COL].iloc[0] == {"86101"}
+    assert result.loc[result["unique_id"] == "A2", MODEL_COL].iloc[0] == {
         "86210",
         "86101",
         "01420",
