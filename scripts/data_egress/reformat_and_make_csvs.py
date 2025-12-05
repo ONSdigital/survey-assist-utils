@@ -9,10 +9,11 @@ and then outputs three-four CSV files:
 - A 'minimal' version with only the participant information and 3 TLFS fields.
 - An 'extra' version with the survey-assist questions and responses included as well.
 - An 'evaluation' version with all fields included for analysis purposes.
-- An 'invalid' version with responses that were marked as invalid or duplicated,
-  if the --include_invalid flag is not set.
+- An 'invalid' version with responses that were marked as invalid or duplicated.
+- A 'not employed' version with responses that were not in employment.
 """
-# pylint: disable=line-too-long,C0103
+# pylint: disable=line-too-long,C0103,C0121
+# ruff: noqa: E712
 
 import json
 import os
@@ -44,6 +45,7 @@ open_question_col = "survey_assist_open_question"
 open_question_response_col = "survey_assist_open_question_response"
 closed_question_response_col = "survey_assist_closed_question_response"
 closed_question_opt_cols = "survey_assist_closed_question_option_"
+
 
 COLUMN_NAME_MAPPING = {
     "id": "unique_id",
@@ -113,6 +115,9 @@ EVALUATION_COLUMNS = [
     closed_question_opt_cols + "4",
     closed_question_opt_cols + "5",
     closed_question_opt_cols + "6",
+    "response_valid",
+    "response_unique",
+    "not_in_employment_proxy",
 ]
 
 FEEDBACK_COLUMNS = [
@@ -165,12 +170,6 @@ def setup_parser() -> AP:
         default="2024_01_01__00_00_000000",
         help="Restrict results to those collected after specified timestamp. "
         "Format Y_m_d__H_M_S (e.g. '2024_01_01__00_00_000000').",
-    )
-    parser.add_argument(
-        "--include_invalid",
-        action="store_true",
-        help="Include responses which had issues when parsing from the "
-        "Firestore database collection. Default: False.",
     )
     return parser
 
@@ -277,50 +276,38 @@ if __name__ == "__main__":
             f"Filtering chunk {chunk_id} for responses after {only_after_timestamp}."
         )
         cc_chunks.append(chunk)
-    cc_df = pd.concat(cc_chunks)
-    logger.info(f"Completed processing all chunks. Number of responses: {len(cc_df)}")
-    invalid_response = pd.DataFrame()
-    if not args.include_invalid:
+    merged_df = pd.concat(cc_chunks)
+    merged_df = merged_df.where(merged_df.notnull(), None)
+    logger.info(
+        f"Completed processing all chunks. Number of responses: {len(merged_df)}"
+    )
 
-        logger.debug("Filtering out people not in employment...")
-        cc_df["lookup_used"] = ~cc_df[
-            "survey_assist_interactions_0_response_found"
-        ].isna()
-        if (not_in_employment_msk := ~cc_df["lookup_used"]).any():
-            invalid_response = pd.concat(
-                [invalid_response, cc_df[not_in_employment_msk]], ignore_index=True
-            )
-            cc_df = cc_df[cc_df["lookup_used"]].reset_index(drop=True)
-            logger.info(
-                f"Removed {sum(not_in_employment_msk)} responses from people not in employment (identified by lookup N/A)."
-            )
+    # A user pressing 'no' for the 'paid employment' question results in a null value
+    # being saved for the interaction 0 response. However it is possible for other
+    # issues (associated with the back button issue) to also cause this behaviour.
+    # We use it as a proxy measure for if they were in employment, but note that it
+    # is an imperfect measure.
+    merged_df["not_in_employment_proxy"] = merged_df[
+        "survey_assist_interactions_0_response_found"
+    ].isna()
 
-        logger.debug("Marking invalid responses...")
-        cc_df["valid_response"] = cc_df.apply(assign_response_valid, axis=1)
-        if (invalid_msk := ~cc_df["valid_response"]).any():
-            invalid_response = pd.concat(
-                [invalid_response, cc_df[invalid_msk]], ignore_index=True
-            )
-            cc_df = cc_df[~invalid_msk].reset_index(drop=True)
-            logger.info(
-                f"Removed {sum(invalid_msk)} invalid responses from the output."
-            )
+    merged_df["response_valid"] = None
+    employed_mask = merged_df["not_in_employment_proxy"] == False
+    merged_df.loc[employed_mask, "response_valid"] = merged_df[employed_mask].apply(
+        assign_response_valid, axis=1
+    )
 
-        logger.info("Marking duplicated responses...")
-        cc_df["unique_response"] = [
-            assign_response_unique(cc_df, row) for _, row in cc_df.iterrows()
-        ]
-        if (duplicated_msk := ~cc_df["unique_response"]).any():
-            invalid_response = pd.concat(
-                [invalid_response, cc_df[duplicated_msk]], ignore_index=True
+    duplication_status = []
+    for _, r in merged_df.iterrows():
+        if r["response_valid"]:
+            duplication_status.append(
+                assign_response_unique(
+                    merged_df[merged_df["response_valid"] == True], r
+                )
             )
-            cc_df = cc_df[~duplicated_msk].reset_index(drop=True)
-            logger.info(
-                f"Removed {sum(duplicated_msk)} duplicated responses from the output."
-            )
-        invalid_response = invalid_response.rename(columns=COLUMN_NAME_MAPPING)
-    logger.debug("Renaming columns...")
-    cc_df = cc_df.rename(columns=COLUMN_NAME_MAPPING)
+        else:
+            duplication_status.append(None)  # type: ignore[arg-type]
+    merged_df["response_unique"] = duplication_status
 
     if args.intermediate_feedback_path != "":
         logger.info("Loading the feedback metadata file...")
@@ -337,36 +324,87 @@ if __name__ == "__main__":
             feedback_chunks.append(chunk)
         feedback_df = pd.concat(feedback_chunks)
         logger.info("Merging in the feedback data...")
-        cc_df["intermediate_feedback_column"] = cc_df.apply(
-            lambda row: get_feedback(row, feedback_df), axis=1
+        merged_df["intermediate_feedback_column"] = merged_df.apply(
+            lambda r: get_feedback(r, feedback_df), axis=1
         )
         for fc_name, fc_raw_name in zip(FEEDBACK_COLUMN_NAMES, FEEDBACK_COLUMNS):
             extraction_func = make_extract_feedback_field_func(fc_raw_name)
-            cc_df[fc_name] = cc_df["intermediate_feedback_column"].apply(
+            merged_df[fc_name] = merged_df["intermediate_feedback_column"].apply(
                 extraction_func
             )
-        del cc_df["intermediate_feedback_column"]
+        del merged_df["intermediate_feedback_column"]
         logger.debug("Completed merging the feedback data.")
         EVALUATION_COLUMNS.extend(FEEDBACK_COLUMN_NAMES)
 
-    logger.info("Saving dataframes to CSV files...")
-    cc_df[EVALUATION_COLUMNS].to_csv(
-        f"{args.output_name_base}_evaluation.csv", index=False
+    merged_df = merged_df.rename(columns=COLUMN_NAME_MAPPING)
+
+    valid_unique_employed_mask = (
+        (merged_df["response_valid"] == True)
+        & (merged_df["response_unique"] == True)
+        & (merged_df["not_in_employment_proxy"] == False)
     )
-    cc_df[CC_COLUMNS_MINIMAL].to_csv(
-        f"{args.output_name_base}_minimal.csv", index=False
-    )
-    cc_df.loc[~cc_df["survey_assist_open_question"].isna(), CC_COLUMNS_EXTRA].to_csv(
-        f"{args.output_name_base}_extra.csv", index=False
+    valid_unique_employed_df = merged_df[valid_unique_employed_mask]
+
+    invalid_or_duplicated_employed_mask = (
+        merged_df["not_in_employment_proxy"] == False
+    ) & (
+        (merged_df["response_valid"] == False) | (merged_df["response_unique"] == False)
     )
 
-    if (not args.include_invalid) and len(invalid_response) > 0:
-        invalid_response.to_csv(f"{args.output_name_base}_invalid.csv", index=False)
-        logger.info(f"Saved invalid responses to {args.output_name_base}_invalid.csv")
+    invalid_or_duplicate_df = merged_df[invalid_or_duplicated_employed_mask]
+    not_employed_df = merged_df[merged_df["not_in_employment_proxy"]]
+
+    logger.info("Saving dataframes to CSV files...")
+    valid_unique_employed_df[EVALUATION_COLUMNS].to_csv(
+        f"{args.output_name_base}_evaluation.csv", index=False
+    )
+    valid_unique_employed_df[EVALUATION_COLUMNS].to_parquet(
+        f"{args.output_name_base}_evaluation.parquet", index=False
+    )
+    valid_unique_employed_df[CC_COLUMNS_MINIMAL].to_csv(
+        f"{args.output_name_base}_minimal.csv", index=False
+    )
+    valid_unique_employed_df.loc[
+        ~valid_unique_employed_df["survey_assist_open_question"].isna(),
+        CC_COLUMNS_EXTRA,
+    ].to_csv(f"{args.output_name_base}_extra.csv", index=False)
+
+    invalid_or_duplicate_df.to_csv(f"{args.output_name_base}_invalid.csv", index=False)
+    invalid_or_duplicate_df.to_parquet(
+        f"{args.output_name_base}_invalid.parquet", index=False
+    )
+    logger.info(
+        f"Saved invalid responses to {args.output_name_base}_invalid<.csv/.parquet>"
+    )
+
+    not_employed_df.to_csv(f"{args.output_name_base}_not_employed.csv", index=False)
+    not_employed_df.to_parquet(
+        f"{args.output_name_base}_not_employed.parquet", index=False
+    )
+    logger.info(
+        f"Saved not-employed responses to {args.output_name_base}_not_employed<.csv/.parquet>"
+    )
 
     logger.info(
         f"Saved dataframes to {args.output_name_base}_extra.csv, "
         f"{args.output_name_base}_minimal.csv and "
-        f"{args.output_name_base}_evaluation.csv"
+        f"{args.output_name_base}_evaluation<.csv/.parquet>"
     )
     logger.info("Survey response reformatting finished.")
+
+    print(
+        f"""
+EXPORT SUMMARY
+--------------------------------
+total:                   {len(merged_df)}
+--------------------------------
+valid, unique, employed: {len(valid_unique_employed_df)}
+invalid / duplicate:     {len(invalid_or_duplicate_df)}
+invalid:                 {len(invalid_or_duplicate_df[invalid_or_duplicate_df['response_valid'] == False])}
+duplicate:               {len(invalid_or_duplicate_df[invalid_or_duplicate_df['response_unique'] == False])}
+not employed:            {len(not_employed_df)}
+
+Note: some records may be simultaneously invalid, duplicates,
+      and/or not in employment.
+    """
+    )

@@ -9,9 +9,11 @@
 It is designed to handle large datasets efficiently by processing documents in chunks, creating intermediate files.
 It can be used to extract both the survey responses and the survey feedback.
 
-`reformat_and_make_csvs.py` reformats and collates the files output by `retrieve_survey_responses.py`, then saves subsets of the data in three files; a 'minimal' CSV for clerical coders (contains only ID and initial question responses), an 'extra' CSV for clerical coders (extends 'minimal' to include open dynamic question and response), and an 'evaluation' CSV for internal use (extends 'extra' to include survey-assist decisions, assigned codes, candidates, closed questions, and optionally feedback).
+`reformat_and_make_csvs.py` reformats and collates the files output by `retrieve_survey_responses.py`, then saves subsets of the data in five files; a 'minimal' CSV for clerical coders (contains only ID and initial question responses), an 'extra' CSV for clerical coders (extends 'minimal' to include open dynamic question and response), and an 'evaluation' CSV for internal use (extends 'extra' to include survey-assist decisions, assigned codes, candidates, closed questions, and optionally feedback).
+The remaining two output files have the full set of data fields for responses detected as invalid / duplicate, or not in employment.
 It can optionally include feedback data in the evaluation CSV, and can filter the data to a) only output responses entered after a chosen timestamp.
-By default it will detect and exclude malformed response data, but this can be included by passing the `--include_invalid` flag.
+It will detect and flag malformed response data, duplicate responses, and responses where people have selected 'not in employment'.
+On completion, it will print a concise summary / breakdown of the valid / invalid / duplicate / not in employment responses.
 
 
 ## Notes
@@ -67,5 +69,4 @@ options:
                         path to the files output from the feedback data egress process.
   --only_after ONLY_AFTER
                         Restrict results to those collected after specified timestamp. Format Y_m_d__H_M_S (e.g. '2024_01_01__00_00_000000').
-  --include_invalid     Include responses which had issues when parsing from the Firestore database collection. Default: False.
 ```
