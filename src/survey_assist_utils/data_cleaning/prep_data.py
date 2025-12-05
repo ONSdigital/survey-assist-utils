@@ -144,14 +144,11 @@ def prep_model_codes(  # noqa:PLR0913
 
     if codes_col:
         # Make a temp col for the partially cleaned codes:
-        input_df["out_col_temp"] = input_df[codes_col].apply(parse_numerical_code)
+        out_df["out_col_temp"] = input_df[codes_col].apply(parse_numerical_code)
 
-        cleaned_results = input_df["out_col_temp"].apply(
+        out_df[[out_col, "invalid_codes"]] = out_df["out_col_temp"].apply(
             lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
         )
-
-        out_df[out_col] = cleaned_results[0]
-        out_df["invalid_codes"] = cleaned_results[1]
 
     # Extract the codes from the model's alt_sic_candidates if ambiguous
     if alt_codes_col is not None:
