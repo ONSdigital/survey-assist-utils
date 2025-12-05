@@ -155,18 +155,16 @@ def get_clean_n_digit_codes(
         return set()
 
     # Was an item in the input list invalid?
-    cleaned_list = []
-    invalid_set = set()
+    cleaned_set: set[str] = set()
+    invalid_set: set[str] = set()
 
     for item in input_list:
-        result = get_clean_n_digit_one_code(item, n)
-        if len(result) == 0:
-            logger.warning("Warning: '%s' has no valid codes.", item)
+        result = get_clean_n_digit_one_code(item, n)  # result is a set[str]
+        if not result:
+            logger.warning("Item '%s' has no valid codes.", item)
             invalid_set.add(item)
-        cleaned_list.append(result)
-
-    # Flatten the sets and deduplicate
-    cleaned_set = set().union(*cleaned_list)
+        else:
+            cleaned_set.update(result)
 
     return cleaned_set, invalid_set
 

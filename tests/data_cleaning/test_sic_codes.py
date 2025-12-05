@@ -117,6 +117,24 @@ def test_get_clean_n_digit_codes_section():
     assert invalid == set()
 
 
+def test_get_clean_n_digit_codes_logs_invalid_item(caplog):
+    # Ensure we capture WARNING logs for this test
+    with caplog.at_level("WARNING"):
+        # Input contains an item that will produce no valid codes
+        cleaned, invalid = get_clean_n_digit_codes({"98765"}, n=5)
+
+    # Assert logging happened with the expected message fragment
+    assert any(
+        "has no valid codes" in record.message.lower() for record in caplog.records
+    ), "Expected a warning about invalid codes to be logged"
+
+    # And the invalid item is recorded in the invalid set
+    assert "98765" in invalid
+    # cleaned may be empty depending on your cleaning logic
+    assert isinstance(cleaned, set)
+    assert isinstance(invalid, set)
+
+
 def test_validate_sic_codes():
     assert validate_sic_codes("01110") == {"01110"}
     valid = validate_sic_codes(["01110", "99999", "A"])
