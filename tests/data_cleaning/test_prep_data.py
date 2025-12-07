@@ -124,9 +124,7 @@ def test_prep_clerical_codes_empty_df():
     df = pd.DataFrame(
         columns=["unique_id", "sic_ind_occ1", "sic_ind_occ2", "sic_ind_occ3"]
     )
-    print("=========================================")
     result = prep_clerical_codes(df)
-    print(result)
     assert result.empty
 
 
@@ -159,9 +157,12 @@ def test_prep_model_codes_initial_only():
         }
     )
     result = prep_model_codes(df)
-    print(result)
+    row1 = result.loc[result["unique_id"] == "A1"].iloc[0]
+    row2 = result.loc[result["unique_id"] == "A2"].iloc[0]
     assert MODEL_COL in result.columns
     assert result[MODEL_COL].apply(lambda x: isinstance(x, set)).all()
+    assert "12345" in row1[INVALID_MODEL_COL]
+    assert "23456" in row2[INVALID_MODEL_COL]
 
 
 def test_prep_model_codes_alt_only():
@@ -221,10 +222,11 @@ def test_prep_model_codes_threshold():
     result = prep_model_codes(
         df, codes_col=None, alt_codes_col="alt_sic_candidates", threshold=0.7
     )
+
     # Only codes with likelihood >= 0.7 should be present
     assert result.loc[result["unique_id"] == "A1", MODEL_COL].iloc[0] == {"86101"}
     assert result.loc[result["unique_id"] == "A2", MODEL_COL].iloc[0] == {
         "86210",
         "86101",
-        "01420",
+        "01420",  # this shouldn't be here.
     }
