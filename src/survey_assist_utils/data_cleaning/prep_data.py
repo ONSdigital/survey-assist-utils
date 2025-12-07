@@ -30,15 +30,15 @@ def prep_clerical_codes(
     invalid codes that cannot be cleaned.
 
     Args:
-        df (pd.DataFrame): Primary DataFrame containing clerical codes.
+        df: Primary DataFrame containing clerical codes.
             Must include the unique identifier column (ID_COL) and up to three
             columns for clerical codes (e.g., sic_ind_occ1, sic_ind_occ2, sic_ind_occ3).
-        df_four_plus (pd.DataFrame | None): Optional DataFrame containing additional
+        df_four_plus: Optional DataFrame containing additional
             clerical codes for "4+" cases. If provided, codes from this DataFrame
             will be merged into the primary DataFrame. Defaults to None.
-        clerical_col (str): Base name for clerical code columns in df.
+        clerical_col: Base name for clerical code columns in df.
             Defaults to "sic_ind_occ".
-        out_col (str): Name of the output column that will contain cleaned clerical codes.
+        out_col: Name of the output column that will contain cleaned clerical codes.
             Defaults to "clerical_codes".
         digits (int): Number of digits to which SIC codes should be cleaned or expanded.
             Defaults to 5.
