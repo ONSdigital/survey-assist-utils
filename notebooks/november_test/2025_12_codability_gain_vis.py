@@ -7,7 +7,9 @@ import re
 
 import dotenv
 import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 
@@ -177,5 +179,48 @@ for section_name, sections in large_sections.items():
             right_col="SA Final Codes - " + question_type.capitalize() + " Question",
             title_suffix=f" - Section {section_name}",
         ).show()
+
+
+# %%
+# plot user numbers vs time start
+if "time_start" in combined_df.columns:
+
+    combined_df["response_start_time"] = pd.to_datetime(combined_df["time_start"])
+    combined_df["user_num"] = combined_df["user"].map(lambda x: int(x[3:8]))
+
+    # Prepare data
+    combined_df = combined_df.sort_values("response_start_time")
+    combined_df["cum_user_num"] = range(1, len(combined_df) + 1)
+
+    # Create subplots with secondary y-axis
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    # Scatter plot for user_num
+    scatter = px.scatter(
+        combined_df, x="response_start_time", y="user_num", template="simple_white"
+    )
+    fig.add_trace(scatter.data[0], secondary_y=False)
+
+    # Line plot for cumulative user numbers
+    line = px.line(
+        combined_df,
+        x="response_start_time",
+        y="cum_user_num",
+        color_discrete_sequence=["orange"],
+        template="simple_white",
+    )
+    fig.add_trace(line.data[0], secondary_y=True)
+
+    # Update layout
+    fig.update_layout(
+        title="User Numbers vs Response Start Time",
+        xaxis_title="Response Start Time",
+        yaxis_title="User ID Number",
+        yaxis2_title="Cumulative User Count",
+        template="simple_white",
+    )
+
+    fig.show()
+
 
 # %%
