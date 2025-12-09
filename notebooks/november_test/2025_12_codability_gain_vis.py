@@ -2,6 +2,7 @@
 
 # pylint: disable=C0301,C0103,R0801
 # %%
+import os
 import re
 
 import dotenv
@@ -10,11 +11,13 @@ import plotly.graph_objects as go
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 
-dotenv.load_dotenv("../../.env")
-
 # %%
-folder = data_bucket + "data/2025-12-05-export"
-out_dir = folder + "/figures/"  # set to None to skip saving
+folder = data_bucket + "analysis-interim-results"
+out_dir = (
+    "data/figures/"  # needs local folder unfortunately, set to None to skip saving
+)
+if out_dir:
+    os.makedirs(out_dir, exist_ok=True)
 
 combined_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
 

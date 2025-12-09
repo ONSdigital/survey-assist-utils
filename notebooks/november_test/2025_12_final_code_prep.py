@@ -13,13 +13,9 @@ from survey_assist_utils.data_cleaning.sic_codes import (
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 
-dotenv.load_dotenv("../../.env")
-
 # %%
-folder = data_bucket + "data/2025-12-05-export"
-out_file_name = (
-    folder + "/evaluation_df_with_sa_clean_codes.parquet"
-)  # set to None to skip saving
+folder = data_bucket + "firestore-data-export/2025-12-09-public_test_complete_data"
+out_folder = data_bucket + "analysis-interim-results"  # set to None to skip saving
 
 # %%
 # read data exported from firesore
@@ -83,11 +79,13 @@ pipe_df = (
     .fillna("")
 )
 
-pipe_df.to_parquet(folder + "/sic_coding_pipeline_input.parquet", index=False)
+pipe_df.to_parquet(
+    out_folder + "/SA_final_code_tmp/sic_coding_pipeline_input.parquet", index=False
+)
 
 # %%
 # after the final classification script run:
-final_code_df = pd.read_parquet(folder + "/STG7.parquet")
+final_code_df = pd.read_parquet(out_folder + "/SA_final_code_tmp/STG7.parquet")
 final_code_df = prep_model_codes(
     final_code_df,
     out_col="sa_final_codes_open_q",
@@ -175,5 +173,47 @@ combined_df["most_likely_sic_section"] = combined_df.apply(
 
 # %%
 # save the pre-processed data with clean SA codes
-if out_file_name:
-    combined_df.to_parquet(out_file_name, index=False)
+if out_folder:
+    combined_df.to_parquet(
+        out_folder + "/evaluation_df_with_sa_clean_codes.parquet", index=False
+    )
+
+# %%
+# prepare feedback file for Katrina
+combined_df["survey_assist_closed_question_options"] = combined_df[
+    "survey_assist_closed_question_option_1"
+]
+for i in range(2, 7):
+    msk = ~combined_df[f"survey_assist_closed_question_option_{i}"].isna()
+    combined_df.loc[msk, "survey_assist_closed_question_options"] += (
+        "; " + combined_df.loc[msk, f"survey_assist_closed_question_option_{i}"]
+    )
+
+columns_for_katrina = [
+    "unique_id",
+    "user",
+    "job_title",
+    "job_description",
+    "org_description",
+    "direct_lookup_classified",
+    "survey_assist_classified",
+    "sa_initial_codability_level",
+    "survey_assist_open_question",
+    "survey_assist_open_question_response",
+    "sa_final_codability_level_open_q",
+    "survey_assist_closed_question_options",
+    "survey_assist_closed_question_response",
+    "sa_final_codability_level_closed_q",
+    "most_likely_sic_section",
+    "feedback_age_range",
+    "feedback_survey_ease",
+    "feedback_survey_relevance",
+    "feedback_survey_comfort",
+    "feedback_comments",
+]
+
+if out_folder:
+    combined_df[columns_for_katrina].to_csv(
+        out_folder + "/feedback_file_for_katrina.csv", index=False
+    )
+# %%
