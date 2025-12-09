@@ -21,18 +21,32 @@ if out_dir:
 
 combined_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
 
-# %%
-# create sankey diagram
-for question_type in ["closed", "open"]:
-    left_col = "SA Initial Codes"
-    right_col = (
-        f"SA Final Codes - {question_type.capitalize()} Question"  # "clerical_codes"
-    )
-    sankey_df = combined_df.copy()
-    sankey_df[left_col] = sankey_df["sa_initial_codability_level"]
-    sankey_df[right_col] = sankey_df[f"sa_final_codability_level_{question_type}_q"]
 
-    sankey_df = sankey_df.groupby([left_col, right_col]).size().reset_index()
+# %%
+def create_sankey_codability_gain_loss(
+    input_df: pd.DataFrame,
+    left_col="SA Initial Codes",
+    right_col="SA Final Codes",
+    title_suffix: str = "",
+) -> go.Figure:
+    """Create a Sankey diagram to visualise codability gain/loss.
+
+    Args:
+        input_df: DataFrame containing initial and final codability levels.
+        left_col: Name of the column representing initial codability levels.
+        right_col: Name of the column representing final codability levels.
+        out_dir: Directory to save the figure, if provided.
+        title_suffix: Suffix to add to the title of the figure, e.g. section name.
+
+    Return:
+        A Plotly Figure object representing the Sankey diagram, or None if columns not found.
+    """
+    if left_col not in input_df.columns or right_col not in input_df.columns:
+        raise ValueError(
+            f"Columns {left_col} or {right_col} not found in input DataFrame."
+        )
+
+    sankey_df = input_df.groupby([left_col, right_col]).size().reset_index()
 
     label_list = list(pd.unique(sankey_df[[left_col, right_col]].values.ravel("K")))
     # sort the list by value of number contained in the string
@@ -101,15 +115,67 @@ for question_type in ["closed", "open"]:
     )
 
     sankey_fig.update_layout(
-        title_text="Impact of SurveyAssist Follow-up Q/A on Codability Levels",
+        title_text=f"Impact of SurveyAssist Follow-up Q/A on Codability Levels {title_suffix}",
         font_size=10,
         height=600,
         width=600,
     )
-    sankey_fig.show()
+    return sankey_fig
+
+
+# %%
+# create sankey diagram
+for question_type in ["open", "closed"]:
+    temp_df = combined_df[
+        ["sa_initial_codability_level", f"sa_final_codability_level_{question_type}_q"]
+    ].rename(
+        columns={
+            "sa_initial_codability_level": "SA Initial Codes",
+            f"sa_final_codability_level_{question_type}_q": "SA Final Codes - "
+            + question_type.capitalize()
+            + " Question",
+        }
+    )
+    fig = create_sankey_codability_gain_loss(
+        temp_df,
+        right_col="SA Final Codes - " + question_type.capitalize() + " Question",
+    )
+    fig.show()
     if out_dir:
-        sankey_fig.write_image(
+        fig.write_image(
             f"{out_dir}/sankey_codability_gain_loss_sa_followup_{question_type}_q.png"
         )
+
+# %%
+# same figures but for large sections only
+section_sizes = combined_df.most_likely_sic_section.value_counts(dropna=False)
+size_thr = 100
+large_sections = {x: [x] for x in section_sizes[section_sizes >= size_thr].index}
+large_sections["Other"] = section_sizes[section_sizes < size_thr].index.tolist()
+
+for section_name, sections in large_sections.items():
+    large_sections_df = combined_df[combined_df.most_likely_sic_section.isin(sections)]
+    print(
+        f"Sankey diagrams for section {section_name} with {len(large_sections_df)} entries:"
+    )
+    for question_type in ["open", "closed"]:
+        temp_df = large_sections_df[
+            [
+                "sa_initial_codability_level",
+                f"sa_final_codability_level_{question_type}_q",
+            ]
+        ].rename(
+            columns={
+                "sa_initial_codability_level": "SA Initial Codes",
+                f"sa_final_codability_level_{question_type}_q": "SA Final Codes - "
+                + question_type.capitalize()
+                + " Question",
+            }
+        )
+        create_sankey_codability_gain_loss(
+            temp_df,
+            right_col="SA Final Codes - " + question_type.capitalize() + " Question",
+            title_suffix=f" - Section {section_name}",
+        ).show()
 
 # %%
