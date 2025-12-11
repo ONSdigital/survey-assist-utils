@@ -7,6 +7,7 @@ import pandas as pd
 
 from survey_assist_utils.data_cleaning.prep_data import prep_model_codes
 from survey_assist_utils.data_cleaning.sic_codes import (
+    asses_codability_gain,
     get_clean_n_digit_codes,
     get_codability_level,
 )
@@ -121,21 +122,6 @@ combined_df.groupby(
 
 # %%
 # assess codability gain
-level_to_num = {
-    "Uncodable": -1,
-    "Section (letter)": 0,
-    "Division (2-digits)": 2,
-    "Group (3-digits)": 3,
-    "Class (4-digits)": 4,
-    "Sub-class (5-digits)": 5,
-}
-
-
-def asses_codability_gain(row, initial_level_col: str, final_level_col: str) -> bool:
-    """Assess if there was a codability gain between initial and final levels."""
-    return level_to_num[row[final_level_col]] > level_to_num[row[initial_level_col]]
-
-
 combined_df["sa_codability_gain_open_q"] = combined_df.apply(
     asses_codability_gain,
     axis=1,

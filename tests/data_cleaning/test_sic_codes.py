@@ -5,6 +5,7 @@
 import pytest
 
 from survey_assist_utils.data_cleaning.sic_codes import (
+    asses_codability_gain,
     expand_to_n_digit_str,
     extract_alt_candidates_n_digit_codes,
     get_clean_n_digit_codes,
@@ -123,3 +124,27 @@ def test_extract_alt_candidates_n_digit_codes():
 )
 def test_get_codability_level(codes, expected):
     assert get_codability_level(codes) == expected
+
+
+@pytest.mark.parametrize(
+    "left,right,expected",
+    [
+        ("Uncodable", "Uncodable", False),
+        ("Uncodable", "Section (letter)", True),
+        ("Section (letter)", "Uncodable", False),
+        ("Division (2-digits)", "Group (3-digits)", True),
+        ("Group (3-digits)", "Division (2-digits)", False),
+        ("Class (4-digits)", "Class (4-digits)", False),
+        ("Sub-class (5-digits)", "Class (4-digits)", False),
+        ("not a label", "Sub-class (5-digits)", None),
+        ("not a label", "not a label", None),
+    ],
+)
+def test_asses_codability_gain(left, right, expected):
+    row = {"initial": left, "final": right}
+    out = asses_codability_gain(
+        row,
+        initial_level_col="initial",
+        final_level_col="final",
+    )
+    assert out == expected

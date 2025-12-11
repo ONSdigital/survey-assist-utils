@@ -4,6 +4,8 @@ import logging
 import re
 from collections.abc import Iterable
 
+import pandas as pd
+
 from survey_assist_utils.data_cleaning.sic_code_section_list import (
     SECTION_LOOKUP,
     VALID_SIC_CODES,
@@ -29,6 +31,15 @@ INVALID_VALUES = (
 EXPECTED_CODE_LENGTH = 5
 
 SIC_REGEX_PATTERN = r"([0-9]+x*X*)"
+
+CODABILITY_LEVELS = (
+    (5, "Sub-class (5-digits)"),
+    (4, "Class (4-digits)"),
+    (3, "Group (3-digits)"),
+    (2, "Division (2-digits)"),
+    (0, "Section (letter)"),
+    (-1, "Uncodable"),
+)
 
 
 def parse_numerical_code(
@@ -225,15 +236,31 @@ def get_codability_level(codes: set[str]) -> str:
     if not codes:
         return "Uncodable"
 
-    for digits, label in [
-        (5, "Sub-class (5-digits)"),
-        (4, "Class (4-digits)"),
-        (3, "Group (3-digits)"),
-        (2, "Division (2-digits)"),
-        (0, "Section (letter)"),
-    ]:
-        codes = get_clean_n_digit_codes(codes, digits)
-        if len(codes) == 1:
-            return label
+    for digits, label in CODABILITY_LEVELS:
+        if digits >= 0:
+            codes = get_clean_n_digit_codes(codes, digits)
+            if len(codes) == 1:
+                return label
 
     return "Uncodable"
+
+
+def asses_codability_gain(
+    row: pd.Series, initial_level_col: str, final_level_col: str
+) -> bool | None:
+    """Assess if there was a codability gain between initial and final levels.
+
+    Args:
+        row: A pandas Series representing a row in the DataFrame.
+        initial_level_col: Column name for the initial codability level.
+        final_level_col: Column name for the final codability level.
+
+    Returns:
+        True if there was a codability gain, False otherwise.
+    """
+    level_to_num = {label: num for num, label in CODABILITY_LEVELS}
+    left = level_to_num.get(row[initial_level_col], None)
+    right = level_to_num.get(row[final_level_col], None)
+    if left is None or right is None:
+        return None
+    return right > left
