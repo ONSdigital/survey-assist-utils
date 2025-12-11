@@ -1,0 +1,218 @@
+"""Notebook to visualise the codability gain/loss using a Sankey diagram."""
+
+# pylint: disable=C0301,C0103,R0801
+# %%
+import os
+
+import dotenv
+import pandas as pd
+import plotly.express as px
+import statsmodels.api as sm
+
+data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+
+# %%
+folder = data_bucket + "analysis-interim-results"
+out_dir = (
+    "data/figures/"  # needs local folder unfortunately, set to None to skip saving
+)
+if out_dir:
+    os.makedirs(out_dir, exist_ok=True)
+
+combined_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
+
+
+# %%
+# create groups by which we want to visualise codability gain/loss
+group_col = "SIC Section"
+section_sizes = combined_df.most_likely_sic_section.value_counts(dropna=False)
+size_thr = 10
+combined_df1 = combined_df.copy()
+combined_df1[group_col] = combined_df1.most_likely_sic_section
+too_small = sorted(section_sizes[section_sizes < size_thr].index.tolist())
+msk = combined_df1.most_likely_sic_section.isin(too_small)
+combined_df1.loc[msk, group_col] = "+".join(too_small)
+combined_df2 = combined_df.copy()
+combined_df2[group_col] = "Total"
+
+# aggregate - group size, percentage of initial codability = 5-digits, percentage of final codability = 5-digits
+plot_df = (
+    pd.concat([combined_df1, combined_df2], axis=0, ignore_index=True)
+    .groupby([group_col])
+    .agg(
+        {
+            "user": "count",
+            "sa_initial_codability_level": lambda x: (
+                x == "Sub-class (5-digits)"
+            ).mean(),
+            "sa_final_codability_level_open_q": lambda x: (
+                x == "Sub-class (5-digits)"
+            ).mean(),
+            "sa_final_codability_level_closed_q": lambda x: (
+                x == "Sub-class (5-digits)"
+            ).mean(),
+        }
+    )
+    .sort_values(group_col, ascending=False)
+    .reset_index()
+    .rename(columns={"user": "num_responses"})
+)
+
+plot_df_melted = plot_df.melt(
+    id_vars=[group_col, "num_responses"],
+    value_vars=[
+        "sa_initial_codability_level",
+        "sa_final_codability_level_open_q",
+        "sa_final_codability_level_closed_q",
+    ],
+    var_name="Stage",
+    value_name="prop",
+)
+
+
+# add confidence intervals for proportions
+def proportion_confint(prop, nobs, alpha=0.05, method="wilson"):
+    """Calculate confidence interval for a proportion."""
+    ci_low, ci_upp = sm.stats.proportion_confint(
+        int(prop * nobs), nobs, alpha=alpha, method=method
+    )
+    return ci_low, ci_upp, prop - ci_low, ci_upp - prop
+
+
+plot_df_melted[["ci_low", "ci_upp", "ci_low_err", "ci_upp_err"]] = plot_df_melted.apply(
+    lambda row: proportion_confint(prop=row["prop"], nobs=row["num_responses"]),
+    axis=1,
+    result_type="expand",
+)
+
+plot_df_melted_ci = plot_df_melted.melt(
+    id_vars=[group_col, "Stage", "num_responses"],
+    value_vars=["ci_low", "ci_upp", "prop"],
+    var_name="Metric",
+    value_name="Proportion of 5-digit Codable",
+)
+
+plot_df_melted_ci["size"] = plot_df_melted_ci["num_responses"]  # for size mapping
+
+plot_df_melted_ci = plot_df_melted_ci.sort_values(
+    [group_col, "Stage"], ascending=[True, False]
+)
+
+# %%
+# based on the plot_df I want a figure where each group will be horizontall, with two connected dots - one for inital codability, one for final codability
+# Slightly offset each Stage vertically for better separation
+stage_offsets = {
+    "sa_initial_codability_level": 0,
+    "sa_final_codability_level_open_q": +0.05,
+    "sa_final_codability_level_closed_q": -0.05,
+}
+plot_df_melted_ci["y_offset"] = plot_df_melted_ci.apply(
+    lambda row: plot_df[group_col].tolist().index(row[group_col])
+    + stage_offsets.get(row["Stage"], 0),
+    axis=1,
+)
+
+fig = px.line(
+    plot_df_melted_ci[plot_df_melted_ci["Metric"] != "prop"],
+    x="Proportion of 5-digit Codable",
+    y="y_offset",
+    color="Stage",
+    markers=True,
+    line_group=group_col,
+    template="plotly_white",
+    title="SA Codability (to 5-digits) by SIC Section",
+)
+
+# Update y-axis ticks to show group names at correct positions
+fig.update_yaxes(
+    tickvals=list(range(len(plot_df[group_col]))),
+    ticktext=plot_df[group_col].tolist(),
+    title_text=None,
+)
+# use percentage on x axis
+fig.update_xaxes(tickformat=".0%", range=[-0.01, 1.045])
+
+# make lines dashed and symbols just vertical line
+fig.update_traces(marker={"symbol": "line-ns-open"}, line={"width": 1})  # dash='2',
+
+fig.add_traces(
+    px.scatter(
+        plot_df_melted_ci[plot_df_melted_ci["Metric"] == "prop"],
+        x="Proportion of 5-digit Codable",
+        y="y_offset",
+        color="Stage",
+        size="size",  # use opacity instead of alpha
+    ).data
+)
+# increse size of markers
+fig.update_traces(
+    selector={"type": "scatter", "mode": "markers"}, marker={"size": 10, "opacity": 0.9}
+)  # , symbol= 'cross'))
+
+# add text above top categor saying Initial (in blue) Open Q (in red) Closed Q (in green) 0 use same colors as in the scatter
+fig.add_annotation(
+    x=0.15,
+    y=len(plot_df[group_col]) + 0.5,
+    text="Initial Codability",
+    showarrow=False,
+    font={"color": px.colors.qualitative.Plotly[0], "size": 14},
+    xref="paper",
+)
+fig.add_annotation(
+    x=0.5,
+    y=len(plot_df[group_col]) + 0.5,
+    text="Final Codability (Open Q)",
+    showarrow=False,
+    font={"color": px.colors.qualitative.Plotly[1], "size": 14},
+    xref="paper",
+)
+fig.add_annotation(
+    x=0.9,
+    y=len(plot_df[group_col]) + 0.5,
+    text="Final Codability (Closed Q)",
+    showarrow=False,
+    font={"color": px.colors.qualitative.Plotly[2], "size": 14},
+    xref="paper",
+)
+fig.add_annotation(
+    x=0,
+    y=len(plot_df[group_col]) + 0.5,
+    text="SIC Section",
+    showarrow=False,
+    font={"color": "black", "size": 14},
+    xanchor="right",
+    xref="paper",
+)
+# add annoptation on the right hand side with total number of responses
+fig.add_annotation(
+    x=1,
+    y=len(plot_df[group_col]) + 0.5,
+    text="Count",
+    showarrow=False,
+    font={"color": "black", "size": 14},
+    xanchor="right",
+    xref="paper",
+)
+
+
+for i, row in plot_df.iterrows():
+    fig.add_annotation(
+        x=1,
+        y=i,
+        text=f"{row['num_responses']}",
+        showarrow=False,
+        font={"color": "black", "size": 10},
+        xanchor="right",
+        xref="paper",
+    )
+
+fig.update_layout(
+    width=1000,
+    height=600,
+    showlegend=False,
+)
+
+
+fig.show()
+
+# %%
