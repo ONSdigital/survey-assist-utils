@@ -27,8 +27,9 @@ combined_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parqu
 # %%
 def create_sankey_codability_gain_loss(
     input_df: pd.DataFrame,
-    left_col="SA Initial Codes",
-    right_col="SA Final Codes",
+    left_col: str = "SA Initial Codes",
+    right_col: str = "SA Final Codes",
+    gain_col: str | None = None,
     title_suffix: str = "",
 ) -> go.Figure:
     """Create a Sankey diagram to visualise codability gain/loss.
@@ -37,18 +38,26 @@ def create_sankey_codability_gain_loss(
         input_df: DataFrame containing initial and final codability levels.
         left_col: Name of the column representing initial codability levels.
         right_col: Name of the column representing final codability levels.
-        out_dir: Directory to save the figure, if provided.
+        gain_col: Name of the column indicating codability gain (True/False) used for color.
+            If None, all links will be grey.
         title_suffix: Suffix to add to the title of the figure, e.g. section name.
 
     Return:
         A Plotly Figure object representing the Sankey diagram, or None if columns not found.
     """
-    if left_col not in input_df.columns or right_col not in input_df.columns:
+    required_columns = [left_col, right_col]
+    if gain_col:
+        required_columns.append(gain_col)
+
+    if not all(col in input_df.columns for col in required_columns):
         raise ValueError(
             f"Columns {left_col} or {right_col} not found in input DataFrame."
         )
 
-    sankey_df = input_df.groupby([left_col, right_col]).size().reset_index()
+    sankey_df = input_df.groupby(required_columns).size().reset_index()
+    if not gain_col:
+        gain_col = "gain_temp_col"
+        sankey_df[gain_col] = False
 
     label_list = list(pd.unique(sankey_df[[left_col, right_col]].values.ravel("K")))
     # sort the list by value of number contained in the string
@@ -77,20 +86,11 @@ def create_sankey_codability_gain_loss(
         "target": sankey_df[right_col]
         .apply(lambda x, label_list=label_list: label_list.index(x) + len(label_list))
         .tolist(),
+        "color": sankey_df[gain_col]
+        .apply(lambda x: "rgba(166,217,106,0.3)" if x else "rgba(180,180,180,0.3)")
+        .tolist(),  # "rgba(253,174,97,0.3)"
         "value": sankey_df[0].tolist(),
     }
-    link["color"] = [
-        (
-            "rgba(253,174,97,0.3)"
-            if (link["target"][i] - len(label_list) > link["source"][i])
-            else (
-                "rgba(166,217,106,0.3)"
-                if (link["target"][i] - len(label_list) < link["source"][i])
-                else "rgba(180,180,180,0.3)"
-            )
-        )
-        for i in range(len(link["value"]))
-    ]
     link["hovertemplate"] = "Count: %{value}<extra></extra>"
 
     sankey_fig = go.Figure(
@@ -128,24 +128,34 @@ def create_sankey_codability_gain_loss(
 # %%
 # create sankey diagram
 for question_type in ["open", "closed"]:
-    temp_df = combined_df[
-        ["sa_initial_codability_level", f"sa_final_codability_level_{question_type}_q"]
-    ].rename(
-        columns={
-            "sa_initial_codability_level": "SA Initial Codes",
-            f"sa_final_codability_level_{question_type}_q": "SA Final Codes - "
-            + question_type.capitalize()
-            + " Question",
-        }
+    temp_df = (
+        combined_df[
+            [
+                "sa_initial_codability_level",
+                f"sa_final_codability_level_{question_type}_q",
+                f"sa_codability_gain_{question_type}_q",
+            ]
+        ]
+        .copy()
+        .rename(
+            columns={
+                "sa_initial_codability_level": "SA Initial Codes",
+                f"sa_final_codability_level_{question_type}_q": "SA Final Codes - "
+                + question_type.capitalize()
+                + " Question",
+                f"sa_codability_gain_{question_type}_q": "Codability Gain",
+            }
+        )
     )
     fig = create_sankey_codability_gain_loss(
         temp_df,
         right_col="SA Final Codes - " + question_type.capitalize() + " Question",
+        gain_col="Codability Gain",
     )
     fig.show()
     if out_dir:
         fig.write_image(
-            f"{out_dir}/sankey_codability_gain_loss_sa_followup_{question_type}_q.png"
+            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.png"
         )
 
 # %%
@@ -165,6 +175,7 @@ for section_name, sections in large_sections.items():
             [
                 "sa_initial_codability_level",
                 f"sa_final_codability_level_{question_type}_q",
+                f"sa_codability_gain_{question_type}_q",
             ]
         ].rename(
             columns={
@@ -172,11 +183,13 @@ for section_name, sections in large_sections.items():
                 f"sa_final_codability_level_{question_type}_q": "SA Final Codes - "
                 + question_type.capitalize()
                 + " Question",
+                f"sa_codability_gain_{question_type}_q": "Codability Gain",
             }
         )
         create_sankey_codability_gain_loss(
             temp_df,
             right_col="SA Final Codes - " + question_type.capitalize() + " Question",
+            gain_col="Codability Gain",
             title_suffix=f" - Section {section_name}",
         ).show()
 
@@ -222,5 +235,7 @@ if "time_start" in combined_df.columns:
 
     fig.show()
 
+    if out_dir:
+        fig.write_image(f"{out_dir}/user_numbers_vs_time_start.png")
 
 # %%

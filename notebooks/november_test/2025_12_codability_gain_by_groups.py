@@ -215,4 +215,7 @@ fig.update_layout(
 
 fig.show()
 
+if out_dir:
+    fig.write_image(os.path.join(out_dir, "sa_codability_by_sic_section.png"), scale=2)
+
 # %%

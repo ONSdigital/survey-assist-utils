@@ -109,6 +109,9 @@ indent-style = "space"
 
 [tool.mypy]
 ignore_missing_imports = true
+# statsmodels is throwing issue with two different module names (__init__)
+# so ignore notebooks using it for now
+exclude = [ "notebooks/november_test/2025_12_codability_gain_by_groups.py"]
 
 [build-system]
 requires = ["poetry-core"]
