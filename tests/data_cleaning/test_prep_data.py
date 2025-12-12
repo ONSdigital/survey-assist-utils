@@ -228,5 +228,5 @@ def test_prep_model_codes_threshold():
     assert result.loc[result["unique_id"] == "A2", MODEL_COL].iloc[0] == {
         "86210",
         "86101",
-        "01420",  # this shouldn't be here.
+        "01420",
     }

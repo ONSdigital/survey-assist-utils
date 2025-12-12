@@ -1,6 +1,8 @@
 """Read clerical data from standard clerical format."""
 
 import logging
+from dataclasses import dataclass
+from typing import overload
 
 import pandas as pd
 
@@ -13,6 +15,18 @@ from survey_assist_utils.data_cleaning.sic_codes import (
 logger = logging.getLogger(__name__)
 
 ID_COL = "unique_id"
+
+
+@dataclass
+class ModelPrepConfig:
+    """Configuration for preparing model codes during data cleaning."""
+
+    codes_col: str | None = "initial_code"
+    alt_codes_col: str | None = "alt_sic_candidates"
+    out_col: str = "model_codes"
+    alt_codes_name: str = "code"
+    threshold: float = 0
+    digits: int = 5
 
 
 def prep_clerical_codes(
@@ -91,11 +105,67 @@ def prep_clerical_codes(
     return df[[ID_COL, out_col, invalid_col]]
 
 
+# Helper function to resolve input parameters of prep_model_codes:
+# pylint: disable=R0913, R0917
+def _resolve_config(  # noqa:PLR0913
+    input_df: pd.DataFrame,
+    codes_col: str | None | ModelPrepConfig,
+    alt_codes_col: str | None,
+    out_col: str,
+    alt_codes_name: str,
+    threshold: float,
+    digits: int,
+) -> ModelPrepConfig:
+    """Makes a standard config of the inputs, checks their validity."""
+    if isinstance(codes_col, ModelPrepConfig):
+        cfg = codes_col
+    else:
+        cfg = ModelPrepConfig(
+            codes_col=codes_col,
+            alt_codes_col=alt_codes_col,
+            out_col=out_col,
+            alt_codes_name=alt_codes_name,
+            threshold=threshold,
+            digits=digits,
+        )
+    if ID_COL not in input_df.columns:
+        raise ValueError(f"Input DataFrame must contain a column '{ID_COL}'")
+    if cfg.codes_col not in input_df.columns:
+        cfg.codes_col = None
+    if cfg.alt_codes_col not in input_df.columns:
+        cfg.alt_codes_col = None
+
+    if cfg.codes_col is None and cfg.alt_codes_col is None:
+        raise ValueError(
+            "At least one of 'codes_col' or 'alt_codes_col' must be provided."
+        )
+    return cfg
+
+
+# overload prep_model_codes:
+@overload
+def prep_model_codes(
+    input_df: pd.DataFrame, codes_col: ModelPrepConfig
+) -> pd.DataFrame: ...
+
+
+@overload
+def prep_model_codes(
+    input_df: pd.DataFrame,
+    codes_col: str | None = "initial_code",
+    alt_codes_col: str | None = "alt_sic_candidates",
+    out_col: str = "model_codes",
+    alt_codes_name: str = "code",
+    threshold: float = 0,
+    digits: int = 5,
+) -> pd.DataFrame: ...
+
+
 # allow more arguments than 5
 # pylint: disable=R0913, R0917
 def prep_model_codes(  # noqa:PLR0913
     input_df: pd.DataFrame,
-    codes_col: str | None = "initial_code",
+    codes_col: str | None | ModelPrepConfig = "initial_code",
     alt_codes_col: str | None = "alt_sic_candidates",
     out_col: str = "model_codes",
     alt_codes_name: str = "code",
@@ -125,19 +195,13 @@ def prep_model_codes(  # noqa:PLR0913
     Raises:
         ValueError: If required columns are missing in the input DataFrame.
     """
+    # Validate the args:
+    cfg = _resolve_config(
+        input_df, codes_col, alt_codes_col, out_col, alt_codes_name, threshold, digits
+    )
+
     # Set a dynamic invalid col name:
     invalid_col = f"{out_col}_invalid"
-    if ID_COL not in input_df.columns:
-        raise ValueError(f"Input DataFrame must contain a column '{ID_COL}'")
-    if codes_col not in input_df.columns:
-        codes_col = None
-    if alt_codes_col not in input_df.columns:
-        alt_codes_col = None
-
-    if codes_col is None and alt_codes_col is None:
-        raise ValueError(
-            "At least one of 'codes_col' or 'alt_codes_col' must be provided."
-        )
 
     # Initialise MAIN output column
     out_df = input_df[[ID_COL]].copy()
@@ -146,26 +210,26 @@ def prep_model_codes(  # noqa:PLR0913
     # Initialise INVALID column (This prevents the KeyError when codes_col is None)
     out_df[invalid_col] = [set() for _ in range(len(input_df))]
 
-    if codes_col:
+    if cfg.codes_col:
         # Make a temp col for the partially cleaned codes:
-        out_df["out_col_temp"] = input_df[codes_col].apply(parse_numerical_code)
+        out_df["out_col_temp"] = input_df[cfg.codes_col].apply(parse_numerical_code)
 
         out_df[[out_col, invalid_col]] = out_df["out_col_temp"].apply(
             lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits))
         )
 
     # Extract the codes from the model's alt_sic_candidates if ambiguous
-    if alt_codes_col is not None:
-        miss_msk = out_df[out_col].apply(lambda x: not x)
+    if cfg.alt_codes_col is not None:
+        miss_msk = out_df[cfg.out_col].apply(lambda x: not x)
         logger.info(
             "Filling initial codes from alternatives for %d rows.",
             miss_msk.sum(),
         )
-        alternatives = input_df.loc[miss_msk, alt_codes_col].apply(
+        alternatives = input_df.loc[miss_msk, cfg.alt_codes_col].apply(
             extract_alt_candidates_n_digit_codes,
-            code_name=alt_codes_name,
-            n=digits,
-            threshold=threshold,
+            code_name=cfg.alt_codes_name,
+            n=cfg.digits,
+            threshold=cfg.threshold,
         )
         out_df.loc[miss_msk, out_col] = alternatives
         # Note: We are NOT extracting invalid codes from alternatives here
