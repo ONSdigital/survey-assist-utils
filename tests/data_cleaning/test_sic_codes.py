@@ -154,15 +154,29 @@ def test_extract_alt_candidates_n_digit_codes():
         {"code": "86101", "likelihood": 0.8},
         {"code": "86210", "likelihood": 0.6},
     ]
-    result = extract_alt_candidates_n_digit_codes(
+    result_valid, result_invalid = extract_alt_candidates_n_digit_codes(
         candidates, code_name="code", score_name="likelihood", threshold=0.7
     )
-    assert result == {"86101"}
+    assert result_valid == {"86101"}
+    assert result_invalid == set()
     # No pruning
-    result2 = extract_alt_candidates_n_digit_codes(
+    result2_valid, result2_invalid = extract_alt_candidates_n_digit_codes(
         candidates, code_name="code", score_name="likelihood", threshold=0
     )
-    assert result2 == {"86101", "86210"}
+    assert result2_valid == {"86101", "86210"}
+    assert result2_invalid == set()
+
+
+def test_extract_alt_candidates_n_digit_codes_invalid():
+    candidates = [
+        {"code": "86101", "likelihood": 0.8},
+        {"code": "12345", "likelihood": 0.6},
+    ]
+    result_valid, result_invalid = extract_alt_candidates_n_digit_codes(
+        candidates, code_name="code", score_name="likelihood", threshold=0.7
+    )
+    assert result_valid == {"86101"}
+    assert result_invalid == {"12345"}
 
 
 @pytest.mark.parametrize(
