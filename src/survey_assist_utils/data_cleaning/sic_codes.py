@@ -195,6 +195,64 @@ def extract_alt_candidates_n_digit_codes(
     n: int = EXPECTED_CODE_LENGTH,
     score_name: str = "likelihood",
     threshold: float = 0,
+) -> tuple[set[str], set[str]]:  # <--- Update type hint
+    """Extracts alternative sic codes from the model predictions.
+
+    Returns:
+        tuple[set[str], set[str]]:
+            - cleaned_set: Set of extracted valid SIC codes.
+            - invalid_set: Set of original codes that were invalid.
+    """
+    # 1. Handle string edge case (ensure get_clean_n_digit_codes returns tuple too!)
+    if isinstance(alt_candidates, str):
+        return get_clean_n_digit_codes(parse_numerical_code(alt_candidates), n)
+
+    if not isinstance(alt_candidates, Iterable):
+        logger.warning(
+            "Expected a list of dicts for alt_candidates, got %s", type(alt_candidates)
+        )
+        return set(), set()
+
+    cleaned: dict[str, float] = {}
+    invalid_set: set[str] = set()
+
+    for item in alt_candidates:
+        # Check if item is dict, handle edge cases where it might not be
+        if not isinstance(item, dict):
+            continue
+
+        raw_code = f"{item.get(code_name, '')}"
+
+        # This helper returns a set of valid codes (e.g. {'86101'})
+        # If it returns empty set, the code was invalid
+        codes = get_clean_n_digit_one_code(raw_code, n)
+
+        if not codes:
+            invalid_set.add(raw_code)
+            continue
+
+        score = item.get(score_name, 0)
+        for code in codes:
+            if code in cleaned:
+                cleaned[code] = max(cleaned[code], score)
+            else:
+                cleaned[code] = score
+
+    pruned = {code for code, score in cleaned.items() if score >= threshold}
+
+    # Logic: If pruning left exactly 1 candidate, return it.
+    # Otherwise return all valid candidates found.
+    valid_set = pruned if len(pruned) == 1 else set(cleaned)
+
+    return valid_set, invalid_set
+
+
+def extract_alt_candidates_n_digit_codes2(
+    alt_candidates: list[dict],
+    code_name: str,
+    n: int = EXPECTED_CODE_LENGTH,
+    score_name: str = "likelihood",
+    threshold: float = 0,
 ) -> set[str]:
     """Extracts alternative sic codes from the model predictions
     and prunes them based on the threshold (i.e. if there is one entry

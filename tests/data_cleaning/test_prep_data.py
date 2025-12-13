@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from survey_assist_utils.data_cleaning.prep_data import (
+    ModelPrepConfig,
     prep_clerical_codes,
     prep_model_codes,
 )
@@ -230,3 +231,128 @@ def test_prep_model_codes_threshold():
         "86101",
         "01420",
     }
+
+
+def test_prep_model_codes_comprehensive_scenarios():
+    """Test all permutations of Primary and Alternative codes to ensure
+    priority and invalid handling work as expected.
+    """
+    # Define the 8 scenarios
+    data = [
+        # 1. Valid Primary, No Alt -> Keep Primary
+        {"unique_id": "Case1", "initial": "86101", "alts": None},
+        # 2. Invalid Primary, No Alt -> Invalid Primary
+        {"unique_id": "Case2", "initial": "12345", "alts": None},
+        # 3. Valid Primary, Valid Alt -> Keep Primary (Ignore Alt)
+        {
+            "unique_id": "Case3",
+            "initial": "86101",
+            "alts": [{"code": "01110", "likelihood": 1.0}],
+        },
+        # 4. Invalid Primary, Valid Alt -> Use Alt (Keep Primary in Invalid)
+        {
+            "unique_id": "Case4",
+            "initial": "12345",
+            "alts": [{"code": "01110", "likelihood": 1.0}],
+        },
+        # 5. Invalid Primary, Invalid Alt -> Both Invalid
+        {
+            "unique_id": "Case5",
+            "initial": "12345",
+            "alts": [{"code": "98765", "likelihood": 1.0}],
+        },
+        # 6. Missing Primary, Valid Alt -> Use Alt
+        {
+            "unique_id": "Case6",
+            "initial": None,
+            "alts": [{"code": "01110", "likelihood": 1.0}],
+        },
+        # 7. Missing Primary, Invalid Alt -> Invalid Alt
+        {
+            "unique_id": "Case7",
+            "initial": None,
+            "alts": [{"code": "98765", "likelihood": 1.0}],
+        },
+        # 8. Missing Primary, No Alt -> Empty
+        {"unique_id": "Case8", "initial": None, "alts": None},
+    ]
+
+    df = pd.DataFrame(data).rename(
+        columns={"initial": "initial_code", "alts": "alt_sic_candidates"}
+    )
+
+    # Run the function
+    result = prep_model_codes(df, alt_codes_col="alt_sic_candidates")
+
+    # Helper to get a row by ID
+    def get_row(uid):
+        return result.loc[result["unique_id"] == uid].iloc[0]
+
+    # --- ASSERTIONS ---
+
+    # Case 1: Standard Success
+    r1 = get_row("Case1")
+    assert r1[MODEL_COL] == {"86101"}
+    assert r1[INVALID_MODEL_COL] == set()
+
+    # Case 2: Standard Failure
+    r2 = get_row("Case2")
+    assert r2[MODEL_COL] == set()
+    assert r2[INVALID_MODEL_COL] == {"12345"}
+
+    # Case 3: Priority Check (Primary wins)
+    r3 = get_row("Case3")
+    assert r3[MODEL_COL] == {"86101"}
+    assert "01110" not in r3[MODEL_COL]  # Alt ignored
+    assert r3[INVALID_MODEL_COL] == set()
+
+    # Case 4: Fallback Success (Primary invalid captured)
+    r4 = get_row("Case4")
+    assert r4[MODEL_COL] == {"01110"}  # Recovered via Alt
+    assert r4[INVALID_MODEL_COL] == {"12345"}  # Primary still marked invalid
+
+    # Case 5: Total Failure (Accumulates both errors)
+    r5 = get_row("Case5")
+    assert r5[MODEL_COL] == set()
+    assert "12345" in r5[INVALID_MODEL_COL]
+    assert "98765" in r5[INVALID_MODEL_COL]
+
+    # Case 6: Standard Fill
+    r6 = get_row("Case6")
+    assert r6[MODEL_COL] == {"01110"}
+    assert r6[INVALID_MODEL_COL] == set()
+
+    # Case 7: Failed Fill
+    r7 = get_row("Case7")
+    assert r7[MODEL_COL] == set()
+    assert r7[INVALID_MODEL_COL] == {"98765"}
+
+    # Case 8: No Data
+    r8 = get_row("Case8")
+    assert r8[MODEL_COL] == set()
+    assert r8[INVALID_MODEL_COL] == set()
+
+
+def test_prep_model_codes_using_config_object():
+    """Test that the function accepts the dataclass configuration correctly."""
+    df = pd.DataFrame(
+        {
+            "unique_id": ["G1"],
+            "my_code_col": ["86101"],
+            "my_alts": [[{"val": "86210", "score": 0.9}]],
+        }
+    )
+    # Create custom config
+    config = ModelPrepConfig(
+        codes_col="my_code_col",
+        alt_codes_col="my_alts",
+        out_col="custom_out",
+        alt_codes_name="val",  # Different key name
+        digits=5,
+    )
+
+    result = prep_model_codes(df, codes_col=config)
+
+    # Check output uses custom column name
+    assert "custom_out" in result.columns
+    assert result.loc[0, "custom_out"] == {"86101"}
