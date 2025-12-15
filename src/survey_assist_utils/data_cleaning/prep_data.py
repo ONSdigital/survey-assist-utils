@@ -62,7 +62,14 @@ def prep_clerical_codes(
         df[invalid_col] = pd.Series([], dtype=object)
         return df[[ID_COL, out_col, invalid_col]]
 
-    clerical_3cols = [clerical_col + str(i) for i in range(1, 4)]
+    clerical_3cols = list(
+        {clerical_col + str(i) for i in range(1, 4)}.intersection(df.columns)
+    )
+    if not clerical_3cols:
+        raise ValueError(
+            f"Input DataFrame must contain at least one of the clerical code columns: "
+            f"{', '.join([clerical_col + str(i) for i in range(1, 4)])}"
+        )
 
     df = df[[ID_COL, *clerical_3cols]].copy()
     df[clerical_col] = df[clerical_3cols].agg(
