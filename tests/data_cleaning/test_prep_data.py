@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 
 from survey_assist_utils.data_cleaning.prep_data import (
-    ModelPrepConfig,
     prep_clerical_codes,
     prep_model_codes,
 )
@@ -331,28 +330,3 @@ def test_prep_model_codes_comprehensive_scenarios():
     r8 = get_row("Case8")
     assert r8[MODEL_COL] == set()
     assert r8[INVALID_MODEL_COL] == set()
-
-
-def test_prep_model_codes_using_config_object():
-    """Test that the function accepts the dataclass configuration correctly."""
-    df = pd.DataFrame(
-        {
-            "unique_id": ["G1"],
-            "my_code_col": ["86101"],
-            "my_alts": [[{"val": "86210", "score": 0.9}]],
-        }
-    )
-    # Create custom config
-    config = ModelPrepConfig(
-        codes_col="my_code_col",
-        alt_codes_col="my_alts",
-        out_col="custom_out",
-        alt_codes_name="val",  # Different key name
-        digits=5,
-    )
-
-    result = prep_model_codes(df, codes_col=config)
-
-    # Check output uses custom column name
-    assert "custom_out" in result.columns
-    assert result.loc[0, "custom_out"] == {"86101"}
