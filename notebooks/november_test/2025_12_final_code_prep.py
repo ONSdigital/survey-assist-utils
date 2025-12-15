@@ -61,7 +61,9 @@ def get_sa_initial_codes(row):
 
 
 # %%
-eval_df["sa_initial_codes"] = eval_df.apply(get_sa_initial_codes, axis=1)
+eval_df["sa_initial_codes"] = eval_df.apply(
+    lambda row: get_sa_initial_codes(row)[0], axis=1
+)
 eval_df["sa_initial_codability_level"] = eval_df["sa_initial_codes"].apply(
     get_codability_level
 )
