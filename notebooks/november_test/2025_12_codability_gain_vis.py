@@ -11,17 +11,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
-
 # %%
-folder = data_bucket + "analysis-interim-results"
+data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+work_dir = data_bucket + "analysis-interim-results"
 out_dir = (
     "data/figures/"  # needs local folder unfortunately, set to None to skip saving
 )
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
-combined_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
+# %%
+combined_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.parquet")
 
 
 # %%
