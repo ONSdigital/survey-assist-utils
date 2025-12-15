@@ -38,7 +38,7 @@ clerical_codes_df["clerical_codes"] = prep_clerical_codes(initial_cc_df)[
 
 # %%
 initial_cc_df.merge(clerical_codes_df).to_parquet(
-    work_dir + "clerical_codes_df_cleaned_initial_codes.parquet"
+    work_dir + "clerical_df_with_cc_clean_initial_codes.parquet"
 )
 
 # %%
