@@ -9,18 +9,27 @@ import pandas as pd
 import plotly.express as px
 import statsmodels.api as sm
 
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+from survey_assist_utils.data_cleaning.sic_codes import CODABILITY_LEVELS
 
 # %%
-folder = data_bucket + "analysis-interim-results"
+data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+work_dir = data_bucket + "analysis-interim-results"
 out_dir = (
     "data/figures/"  # needs local folder unfortunately, set to None to skip saving
 )
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
-combined_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
+# %%
+# load combined df with codability levels
+combined_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.parquet")
 
+# %%
+# set the level of codability to consider
+NUM_DIGITS = 5.0  # 2,0,..
+
+labels_considered_coded = [y for x, y in CODABILITY_LEVELS if x >= NUM_DIGITS]
+x_axis_title = f"Proportion of Responses Codable Unambiguously to {NUM_DIGITS}-digits"
 
 # %%
 # create groups by which we want to visualise codability gain/loss
@@ -35,7 +44,7 @@ combined_df1.loc[msk, group_col] = "+".join(too_small)
 combined_df2 = combined_df.copy()
 combined_df2[group_col] = "Total"
 
-# aggregate - group size, percentage of initial codability = 5-digits, percentage of final codability = 5-digits
+# aggregate - group size, percentage of each codability at desired level
 plot_df = (
     pd.concat([combined_df1, combined_df2], axis=0, ignore_index=True)
     .groupby([group_col])
@@ -43,13 +52,13 @@ plot_df = (
         {
             "user": "count",
             "sa_initial_codability_level": lambda x: (
-                x == "Sub-class (5-digits)"
+                x.isin(labels_considered_coded)
             ).mean(),
             "sa_final_codability_level_open_q": lambda x: (
-                x == "Sub-class (5-digits)"
+                x.isin(labels_considered_coded)
             ).mean(),
             "sa_final_codability_level_closed_q": lambda x: (
-                x == "Sub-class (5-digits)"
+                x.isin(labels_considered_coded)
             ).mean(),
         }
     )
@@ -89,7 +98,7 @@ plot_df_melted_ci = plot_df_melted.melt(
     id_vars=[group_col, "Stage", "num_responses"],
     value_vars=["ci_low", "ci_upp", "prop"],
     var_name="Metric",
-    value_name="Proportion of 5-digit Codable",
+    value_name=x_axis_title,
 )
 
 plot_df_melted_ci["size"] = plot_df_melted_ci["num_responses"]  # for size mapping
@@ -114,13 +123,13 @@ plot_df_melted_ci["y_offset"] = plot_df_melted_ci.apply(
 
 fig = px.line(
     plot_df_melted_ci[plot_df_melted_ci["Metric"] != "prop"],
-    x="Proportion of 5-digit Codable",
+    x=x_axis_title,
     y="y_offset",
     color="Stage",
     markers=True,
     line_group=group_col,
     template="plotly_white",
-    title="SA Codability (to 5-digits) by SIC Section",
+    title=f"SA Codability (to {NUM_DIGITS}-digits) by SIC Section",
 )
 
 # Update y-axis ticks to show group names at correct positions
@@ -138,7 +147,7 @@ fig.update_traces(marker={"symbol": "line-ns-open"}, line={"width": 1})  # dash=
 fig.add_traces(
     px.scatter(
         plot_df_melted_ci[plot_df_melted_ci["Metric"] == "prop"],
-        x="Proportion of 5-digit Codable",
+        x=x_axis_title,
         y="y_offset",
         color="Stage",
         size="size",  # use opacity instead of alpha
@@ -216,6 +225,9 @@ fig.update_layout(
 fig.show()
 
 if out_dir:
-    fig.write_image(os.path.join(out_dir, "sa_codability_by_sic_section.png"), scale=2)
+    fig.write_image(
+        os.path.join(out_dir, f"sa_codability_{NUM_DIGITS}digits_by_sic_section.png"),
+        scale=2,
+    )
 
 # %%
