@@ -232,7 +232,6 @@ if "time_start" in combined_df.columns:
         yaxis2_title="Cumulative User Count",
         template="simple_white",
     )
-
     fig.show()
 
     if out_dir:

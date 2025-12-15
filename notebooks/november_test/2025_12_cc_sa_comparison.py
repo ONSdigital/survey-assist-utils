@@ -143,11 +143,11 @@ Accuracy: Overall percentage of correct codability/ambiguity decisions.
     font={"size": 10},
 )
 fig.update_layout(height=500, width=1000)
-
 fig.show()
 
 if out_dir:
-    fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
+    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
+    fig.write_image(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.png")
 
 
 # %%
@@ -208,10 +208,11 @@ MM: Many-to-Many match on the full set. (Is there any overlap between the true l
     font={"size": 10},
 )
 fig.update_layout(height=500, width=770)
-
 fig.show()
+
 if out_dir:
-    fig.write_html(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.html")
+    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.html")
+    fig.write_image(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.png")
 
 # %%
 # create confusion matrix for section (0-digit) and subset of 5-digit
@@ -252,12 +253,18 @@ for DIGITS in [5, 2]:
             labels = sorted(df[col1].explode().dropna().unique())
             plot_df = df2.groupby([col1, col2]).size().unstack(fill_value="")
 
+        if plot_df.shape[0] == 0 or plot_df.shape[1] == 0:
+            print(
+                f"Skipping confusion matrix for {DIGITS}-digit, {lab} due to no data."
+            )
+            continue
+
         fig = px.imshow(
             plot_df,
             text_auto=True,
             aspect="equal",
             color_continuous_scale="Blues",
-            title=f"Confusion matrix for SIC section, Clerical vs SurveyAssist (2 prompt model)<br><b>{lab}</b>",
+            title=f"Confusion matrix for SIC section, Clerical vs SurveyAssist<br><b>{lab}</b>",
             template="simple_white",
         )
         # reorder x axis values
@@ -289,12 +296,12 @@ for DIGITS in [5, 2]:
         )
 
         fig.update_layout(height=700, width=770)
-
         fig.show()
 
         if out_dir:
-            fig.write_html(
-                f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix.html"
+            # fig.write_html(f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix.html")
+            fig.write_image(
+                f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix_{DIGITS}digits.png"
             )
 
 # %%
@@ -373,11 +380,12 @@ fig.update_layout(
     }
 )
 
-if out_dir:
-    fig.write_html(f"{out_dir}/cc_sa_initial_codes_section_distribution.html")
-
 fig.update_layout(height=500, width=1200)
 fig.show()
+
+if out_dir:
+    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_section_distribution.html")
+    fig.write_image(f"{out_dir}/cc_sa_initial_codes_section_distribution.png")
 
 
 # %%

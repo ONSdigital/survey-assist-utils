@@ -26,7 +26,7 @@ combined_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.par
 
 # %%
 # set the level of codability to consider
-NUM_DIGITS = 5.0  # 2,0,..
+NUM_DIGITS = 5  # 2,0,..
 
 labels_considered_coded = [y for x, y in CODABILITY_LEVELS if x >= NUM_DIGITS]
 x_axis_title = f"Proportion of Responses Codable Unambiguously to {NUM_DIGITS}-digits"
@@ -203,7 +203,6 @@ fig.add_annotation(
     xref="paper",
 )
 
-
 for i, row in plot_df.iterrows():
     fig.add_annotation(
         x=1,
@@ -220,8 +219,6 @@ fig.update_layout(
     height=600,
     showlegend=False,
 )
-
-
 fig.show()
 
 if out_dir:
