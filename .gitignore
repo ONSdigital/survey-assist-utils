@@ -12,6 +12,7 @@
 *.npz
 *.zip
 *.gz
+*.asc
 /data/
 
 # ignore temporary files
