@@ -1,4 +1,18 @@
-"""Notebook to read November test data and clean up SA initial&final codes."""
+"""Notebook to read November test data and clean up SA initial&final codes.
+
+It only needs to be run once, before other analysis notebooks.
+Saves the cleaned data to a parquet file for further analysis.
+
+Usage:
+    1. Set the PREPROD_DATA_BUCKET in .env file to point to the correct data bucket.
+    2. Run this notebook to output data for final code assignement (around line 100).
+    3. Run the SIC classification pipeline in `sic-classification-utils` to get final codes.
+    4. After getting the final codes, run this notebook again to merge final codes and
+       assess codability gain/loss.
+
+For testing purposes, you can set `out_dir` to a local folder to save the output files locally.
+For production runs, set `out_dir` equal to `work_dir`.
+"""
 
 # pylint: disable=C0301,C0103,R0801
 # %%
@@ -15,13 +29,13 @@ from survey_assist_utils.data_cleaning.sic_codes import (
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 
 # %%
-folder = data_bucket + "firestore-data-export/2025-12-09-public_test_complete_data"
-out_folder = data_bucket + "analysis-interim-results"  # set to None to skip saving
+work_dir = data_bucket + "analysis-interim-results"
+out_dir = work_dir  # set to None to skip saving
 
 # %%
 # read data exported from firesore
 eval_df = pd.read_parquet(
-    folder + "/survey_results_reformatted_for_cc_evaluation.parquet"
+    work_dir + "/survey_results_reformatted_for_cc_evaluation.parquet"
 )
 
 
@@ -81,12 +95,12 @@ pipe_df = (
 )
 
 pipe_df.to_parquet(
-    out_folder + "/SA_final_code_tmp/sic_coding_pipeline_input.parquet", index=False
+    out_dir + "/SA_final_code_tmp/sic_coding_pipeline_input.parquet", index=False
 )
 
 # %%
 # after the final classification script run:
-final_code_df = pd.read_parquet(out_folder + "/SA_final_code_tmp/STG7.parquet")
+final_code_df = pd.read_parquet(out_dir + "/SA_final_code_tmp/STG7.parquet")
 final_code_df = prep_model_codes(
     final_code_df,
     out_col="sa_final_codes_open_q",
@@ -159,9 +173,9 @@ combined_df["most_likely_sic_section"] = combined_df.apply(
 
 # %%
 # save the pre-processed data with clean SA codes
-if out_folder:
+if out_dir:
     combined_df.to_parquet(
-        out_folder + "/evaluation_df_with_sa_clean_codes.parquet", index=False
+        out_dir + "/evaluation_df_with_sa_clean_codes.parquet", index=False
     )
 
 # %%
@@ -198,8 +212,8 @@ columns_for_katrina = [
     "feedback_comments",
 ]
 
-if out_folder:
+if out_dir:
     combined_df[columns_for_katrina].to_csv(
-        out_folder + "/feedback_file_for_katrina.csv", index=False
+        out_dir + "/feedback_file_for_katrina.csv", index=False
     )
 # %%
