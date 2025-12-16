@@ -21,7 +21,10 @@ if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
 # %%
-combined_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.parquet")
+sa_coded_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.parquet")
+cc_coded_df = pd.read_parquet(
+    work_dir + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
+)
 
 
 # %%
@@ -127,46 +130,61 @@ def create_sankey_codability_gain_loss(
 
 # %%
 # create sankey diagram
-for question_type in ["open", "closed"]:
-    temp_df = (
-        combined_df[
-            [
-                "sa_initial_codability_level",
-                f"sa_final_codability_level_{question_type}_q",
-                f"sa_codability_gain_{question_type}_q",
-            ]
-        ]
-        .copy()
-        .rename(
+for coding_type in ["cc", "sa"]:
+    for question_type in ["open", "closed"]:
+        if coding_type == "sa":
+            temp_df = sa_coded_df[
+                [
+                    "sa_initial_codability_level",
+                    f"sa_final_codability_level_{question_type}_q",
+                    f"sa_codability_gain_{question_type}_q",
+                ]
+            ].copy()
+            title_prefix = "SurveyAssist"
+        else:
+            if question_type == "closed":
+                continue  # clerical coding only for open questions
+            temp_df = cc_coded_df[cc_coded_df["batch_num"] == 1][
+                [
+                    "cc_initial_codability_level",
+                    "cc_final_codability_level_open_q",
+                    "cc_codability_gain_open_q",
+                ]
+            ].copy()
+            title_prefix = "Clerical"
+        temp_df = temp_df.rename(
             columns={
-                "sa_initial_codability_level": "SA Initial Codes",
-                f"sa_final_codability_level_{question_type}_q": "SA Final Codes - "
+                f"{coding_type}_initial_codability_level": f"{title_prefix} Initial Codes",
+                f"{coding_type}_final_codability_level_{question_type}_q": f"{title_prefix} Final Codes - "
                 + question_type.capitalize()
                 + " Question",
-                f"sa_codability_gain_{question_type}_q": "Codability Gain",
+                f"{coding_type}_codability_gain_{question_type}_q": "Codability Gain",
             }
         )
-    )
-    fig = create_sankey_codability_gain_loss(
-        temp_df,
-        right_col="SA Final Codes - " + question_type.capitalize() + " Question",
-        gain_col="Codability Gain",
-    )
-    fig.show()
-    if out_dir:
-        fig.write_image(
-            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.png"
+        fig = create_sankey_codability_gain_loss(
+            temp_df,
+            left_col=f"{title_prefix} Initial Codes",
+            right_col=f"{title_prefix} Final Codes - "
+            + question_type.capitalize()
+            + " Question",
+            gain_col="Codability Gain",
         )
+        fig.show()
+        if out_dir:
+            fig.write_image(
+                f"{out_dir}/{coding_type}_codability_gain_sankey_followup_{question_type}_q.png"
+            )
+
 
 # %%
 # same figures but for large sections only
-section_sizes = combined_df.most_likely_sic_section.value_counts(dropna=False)
+section_sizes = sa_coded_df.most_likely_sic_section.value_counts(dropna=False)
 size_thr = 100
 large_sections = {x: [x] for x in section_sizes[section_sizes >= size_thr].index}
 large_sections["Other"] = section_sizes[section_sizes < size_thr].index.tolist()
 
 for section_name, sections in large_sections.items():
-    large_sections_df = combined_df[combined_df.most_likely_sic_section.isin(sections)]
+    large_sections_df = sa_coded_df[sa_coded_df.most_likely_sic_section.isin(sections)]
     print(
         f"Sankey diagrams for section {section_name} with {len(large_sections_df)} entries:"
     )
@@ -196,27 +214,27 @@ for section_name, sections in large_sections.items():
 
 # %%
 # plot user numbers vs time start
-if "time_start" in combined_df.columns:
+if "time_start" in sa_coded_df.columns:
 
-    combined_df["response_start_time"] = pd.to_datetime(combined_df["time_start"])
-    combined_df["user_num"] = combined_df["user"].map(lambda x: int(x[3:8]))
+    sa_coded_df["response_start_time"] = pd.to_datetime(sa_coded_df["time_start"])
+    sa_coded_df["user_num"] = sa_coded_df["user"].map(lambda x: int(x[3:8]))
 
     # Prepare data
-    combined_df = combined_df.sort_values("response_start_time")
-    combined_df["cum_user_num"] = range(1, len(combined_df) + 1)
+    sa_coded_df = sa_coded_df.sort_values("response_start_time")
+    sa_coded_df["cum_user_num"] = range(1, len(sa_coded_df) + 1)
 
     # Create subplots with secondary y-axis
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     # Scatter plot for user_num
     scatter = px.scatter(
-        combined_df, x="response_start_time", y="user_num", template="simple_white"
+        sa_coded_df, x="response_start_time", y="user_num", template="simple_white"
     )
     fig.add_trace(scatter.data[0], secondary_y=False)
 
     # Line plot for cumulative user numbers
     line = px.line(
-        combined_df,
+        sa_coded_df,
         x="response_start_time",
         y="cum_user_num",
         color_discrete_sequence=["orange"],
