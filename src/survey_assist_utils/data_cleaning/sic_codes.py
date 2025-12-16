@@ -331,7 +331,7 @@ def get_codability_level(codes: set[str]) -> str:
 
 def asses_codability_gain(
     row: pd.Series, initial_level_col: str, final_level_col: str
-) -> bool | None:
+) -> int | None:
     """Assess if there was a codability gain between initial and final levels.
 
     Args:
@@ -347,4 +347,4 @@ def asses_codability_gain(
     right = level_to_num.get(row[final_level_col], None)
     if left is None or right is None:
         return None
-    return right > left
+    return right - left

@@ -146,7 +146,7 @@ clerical_codes_df.loc[mask_no_follow_up, "cc_final_codes_open_q"] = (
 clerical_codes_df["cc_final_codability_level_open_q"] = clerical_codes_df[
     "cc_final_codes_open_q"
 ].apply(get_codability_level)
-clerical_codes_df["sa_codability_gain_open_q"] = clerical_codes_df.apply(
+clerical_codes_df["cc_codability_gain_open_q"] = clerical_codes_df.apply(
     asses_codability_gain,
     axis=1,
     initial_level_col="cc_initial_codability_level",
