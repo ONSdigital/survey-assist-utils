@@ -90,8 +90,14 @@ def create_sankey_codability_gain_loss(
         .apply(lambda x, label_list=label_list: label_list.index(x) + len(label_list))
         .tolist(),
         "color": sankey_df[gain_col]
-        .apply(lambda x: "rgba(166,217,106,0.3)" if x else "rgba(180,180,180,0.3)")
-        .tolist(),  # "rgba(253,174,97,0.3)"
+        .apply(
+            lambda x: (
+                "rgba(166,217,106,0.3)"
+                if x > 0
+                else ("rgba(180,180,180,0.3)" if x == 0 else "rgba(253,174,97,0.3)")
+            )
+        )
+        .tolist(),
         "value": sankey_df[0].tolist(),
     }
     link["hovertemplate"] = "Count: %{value}<extra></extra>"
@@ -129,51 +135,75 @@ def create_sankey_codability_gain_loss(
 
 
 # %%
-# create sankey diagram
-for coding_type in ["cc", "sa"]:
-    for question_type in ["open", "closed"]:
-        if coding_type == "sa":
-            temp_df = sa_coded_df[
-                [
-                    "sa_initial_codability_level",
-                    f"sa_final_codability_level_{question_type}_q",
-                    f"sa_codability_gain_{question_type}_q",
-                ]
-            ].copy()
-            title_prefix = "SurveyAssist"
-        else:
-            if question_type == "closed":
-                continue  # clerical coding only for open questions
-            temp_df = cc_coded_df[cc_coded_df["batch_num"] == 1][
-                [
-                    "cc_initial_codability_level",
-                    "cc_final_codability_level_open_q",
-                    "cc_codability_gain_open_q",
-                ]
-            ].copy()
-            title_prefix = "Clerical"
-        temp_df = temp_df.rename(
+# create sankey diagram for CC codes
+subset_msk = {
+    "(batch 1)": cc_coded_df["batch_num"] == 1,
+    "(follow-up&batch1)": (cc_coded_df["batch_num"] == 1)
+    & ~cc_coded_df["survey_assist_open_question"].isna(),
+}
+for subset_name, msk in subset_msk.items():
+    temp_df = (
+        cc_coded_df[msk][
+            [
+                "cc_initial_codability_level",
+                "cc_final_codability_level_open_q",
+                "cc_codability_gain_open_q",
+            ]
+        ]
+        .copy()
+        .rename(
             columns={
-                f"{coding_type}_initial_codability_level": f"{title_prefix} Initial Codes",
-                f"{coding_type}_final_codability_level_{question_type}_q": f"{title_prefix} Final Codes - "
-                + question_type.capitalize()
-                + " Question",
-                f"{coding_type}_codability_gain_{question_type}_q": "Codability Gain",
+                "cc_initial_codability_level": "Clerical Initial Codes",
+                "cc_final_codability_level_open_q": "Clerical Final Codes - Open Question",
+                "cc_codability_gain_open_q": "Codability Gain",
             }
         )
-        fig = create_sankey_codability_gain_loss(
-            temp_df,
-            left_col=f"{title_prefix} Initial Codes",
-            right_col=f"{title_prefix} Final Codes - "
-            + question_type.capitalize()
-            + " Question",
-            gain_col="Codability Gain",
+    )
+    fig = create_sankey_codability_gain_loss(
+        temp_df,
+        left_col="Clerical Initial Codes",
+        right_col="Clerical Final Codes - Open Question",
+        gain_col="Codability Gain",
+        title_suffix=f" {subset_name}",
+    )
+    fig.show()
+    if out_dir:
+        fig.write_image(
+            f"{out_dir}/cc_codability_gain_sankey_followup_{subset_name}_q.png"
         )
-        fig.show()
-        if out_dir:
-            fig.write_image(
-                f"{out_dir}/{coding_type}_codability_gain_sankey_followup_{question_type}_q.png"
-            )
+
+# %%
+# create sankey diagram for SA codes
+for question_type in ["open", "closed"]:
+    temp_df = (
+        sa_coded_df[
+            [
+                "sa_initial_codability_level",
+                f"sa_final_codability_level_{question_type}_q",
+                f"sa_codability_gain_{question_type}_q",
+            ]
+        ]
+        .copy()
+        .rename(
+            columns={
+                "sa_initial_codability_level": "SA Initial Codes",
+                f"sa_final_codability_level_{question_type}_q": "SA Final Codes - "
+                + question_type.capitalize()
+                + " Question",
+                f"sa_codability_gain_{question_type}_q": "Codability Gain",
+            }
+        )
+    )
+    fig = create_sankey_codability_gain_loss(
+        temp_df,
+        right_col="SA Final Codes - " + question_type.capitalize() + " Question",
+        gain_col="Codability Gain",
+    )
+    fig.show()
+    if out_dir:
+        fig.write_image(
+            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.png"
+        )
 
 
 # %%
