@@ -163,7 +163,7 @@ def get_most_likely_section(
 ) -> str | None:
     """Get the most likely SIC section if only one section is present in the codes."""
     for col in columns_to_consider:
-        codes = get_clean_n_digit_codes(row[col], n=0)
+        codes, _ = get_clean_n_digit_codes(row[col], n=0)
         if len(codes) == 1:
             return next(iter(codes))
     return None
