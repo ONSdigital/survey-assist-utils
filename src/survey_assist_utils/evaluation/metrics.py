@@ -306,13 +306,14 @@ def calc_simple_metrics(
         )
         final_model_col = None
 
-    required_cols = [initial_model_col, truth_col] + (
-        [final_model_col] if final_model_col else []
-    )
-    if miss := set(required_cols) - set(df.columns):
+    required_cols = {initial_model_col, truth_col}
+    if final_model_col:
+        required_cols |= {final_model_col}
+
+    if miss := required_cols - set(df.columns):
         raise ValueError(f"DataFrame is missing required columns: {miss}")
 
-    df = df[required_cols].copy()
+    df = df[list(required_cols)].copy()
     for col in df.columns:
         df[col] = df[col].apply(cast_code_to_set)
 

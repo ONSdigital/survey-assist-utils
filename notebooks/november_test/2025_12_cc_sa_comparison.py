@@ -16,8 +16,12 @@ import os
 import dotenv
 import pandas as pd
 import plotly.express as px
+from statsmodels.api import stats
 
-from survey_assist_utils.data_cleaning.prep_data import get_clean_n_digit_codes
+from survey_assist_utils.data_cleaning.prep_data import (
+    get_clean_n_digit_codes,
+    parse_numerical_code,
+)
 from survey_assist_utils.evaluation.metrics import (
     calc_simple_metrics,
 )
@@ -31,37 +35,77 @@ out_dir = (
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
+# %%
+# load combined df with codability levels
+sa_coded_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.parquet")
+sa_closed_q = pd.read_parquet(
+    work_dir + "/closed_questions/closed_questions_codes.parquet"
+)
+sa_closed_q["sa_final_codes_closed_q"] = sa_closed_q[
+    "survey_assist_closed_question_response_code"
+].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
 
-# %% load data
-cc_file = work_dir + "/clerically-coded/clerical_df_with_cc_clean_initial_codes.parquet"
-sa_file = work_dir + "/evaluation_df_with_sa_clean_codes.parquet"
-cc_df = pd.read_parquet(cc_file)
-sa_df = pd.read_parquet(sa_file)
-
-merged_subset = cc_df.merge(
-    sa_df, on="unique_id", how="inner", suffixes=("_cc", "_sa")
-).reset_index(drop=True)
+cc_coded_df = pd.read_parquet(
+    work_dir + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
+)
+combined_df = pd.merge(
+    sa_coded_df,
+    cc_coded_df.drop(
+        columns=[
+            "job_title",
+            "job_description",
+            "org_description",
+            "survey_assist_open_question",
+            "survey_assist_open_question_response",
+        ]
+    ),
+    on=["unique_id", "user"],
+    how="outer",
+).merge(
+    sa_closed_q[["unique_id", "sa_final_codes_closed_q"]],
+    on=["unique_id"],
+    how="outer",
+)
 
 print(
-    f"Loaded data with {merged_subset.shape[0]} records (after merging clerical {cc_df.shape[0]} and model data {sa_df.shape[0]})."
+    f"Loaded data with {combined_df.shape[0]} records (after merging clerical {cc_coded_df.shape[0]} and model data {sa_coded_df.shape[0]})."
 )
 
 
 # %% calculate metrics at different digit levels for different methods
 eval_metrics = {}
-for DIGITS in [0, 2, 3, 4, 5]:
-    merged_subset[f"clerical_codes_to_{DIGITS}digits"] = merged_subset[
-        "clerical_codes"
-    ].apply(lambda x, n=DIGITS: get_clean_n_digit_codes(set(x), n=n)[0])
-    merged_subset[f"sa_initial_codes_to_{DIGITS}digits"] = merged_subset[
-        "sa_initial_codes"
-    ].apply(lambda x, n=DIGITS: get_clean_n_digit_codes(set(x), n=n)[0])
-    eval_metrics[(DIGITS, "Initial SA")] = calc_simple_metrics(
-        merged_subset,
-        truth_col=f"clerical_codes_to_{DIGITS}digits",
-        initial_model_col=f"sa_initial_codes_to_{DIGITS}digits",
-        final_model_col=None,
-    )
+stage_cols = {
+    "Initial": ("cc_initial_codes", "sa_initial_codes"),
+    "Final Open Q": ("cc_final_codes_open_q", "sa_final_codes_open_q"),
+    "Final Closed Q": ("cc_final_codes_open_q", "sa_final_codes_closed_q"),
+}
+for stage, col_names in stage_cols.items():
+    # we don't have clerical for most batches so use temporary subset for now
+    if stage == "Initial":
+        msk = combined_df.batch_num.notna()
+    else:
+        msk = (
+            combined_df.batch_num.isin([1])
+            & combined_df["survey_assist_open_question"].notna()
+        )
+    for DIGITS in [0, 2, 3, 4, 5]:
+        for col in col_names:
+            print(f"Processing {stage} codes to {DIGITS} digits for column {col}...")
+            combined_df.loc[msk, f"{col}_to_{DIGITS}digits"] = combined_df.loc[
+                msk, col
+            ].apply(lambda x, n=DIGITS: get_clean_n_digit_codes(set(x), n=n)[0])
+        eval_metrics[(DIGITS, stage, "sa_cc")] = calc_simple_metrics(
+            combined_df.loc[msk],
+            truth_col=f"{col_names[0]}_to_{DIGITS}digits",
+            initial_model_col=f"{col_names[1]}_to_{DIGITS}digits",
+            final_model_col=None,
+        )
+        eval_metrics[(DIGITS, stage, "cc_cc")] = calc_simple_metrics(
+            combined_df.loc[msk],
+            truth_col=f"{col_names[0]}_to_{DIGITS}digits",
+            initial_model_col=f"{col_names[0]}_to_{DIGITS}digits",
+            final_model_col=None,
+        )
 
 
 # %%
@@ -69,28 +113,16 @@ plot_df_f1 = pd.DataFrame(
     [
         {
             "digits": str(k[0]) if k[0] > 0 else "S",
-            "method": k[1],
+            "method": k[2][0:2].upper() + " " + k[1],
             "codability": v.codability_metrics.initial_codable_prop,
-            "f1": v.ambiguity_metrics.f1,
-            "precision": v.ambiguity_metrics.precision,
-            "recall": v.ambiguity_metrics.recall,
-            "accuracy": v.ambiguity_metrics.accuracy,
+            "f1": v.ambiguity_metrics.f1 if k[2] == "sa_cc" else None,
+            "precision": v.ambiguity_metrics.precision if k[2] == "sa_cc" else None,
+            "recall": v.ambiguity_metrics.recall if k[2] == "sa_cc" else None,
+            "accuracy": v.ambiguity_metrics.accuracy if k[2] == "sa_cc" else None,
         }
         for k, v in eval_metrics.items()
     ]
 )
-true_codablity = pd.DataFrame(
-    [
-        {
-            "digits": str(k[0]) if k[0] > 0 else "S",
-            "method": "Initial CC",
-            "codability": (v.ambiguity_metrics.TN + v.ambiguity_metrics.FP)
-            / v.initial_accuracy_metrics.total_records,
-        }
-        for k, v in eval_metrics.items()
-    ]
-).drop_duplicates()
-plot_df_f1 = pd.concat([plot_df_f1, true_codablity], ignore_index=True)
 
 # melt for easier plotting
 plot_df_f1 = plot_df_f1.melt(
@@ -101,7 +133,7 @@ plot_df_f1 = plot_df_f1.melt(
 )
 
 # add wald CI for codability
-n = merged_subset.shape[0]
+n = combined_df.shape[0]
 plot_df_f1["ci"] = 1.96 * (plot_df_f1["value"] * (1 - plot_df_f1["value"]) / n).pow(0.5)
 plot_df_f1.loc[~plot_df_f1["metrics"].isin(["codability", "accuracy"]), "ci"] = None
 
@@ -145,9 +177,9 @@ Accuracy: Overall percentage of correct codability/ambiguity decisions.
 fig.update_layout(height=500, width=1000)
 fig.show()
 
-if out_dir:
-    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
-    fig.write_image(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.png")
+# if out_dir:
+# fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
+# fig.write_image(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.png")
 
 
 # %%
@@ -162,6 +194,7 @@ plot_df_accu = pd.DataFrame(
             "MM Accuracy": v.initial_accuracy_metrics.accuracy_mm_total,
         }
         for k, v in eval_metrics.items()
+        if k[2] == "sa_cc"
     ]
 )
 
@@ -214,14 +247,15 @@ if out_dir:
     # fig.write_html(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.html")
     fig.write_image(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.png")
 
+
 # %%
 # create confusion matrix for section (0-digit) and subset of 5-digit
-df = merged_subset.copy()
+df = combined_df[combined_df.batch_num.notna()].copy()
 for DIGITS in [5, 2]:
-    col1 = f"clerical_codes_to_{DIGITS}digits"
+    col1 = f"cc_initial_codes_to_{DIGITS}digits"
     col2 = f"sa_initial_codes_to_{DIGITS}digits"
     subset = {}
-    subset["Unambiguously coded cases only"] = (merged_subset[col1].map(len) == 1) & (
+    subset["Unambiguously coded cases only"] = (df[col1].map(len) == 1) & (
         df[col2].map(len) == 1
     )
     # for semi-unambiguous, keep only cases where there is small set on either side
@@ -304,40 +338,63 @@ for DIGITS in [5, 2]:
                 f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix_{DIGITS}digits.png"
             )
 
+
 # %%
 # histogram by section (digits=0)
 df_section = {}
-df_section["CC initial"] = merged_subset[["clerical_codes_to_0digits"]].copy()
-df_section["CC initial"]["sic_section"] = df_section["CC initial"][
-    "clerical_codes_to_0digits"
-].map(lambda x: next(iter(x)) if len(x) == 1 else None)
-df_section["SA initial"] = merged_subset[["sa_initial_codes_to_0digits"]].copy()
-df_section["SA initial"]["sic_section"] = df_section["SA initial"][
-    "sa_initial_codes_to_0digits"
-].map(lambda x: next(iter(x)) if len(x) == 1 else None)
+for i, (stage, cols) in enumerate(stage_cols.items()):
+    for col in cols:
+        if col in df_section:
+            continue
+        print(f"Processing section distribution for column {col}...")
+        msk = combined_df[col + "_to_0digits"].notna()
+        df_section[col] = (
+            combined_df.loc[msk, col + "_to_0digits"]
+            .map(lambda x: next(iter(x)) if len(x) == 1 else None)
+            .dropna()
+            .to_frame(name="sic_section")
+        )
+        df_section[col]["source"] = f"{col.split('_')[0].upper()} {stage}"
+        df_section[col]["ind"] = i  # for ordering traces in plot
 
-for key, df in df_section.items():
-    df["source"] = key
 
 plot_df_section = (
     pd.concat(df_section.values(), ignore_index=True)
     .dropna(subset=["sic_section"])
-    .groupby(["sic_section", "source"])
+    .groupby(
+        [
+            "sic_section",
+            "ind",
+            "source",
+        ]
+    )
     .size()
     .reset_index()
     .rename(columns={0: "count"})
 )
+
 plot_df_section["sample_size"] = plot_df_section.groupby("source")["count"].transform(
     "sum"
 )
 plot_df_section["Frequency"] = plot_df_section.groupby("source")["count"].transform(
     lambda x: x / x.sum()
 )
-plot_df_section["ci"] = 1.96 * (
-    plot_df_section["Frequency"]
-    * (1 - plot_df_section["Frequency"])
-    / plot_df_section["sample_size"]
-).pow(0.5)
+
+
+def add_proportion_confint(prop, nobs, alpha=0.05, method="wilson"):
+    """Calculate confidence interval for a proportion."""
+    ci_low, ci_upp = stats.proportion_confint(
+        int(prop * nobs), nobs, alpha=alpha, method=method
+    )
+    return prop - ci_low, ci_upp - prop
+
+
+plot_df_section[["error_y_minus", "error_y_plus"]] = plot_df_section.apply(
+    lambda row: pd.Series(
+        add_proportion_confint(prop=row["Frequency"], nobs=row["sample_size"])
+    ),
+    axis=1,
+)
 
 fig = px.bar(
     plot_df_section,
@@ -347,7 +404,8 @@ fig = px.bar(
     barmode="group",
     title="Distribution of unambiguously coded responses at SIC Section level",
     template="simple_white",
-    error_y="ci",
+    error_y="error_y_plus",
+    error_y_minus="error_y_minus",
     hover_data={"count": True, "sample_size": True},
 )
 
@@ -380,7 +438,7 @@ fig.update_layout(
     }
 )
 
-fig.update_layout(height=500, width=1200)
+fig.update_layout(height=500, width=1400)
 fig.show()
 
 if out_dir:
