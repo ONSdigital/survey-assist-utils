@@ -54,7 +54,7 @@ def get_sa_initial_codes(row):
     codes = [row["survey_assist_assigned_code"]]
     if not row["survey_assist_classified"]:
         codes = codes + [
-            row[f"survey_assist_alt_candidate_code_{i}"] for i in range(1, 5)
+            row[f"survey_assist_alt_candidate_code_{i}"] for i in range(1, 6)
         ]
     codes = {code for code in codes if pd.notna(code)}
     return get_clean_n_digit_codes(codes, n=5)
