@@ -14,7 +14,7 @@ import os
 import dotenv
 import pandas as pd
 import plotly.express as px
-from statsmodels.api import stats
+from scipy.stats import binomtest
 
 from survey_assist_utils.data_cleaning.sic_codes import CODABILITY_LEVELS
 
@@ -122,12 +122,10 @@ plot_df_melted = (
 
 
 # add confidence intervals for proportions
-def add_proportion_confint(prop, nobs, alpha=0.05, method="wilson"):
+def add_proportion_confint(prop: float, nobs: int, alpha=0.05):
     """Calculate confidence interval for a proportion."""
-    ci_low, ci_upp = stats.proportion_confint(
-        int(prop * nobs), nobs, alpha=alpha, method=method
-    )
-    return ci_low, ci_upp, prop - ci_low, ci_upp - prop
+    ci = binomtest(int(prop * nobs), nobs).proportion_ci(confidence_level=1 - alpha)
+    return ci.low, ci.high, prop - ci.low, ci.high - prop
 
 
 plot_df_melted[["ci_low", "ci_upp", "ci_low_err", "ci_upp_err"]] = plot_df_melted.apply(
