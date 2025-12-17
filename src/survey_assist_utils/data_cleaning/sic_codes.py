@@ -157,13 +157,15 @@ def get_clean_n_digit_codes(
         - If input_list is a single string, it is converted to a list internally.
         - Invalid codes are logged and returned in the second set.
     """
+    if input_list is None:
+        return set(), set()
     if isinstance(input_list, str):
         input_list = [input_list]
     if not isinstance(input_list, (set, list)):
         logger.warning(
             "Expected a list or set of strings for input_list, got %s", type(input_list)
         )
-        return set()
+        return set(), set()
 
     # Was an item in the input list invalid?
     cleaned_set: set[str] = set()

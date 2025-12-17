@@ -154,6 +154,11 @@ clerical_codes_df["cc_codability_gain_open_q"] = clerical_codes_df.apply(
 )
 
 # %%
+for col in [
+    "cc_initial_codes",
+    "cc_final_codes_open_q",
+]:
+    clerical_codes_df[col] = clerical_codes_df[col].apply(list)
 clerical_codes_df.to_parquet(work_dir + "clerical_df_with_cc_clean_codes.parquet")
 
 # %%
