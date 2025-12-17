@@ -1,4 +1,11 @@
-"""Notebook to visualise the codability gain/loss using a Sankey diagram."""
+"""Notebook to visualise the codability gain/loss using a Sankey diagram.
+
+Loads preprocessed data with both clerical and SA codings,
+calculates various metrics and visualises them.
+Expects environment variable PREPROD_DATA_BUCKET to be set.
+
+Disabled check for too long lines (f strings) and variables names (uppercase for constants)
+"""
 
 # pylint: disable=C0301,C0103,R0801
 # %%

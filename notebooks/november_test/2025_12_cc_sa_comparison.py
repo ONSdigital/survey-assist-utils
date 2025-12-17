@@ -1,9 +1,8 @@
-"""Work in progress notebook to visualize metrics for different models.
+"""Notebook to compare clerical coding vs SurveyAssist model coding performance.
 
-It loads specific clerical coding data and model outputs from bucket.
-The bucket name and folder (on line 32) can be manually entered or it is read from
-the .env file, where it should be stored as BUCKET_PREFIX variable, i.e.:
-BUCKET_PREFIX = "gs://<bucket-name>/<folder>/"
+Loads preprocessed data with both clerical and SA codings,
+calculates various metrics and visualises them.
+Expects environment variable PREPROD_DATA_BUCKET to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
@@ -41,35 +40,50 @@ sa_coded_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.par
 sa_closed_q = pd.read_parquet(
     work_dir + "/closed_questions/closed_questions_codes.parquet"
 )
-sa_closed_q["sa_final_codes_closed_q"] = sa_closed_q[
-    "survey_assist_closed_question_response_code"
-].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
-
 cc_coded_df = pd.read_parquet(
     work_dir + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
 )
-combined_df = pd.merge(
-    sa_coded_df,
-    cc_coded_df.drop(
-        columns=[
-            "job_title",
-            "job_description",
-            "org_description",
-            "survey_assist_open_question",
-            "survey_assist_open_question_response",
-        ]
-    ),
+repeated_cols = [
+    "job_title",
+    "job_description",
+    "org_description",
+    "survey_assist_open_question",
+    "survey_assist_open_question_response",
+]
+combined_df = sa_coded_df.merge(
+    sa_closed_q.drop(columns=repeated_cols[0:3]),
     on=["unique_id", "user"],
     how="outer",
 ).merge(
-    sa_closed_q[["unique_id", "sa_final_codes_closed_q"]],
-    on=["unique_id"],
+    cc_coded_df.drop(columns=repeated_cols),
+    on=["unique_id", "user"],
     how="outer",
 )
 
 print(
-    f"Loaded data with {combined_df.shape[0]} records (after merging clerical {cc_coded_df.shape[0]} and model data {sa_coded_df.shape[0]})."
+    f"Loaded data with {combined_df.shape[0]} records. "
+    f"Merging clerical ({cc_coded_df.shape[0]}) with model data ({sa_coded_df.shape[0]}) "
+    f"and closed q data ({sa_closed_q.shape[0]})."
 )
+
+# %%
+# parquet doesn't like sets it saves it as arrays, convert back
+set_cols = [
+    "sa_initial_codes",
+    "sa_final_codes_open_q",
+    "cc_initial_codes",
+    "cc_final_codes_open_q",
+]
+
+for col in set_cols:
+    msk = combined_df[col].notna()
+    combined_df.loc[msk, col] = combined_df.loc[msk, col].apply(set)
+    combined_df.loc[~msk, col] = [set() for _ in range(msk.sum(), combined_df.shape[0])]
+
+# and convert closed q codes to set for consistency
+combined_df["sa_final_codes_closed_q"] = combined_df[
+    "survey_assist_closed_question_response_code"
+].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
 
 
 # %% calculate metrics at different digit levels for different methods
@@ -93,7 +107,7 @@ for stage, col_names in stage_cols.items():
             print(f"Processing {stage} codes to {DIGITS} digits for column {col}...")
             combined_df.loc[msk, f"{col}_to_{DIGITS}digits"] = combined_df.loc[
                 msk, col
-            ].apply(lambda x, n=DIGITS: get_clean_n_digit_codes(set(x), n=n)[0])
+            ].apply(lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n)[0])
         eval_metrics[(DIGITS, stage, "sa_cc")] = calc_simple_metrics(
             combined_df.loc[msk],
             truth_col=f"{col_names[0]}_to_{DIGITS}digits",
@@ -177,9 +191,9 @@ Accuracy: Overall percentage of correct codability/ambiguity decisions.
 fig.update_layout(height=500, width=1000)
 fig.show()
 
-# if out_dir:
-# fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
-# fig.write_image(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.png")
+if out_dir:
+    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
+    fig.write_image(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.png")
 
 
 # %%
