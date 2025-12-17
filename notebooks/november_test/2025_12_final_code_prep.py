@@ -176,9 +176,6 @@ combined_df["most_likely_sic_section"] = combined_df.apply(
 # %%
 # save the pre-processed data with clean SA codes
 if out_dir:
-    # parquet file doesn't support sets, convert to lists
-    for code_col in ["sa_initial_codes", "sa_final_codes_open_q"]:
-        combined_df[code_col] = combined_df[code_col].apply(list)
     combined_df.to_parquet(
         out_dir + "/evaluation_df_with_sa_clean_codes.parquet", index=False
     )
