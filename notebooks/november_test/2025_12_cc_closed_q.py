@@ -16,7 +16,7 @@ import dotenv
 import pandas as pd
 import plotly.express as px
 from plotly.subplots import make_subplots
-from scipy.stats import chisquare
+from scipy.stats import binomtest, chisquare
 
 from survey_assist_utils.data_cleaning.prep_data import (
     get_clean_n_digit_codes,
@@ -212,6 +212,29 @@ plot_df = all_groups.rename(
     value_name="count",
 )
 
+
+# %% add ci
+def compute_binom_ci(row, alpha=0.05, num_trials=5 + 4 + 3 + 2):
+    """Compute binomial confidence interval for expected counts under uniform distribution."""
+    ci = binomtest(int(row["count_expected"]), int(row["count_group"])).proportion_ci(
+        confidence_level=1 - alpha / num_trials  # bonferroni correction
+    )
+    return pd.Series(
+        {
+            "closed_q_num_options": row["closed_q_num_options"],
+            "ci_low": ci.low * row["count_group"],
+            "ci_upp": ci.high * row["count_group"],
+        }
+    )
+
+
+all_groups_ci = (
+    all_groups.apply(compute_binom_ci, axis=1)
+    .drop_duplicates()
+    .set_index("closed_q_num_options")
+)
+
+
 # %%
 # do the same but with plotly subplots for more control
 option_sizes = [5, 4, 3, 2]
@@ -225,6 +248,24 @@ fig = make_subplots(
     column_widths=col_widths,
 )
 for i, option_size in enumerate(option_sizes):
+    # add green zone for expected counts (light green polygon)
+    y_min = all_groups_ci.loc[option_size, "ci_low"]
+    y_max = all_groups_ci.loc[option_size, "ci_upp"]
+    fig.add_shape(
+        type="rect",
+        x0=0.2,
+        x1=option_size + 0.8,
+        y0=y_min,
+        y1=y_max,
+        fillcolor=px.colors.qualitative.D3[2],
+        opacity=0.15,
+        line_width=0,
+        row=1,
+        col=i + 1,
+        layer="below",
+        name="Confidence Interval for Uniform Distribution",
+        showlegend=i == 0,
+    )
     sub_df = plot_df[plot_df["closed_q_num_options"] == option_size]
     bar_fig = px.bar(
         sub_df,
@@ -232,6 +273,7 @@ for i, option_size in enumerate(option_sizes):
         y="count",
         color="method",
         barmode="group",
+        color_discrete_sequence=px.colors.qualitative.D3,
     )
     for trace in bar_fig.data:
         # Only show legend for the first subplot
@@ -246,10 +288,11 @@ for i, option_size in enumerate(option_sizes):
         template="plotly_white",
         width=900,
         height=500,
-        legend={"x": 0.7, "y": 1.2},
+        legend={"x": 0.64, "y": 1.21},
     )
     fig.update_yaxes(title_text="Count", row=1, col=1)
-    fig.show()
+
+fig.show()
 
 if out_dir:
     fig.write_image(out_dir + "/closed_q_rank_distributions.png")

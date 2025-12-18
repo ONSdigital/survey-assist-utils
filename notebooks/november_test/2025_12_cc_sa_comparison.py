@@ -201,7 +201,7 @@ plot_df_accu = pd.DataFrame(
     [
         {
             "digits": str(k[0]) if k[0] > 0 else "S",
-            "method": k[1],
+            "Stage": k[1],
             "OO Accuracy": v.initial_accuracy_metrics.accuracy_oo_unambiguous,
             "OM Accuracy": v.initial_accuracy_metrics.accuracy_om_unambiguous,
             "MO Accuracy": v.initial_accuracy_metrics.accuracy_mo_unambiguous,
@@ -214,7 +214,7 @@ plot_df_accu = pd.DataFrame(
 
 # melt for easier plotting
 plot_df_accu = plot_df_accu.melt(
-    id_vars=["digits", "method"],
+    id_vars=["digits", "Stage"],
     value_vars=["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"],
     var_name="metrics",
     value_name="value",
@@ -223,9 +223,9 @@ fig = px.line(
     plot_df_accu,
     x="digits",
     y="value",
-    color="method",
+    color="Stage",
     facet_col="metrics",
-    title="Initial Classification Accuracy Metrics by Number of Digits and Method",
+    title="Classification Accuracy Metrics by Number of Digits and Stage",
     markers=True,
     template="simple_white",
 )
@@ -458,4 +458,20 @@ if out_dir:
     fig.write_image(f"{out_dir}/cc_sa_initial_codes_section_distribution.png")
 
 
+# %%
+# get examples
+mask = (combined_df["sa_initial_codes"] == {"85310"}) & (
+    combined_df["cc_initial_codes"] == {"85600"}
+)
+examples = combined_df[mask][
+    [
+        "unique_id",
+        "job_title",
+        "job_description",
+        "org_description",
+        "clerical_code_initial",
+        "survey_assist_assigned_code",
+    ]
+]
+print(examples)
 # %%
