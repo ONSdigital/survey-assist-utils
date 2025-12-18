@@ -87,7 +87,7 @@ combined_df["sa_final_codes_closed_q"] = combined_df[
 # %%
 # is the answer to the closed question in CC initial/final codes?
 mask_closed_q_selected = combined_df["sa_final_codes_closed_q"].apply(len) == 1
-cc_coded_batches = {"initial": (1, 2), "final": (1,)}
+cc_coded_batches = {"initial": (1, 2), "final": (1, 2)}
 for method in ["sa", "cc"]:
     for stage, batches in cc_coded_batches.items():
         out_col_name = f"closed_q_in_{method}_{stage}_codes"
