@@ -185,6 +185,7 @@ all_groups["count_expected"] = (
     all_groups["count_group"] / all_groups["closed_q_num_options"]
 )
 
+# overall chi-square test
 chisq_disp = chisquare(all_groups["count_disp"], f_exp=all_groups["count_expected"])
 chisq_llm = chisquare(all_groups["count_llm"], f_exp=all_groups["count_expected"])
 print("Chi-square test across all option sizes: ")
@@ -207,13 +208,12 @@ plot_df = all_groups.rename(
     value_vars=[
         "(Randomised) Display Ordering",
         "SurveyAssist Ordering",
-    ],  # , "count_expected"],
+    ],
     var_name="method",
     value_name="count",
 )
 
 
-# %% add ci
 def compute_binom_ci(row, alpha=0.05, num_trials=5 + 4 + 3 + 2):
     """Compute binomial confidence interval for expected counts under uniform distribution."""
     ci = binomtest(int(row["count_expected"]), int(row["count_group"])).proportion_ci(
@@ -234,9 +234,7 @@ all_groups_ci = (
     .set_index("closed_q_num_options")
 )
 
-
 # %%
-# do the same but with plotly subplots for more control
 option_sizes = [5, 4, 3, 2]
 col_widths = [size / sum(option_sizes) for size in option_sizes]
 
@@ -248,7 +246,6 @@ fig = make_subplots(
     column_widths=col_widths,
 )
 for i, option_size in enumerate(option_sizes):
-    # add green zone for expected counts (light green polygon)
     y_min = all_groups_ci.loc[option_size, "ci_low"]
     y_max = all_groups_ci.loc[option_size, "ci_upp"]
     fig.add_shape(
@@ -276,7 +273,6 @@ for i, option_size in enumerate(option_sizes):
         color_discrete_sequence=px.colors.qualitative.D3,
     )
     for trace in bar_fig.data:
-        # Only show legend for the first subplot
         trace.showlegend = i == 0
         fig.add_trace(trace, row=1, col=i + 1)
         fig.update_xaxes(
