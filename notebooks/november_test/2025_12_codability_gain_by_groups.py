@@ -71,7 +71,7 @@ final_label2 = "SA Final Codability (Closed Q)"
 temp_df = combined_df.copy()
 if coding_method == "cc":
     temp_df = temp_df[
-        temp_df["batch_num"] == 1
+        temp_df["batch_num"].notna()
     ]  # only consider rows with cc final code
 
 group_col = "SIC Section"

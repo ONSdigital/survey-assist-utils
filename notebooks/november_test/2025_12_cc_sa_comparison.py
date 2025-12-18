@@ -99,7 +99,7 @@ for stage, col_names in stage_cols.items():
         msk = combined_df.batch_num.notna()
     else:
         msk = (
-            combined_df.batch_num.isin([1])
+            combined_df.batch_num.isin([1, 2])
             & combined_df["survey_assist_open_question"].notna()
         )
     for DIGITS in [0, 2, 3, 4, 5]:
@@ -454,24 +454,49 @@ fig.update_layout(height=500, width=1400)
 fig.show()
 
 if out_dir:
-    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_section_distribution.html")
-    fig.write_image(f"{out_dir}/cc_sa_initial_codes_section_distribution.png")
+    # fig.write_html(f"{out_dir}/cc_sa_sic_section_distribution.html")
+    fig.write_image(f"{out_dir}/cc_sa_sic_section_distribution.png")
 
 
 # %%
 # get examples
-mask = (combined_df["sa_initial_codes"] == {"85310"}) & (
-    combined_df["cc_initial_codes"] == {"85600"}
+mask_diff = (
+    combined_df["sa_initial_codes"] != combined_df["cc_initial_codes"]
+) & combined_df.batch_num.notna()
+tmp_df = combined_df[mask_diff].copy()
+tmp_df["sa_codes_str"] = tmp_df["sa_initial_codes"].apply(
+    lambda x: ", ".join(sorted(x))
 )
-examples = combined_df[mask][
-    [
-        "unique_id",
-        "job_title",
-        "job_description",
-        "org_description",
-        "clerical_code_initial",
-        "survey_assist_assigned_code",
+tmp_df["cc_codes_str"] = tmp_df["cc_initial_codes"].apply(
+    lambda x: ", ".join(sorted(x))
+)
+frequent_mistakes = (
+    tmp_df.groupby(["cc_codes_str", "sa_codes_str"])
+    .size()
+    .sort_values(ascending=False)
+    .reset_index(name="count")
+)
+min_mistakes = 3
+print(frequent_mistakes[frequent_mistakes["count"] > min_mistakes])
+
+examples = pd.DataFrame()
+for _, row in frequent_mistakes[frequent_mistakes["count"] > min_mistakes].iterrows():
+    msk = (tmp_df["sa_codes_str"] == row.sa_codes_str) & (
+        tmp_df["cc_codes_str"] == row.cc_codes_str
+    )
+    examples = pd.concat([examples, tmp_df[msk]])
+
+print(
+    examples[
+        [
+            "unique_id",
+            "job_title",
+            "job_description",
+            "org_description",
+            "clerical_code_initial",
+            "sa_codes_str",
+            "batch_num",
+        ]
     ]
-]
-print(examples)
+)
 # %%
