@@ -1,14 +1,14 @@
 # %%
 """Work in progess.
 
-Initial analysis of survey responses, focusing on Closed Follow up questions.
+Initial analysis of survey responses, focusing on Clased Follow up questions.
 
 Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
 and ANALYSIS_BUCKET similarly.
 """
 
 # %%
-# pylint: disable=C0103, C0116, C0301, C0114
+# pylint: disable=C0103, C0116, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
 import re
