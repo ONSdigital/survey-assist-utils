@@ -4,6 +4,8 @@ import logging
 import re
 from collections.abc import Iterable
 
+import pandas as pd
+
 from survey_assist_utils.data_cleaning.sic_code_section_list import (
     SECTION_LOOKUP,
     VALID_SIC_CODES,
@@ -29,6 +31,15 @@ INVALID_VALUES = (
 EXPECTED_CODE_LENGTH = 5
 
 SIC_REGEX_PATTERN = r"([0-9]+x*X*)"
+
+CODABILITY_LEVELS = (
+    (5, "Sub-class (5-digits)"),
+    (4, "Class (4-digits)"),
+    (3, "Group (3-digits)"),
+    (2, "Division (2-digits)"),
+    (0, "Section (letter)"),
+    (-1, "Uncodable"),
+)
 
 
 def parse_numerical_code(
@@ -117,31 +128,58 @@ def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
     return validate_sic_codes(prep_set)
 
 
-def get_clean_n_digit_codes(input_list: str | set[str] | list[str], n: int) -> set[str]:
-    """Converts a list of possible codes to a list containing only
-    valid n-digit SIC codes.
-    E.g. ['86011', '86012', '85xxx'] -> ['86011', '86012', '85000', ..., '85999'].
+def get_clean_n_digit_codes(
+    input_list: str | set[str] | list[str], n: int
+) -> tuple[set[str], set[str]]:
+    """Converts a list of possible codes to two sets of strings.
+    The first set contains valid n-digit SIC codes.
+    The second set contains original codes that could not be cleaned.
+
+    Example:
+        ['86011', '86012', '85xxx'] -> (
+            {'86011', '86012', '85000', ..., '85999'},  # valid codes
+            set()  # invalid codes if any
+        )
 
     Args:
-        input_list: List or set of strings containing possible codes.
+        input_list: A string, list, or set of strings containing possible codes.
         n: Number of digits to which the codes should be cleaned/expanded.
 
     Returns:
-        Set of cleaned n-digit SIC code strings.
+        A tuple containing:
+            - cleaned_set: Set of cleaned n-digit SIC code strings.
+            - invalid_set: Set of original codes that could not be cleaned.
+
+    Raises:
+        None explicitly, but logs a warning if input_list is not a list, set, or string.
+
+    Notes:
+        - If input_list is a single string, it is converted to a list internally.
+        - Invalid codes are logged and returned in the second set.
     """
+    if input_list is None:
+        return set(), set()
     if isinstance(input_list, str):
         input_list = [input_list]
     if not isinstance(input_list, (set, list)):
         logger.warning(
             "Expected a list or set of strings for input_list, got %s", type(input_list)
         )
-        return set()
+        return set(), set()
 
-    cleaned_list = [get_clean_n_digit_one_code(i, n) for i in input_list]
-    # Flatten the sets and deduplicate
-    cleaned_set = set().union(*cleaned_list)
+    # Was an item in the input list invalid?
+    cleaned_set: set[str] = set()
+    invalid_set: set[str] = set()
 
-    return cleaned_set
+    for item in input_list:
+        result = get_clean_n_digit_one_code(item, n)  # result is a set[str]
+        if not result:
+            logger.warning("Item '%s' has no valid codes.", item)
+            invalid_set.add(item)
+        else:
+            cleaned_set.update(result)
+
+    return cleaned_set, invalid_set
 
 
 def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
@@ -160,10 +198,69 @@ def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
             "Expected a list or set of strings for input_list, got %s", type(input_set)
         )
         return set()
+
     return {str(x) for x in input_set}.intersection(VALID_SIC_CODES)
 
 
 def extract_alt_candidates_n_digit_codes(
+    alt_candidates: list[dict],
+    code_name: str,
+    n: int = EXPECTED_CODE_LENGTH,
+    score_name: str = "likelihood",
+    threshold: float = 0,
+) -> tuple[set[str], set[str]]:  # <--- Update type hint
+    """Extracts alternative sic codes from the model predictions.
+
+    Returns:
+        tuple[set[str], set[str]]:
+            - cleaned_set: Set of extracted valid SIC codes.
+            - invalid_set: Set of original codes that were invalid.
+    """
+    # 1. Handle string edge case (ensure get_clean_n_digit_codes returns tuple too!)
+    if isinstance(alt_candidates, str):
+        return get_clean_n_digit_codes(parse_numerical_code(alt_candidates), n)
+
+    if not isinstance(alt_candidates, Iterable):
+        logger.warning(
+            "Expected a list of dicts for alt_candidates, got %s", type(alt_candidates)
+        )
+        return set(), set()
+
+    cleaned: dict[str, float] = {}
+    invalid_set: set[str] = set()
+
+    for item in alt_candidates:
+        # Check if item is dict, handle edge cases where it might not be
+        if not isinstance(item, dict):
+            continue
+
+        raw_code = f"{item.get(code_name, '')}"
+
+        # This helper returns a set of valid codes (e.g. {'86101'})
+        # If it returns empty set, the code was invalid
+        codes = get_clean_n_digit_one_code(raw_code, n)
+
+        if not codes:
+            invalid_set.add(raw_code)
+            continue
+
+        score = item.get(score_name, 0)
+        for code in codes:
+            if code in cleaned:
+                cleaned[code] = max(cleaned[code], score)
+            else:
+                cleaned[code] = score
+
+    pruned = {code for code, score in cleaned.items() if score >= threshold}
+
+    # Logic: If pruning left exactly 1 candidate, return it.
+    # Otherwise return all valid candidates found.
+    valid_set = pruned if len(pruned) == 1 else set(cleaned)
+
+    return valid_set, invalid_set
+
+
+def extract_alt_candidates_n_digit_codes2(
     alt_candidates: list[dict],
     code_name: str,
     n: int = EXPECTED_CODE_LENGTH,
@@ -225,15 +322,31 @@ def get_codability_level(codes: set[str]) -> str:
     if not codes:
         return "Uncodable"
 
-    for digits, label in [
-        (5, "Sub-class (5-digits)"),
-        (4, "Class (4-digits)"),
-        (3, "Group (3-digits)"),
-        (2, "Division (2-digits)"),
-        (0, "Section (letter)"),
-    ]:
-        codes = get_clean_n_digit_codes(codes, digits)
-        if len(codes) == 1:
-            return label
+    for digits, label in CODABILITY_LEVELS:
+        if digits >= 0:
+            codes, _ = get_clean_n_digit_codes(codes, digits)
+            if len(codes) == 1:
+                return label
 
     return "Uncodable"
+
+
+def asses_codability_gain(
+    row: pd.Series, initial_level_col: str, final_level_col: str
+) -> int | None:
+    """Assess if there was a codability gain between initial and final levels.
+
+    Args:
+        row: A pandas Series representing a row in the DataFrame.
+        initial_level_col: Column name for the initial codability level.
+        final_level_col: Column name for the final codability level.
+
+    Returns:
+        True if there was a codability gain, False otherwise.
+    """
+    level_to_num = {label: num for num, label in CODABILITY_LEVELS}
+    left = level_to_num.get(row[initial_level_col], None)
+    right = level_to_num.get(row[final_level_col], None)
+    if left is None or right is None:
+        return None
+    return right - left
