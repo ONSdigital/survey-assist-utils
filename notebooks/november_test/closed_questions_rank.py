@@ -4,7 +4,7 @@
 Initial analysis of survey responses, focusing on Closed Follow up questions.
 
 Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
-and ANALYSIS_BUCKET similarly.
+and PREPROD_DATA_BUCKET similarly.
 """
 
 # %%
@@ -26,15 +26,15 @@ from scipy import stats
 
 # %%
 evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-analysis_bucket = dotenv.get_key(".env", "ANALYSIS_BUCKET")
+analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
 if not evaluation_bucket:
     raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
 if not analysis_bucket:
-    raise ValueError("ANALYSIS_BUCKET not found in .env file. Please set it.")
+    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
 # %%
 data = pd.read_parquet(
-    f"{analysis_bucket}closed_questions/closed_questions_codes.parquet"
+    f"{analysis_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
 )
 
 # %%
