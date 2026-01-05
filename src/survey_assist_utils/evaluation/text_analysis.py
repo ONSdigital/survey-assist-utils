@@ -98,6 +98,8 @@ class TextAnalyser:
                     responses considered null or irrelevant (default: []).
                 - 'null_marker_threshold' (float): The distance threshold for
                     marking responses as null (default: 0.0).
+                - 'random_state' (int): Seed for the random number generator for
+                    K-Means initialization, ensuring reproducibility (default: 1234).
         """
         self.df = dataset.copy()
         self.text_column = text_column
@@ -112,6 +114,7 @@ class TextAnalyser:
             "cleaning_func": lambda x: x,
             "example_null_responses": [],
             "null_marker_threshold": 0.0,
+            "random_state": 1234,
         }
         if additional_kwargs is not None:
             kwargs.update(additional_kwargs)
@@ -120,6 +123,7 @@ class TextAnalyser:
         self.model_name: str = kwargs["model_name"]  # type: ignore[assignment]
         self.task_type: str = kwargs["model_task_type"]  # type: ignore[assignment]
         self.max_batch_size: int = kwargs["max_batch_size"]  # type: ignore[assignment]
+        self.random_state: int = kwargs["random_state"]  # type: ignore[assignment]
         self.df["embeddings"] = self.embed(self.df[self.text_column].to_list())
         self.reset_null_behaviour(
             kwargs["example_null_responses"],  # type: ignore[arg-type]
@@ -260,7 +264,6 @@ class TextAnalyser:
         self,
         kmin: int = 2,
         kmax: int = 25,
-        random_state: int = 1234,
         elbow_plot_outfile: str = "elbow.png",
     ):
         """Generates an elbow plot to help determine the optimal number of clusters.
@@ -273,20 +276,16 @@ class TextAnalyser:
         Args:
             kmin (int): The minimum number of clusters to consider (inclusive).
             kmax (int): The maximum number of clusters to consider (exclusive).
-            random_state (int): Seed for the random number generator for K-Means
-                initialization, ensuring reproducibility.
             elbow_plot_outfile (str): The filename (including path) where the
                 elbow plot image will be saved.
 
         Modifies:
             self.kmeans_range (tuple[int, int]): Stores the range of k values used.
-            self.random_state (int): Stores the random state used.
 
         Outputs:
             A PNG image file of the elbow plot.
         """
         self.kmeans_range = (kmin, kmax)
-        self.random_state = random_state
         inertia_values = []
         k_values = range(self.kmeans_range[0], self.kmeans_range[1])
         for k in k_values:
@@ -343,7 +342,7 @@ class TextAnalyser:
         ]
         ids_most_representative_pt = [np.argmin(e) for e in distances_from_centroids]
         return [
-            self.df.iloc[pt_id]["feedback_comments"]
+            self.df.iloc[pt_id][self.text_column]
             for pt_id in ids_most_representative_pt
         ]
 
@@ -479,6 +478,6 @@ class TextAnalyser:
             f"{textwrap.fill(self.cluster_representatives[cluster_id])}\n\n"
         )
         for c in self.df[self.df["feedback_comment_labels"] == cluster_id][
-            "feedback_comments"
+            self.text_column
         ]:
             print(f"{textwrap.fill(c, width=100)}\n")
