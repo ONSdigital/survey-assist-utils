@@ -37,32 +37,48 @@ data = pd.read_parquet(
     f"{analysis_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
 )
 
+
 # %%
-column = "survey_assist_closed_question_option_"
-selected_response = []
+def get_selected_responses(df: pd.DataFrame) -> list:
+    """Creates a list of the ranks the responses were selected by user.
 
-# iterate through all rows of the data
-for data_row in range(len(data)):
-    # save the response selected by the user
-    response = data["survey_assist_closed_question_response"][data_row]
+    Args:
+        df: dataframe with survey responses.
 
-    # check only when closed question was asked
-    if response is not None and response != "none of the above":
+    Return:
+        response_list: list
+    """
+    column = "survey_assist_closed_question_option_"
+    response_list = []
+    # iterate through all rows of the data
+    for response_row in range(len(df)):
+        # save the response selected by the user
+        response = df["survey_assist_closed_question_response"][response_row]
 
-        # change options from closed questions to lower case (matching the selected response)
-        for option_order in range(1, 7):
-            col_name = column + str(option_order)
-            if data[col_name][data_row] is not None:
-                data.loc[data_row, col_name] = data[col_name][data_row].lower()
+        # check only when closed question was asked
+        if response is not None and response != "none of the above":
 
-        # find the order of the selected response
-        j = 1
-        while j < 7:
-            col_name = column + str(j)
-            if response == data[col_name][data_row]:
-                selected_response.append(j)
-                j = 7
-            j += 1
+            # change options from closed questions to lower case (matching the selected response)
+            for k in range(1, 7):
+                column_name = column + str(k)
+                if df[column_name][response_row] is not None:
+                    df.loc[response_row, column_name] = df[column_name][
+                        response_row
+                    ].lower()
+
+            # find the order of the selected response
+            j = 1
+            while j < 7:
+                column_name = column + str(j)
+                if response == data[column_name][response_row]:
+                    response_list.append(j)
+                    j = 7
+                j += 1
+    return response_list
+
+
+# %%
+selected_response = get_selected_responses(data)
 
 # %%
 # percentage of codes found using closed quesiton for all surveys
@@ -70,38 +86,19 @@ print(round(100 * len(selected_response) / len(data), 2))
 
 # %%
 selected_response_order = {}
-for option_order in range(1, 7):
-    picked_response = "option_" + str(option_order)
-    selected_response_order[picked_response] = selected_response.count(option_order)
+for i in range(1, 7):
+    picked_response = "option_" + str(i)
+    selected_response_order[picked_response] = selected_response.count(i)
 
 # %%
 # order, which answer was seleceted
 print(selected_response_order)
 # order of the question selected
-print(
-    "1st rank [%]:",
-    round(100 * selected_response_order["option_1"] / len(selected_response), 2),
-)
-print(
-    "2nd rank [%]:",
-    round(100 * selected_response_order["option_2"] / len(selected_response), 2),
-)
-print(
-    "3rd rank [%]:",
-    round(100 * selected_response_order["option_3"] / len(selected_response), 2),
-)
-print(
-    "4th rank [%]:",
-    round(100 * selected_response_order["option_4"] / len(selected_response), 2),
-)
-print(
-    "5th rank [%]:",
-    round(100 * selected_response_order["option_5"] / len(selected_response), 2),
-)
-print(
-    "6th rank [%]:",
-    round(100 * selected_response_order["option_6"] / len(selected_response), 2),
-)
+for i in range(1, 7):
+    option_order = "option_" + str(i)
+    print(
+        f"Option in order {i} [%]: {round(100 * selected_response_order[option_order] / len(selected_response), 2)}"
+    )
 
 # %% [markdown]
 # Note, "none of the above" is always presented at the bottom of the list, which means the 6th option never brings a code. Options 1 and 2 will always have possible codes.
@@ -154,78 +151,85 @@ def get_code_by_title(dictionary, title):
 
 
 # %%
-sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
-none_of_the_above = 0
+# def get_options_codes(response_row):
 
-options: dict[str, list[str | None]] = {"1": [], "2": [], "3": [], "4": [], "5": []}
+#     options_list: dict[str, list[str | None]] = {
+#         "1": [],
+#         "2": [],
+#         "3": [],
+#         "4": [],
+#         "5": [],
+#     }
+#     sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
 
-for data_row in range(len(data)):
-    # if the closed question response is None, it means the question was not asked, and there's no codes.
-    if data["survey_assist_closed_question_response"][data_row] is not None:
+#     response = response_row["survey_assist_closed_question_response"]
 
-        option_order = 1
-        while option_order < 6:
-            current_row = data[f"survey_assist_closed_question_option_{option_order}"][
-                data_row
-            ].lower()
-            if current_row == "none of the above":
-                none_of_the_above += 1
-                while option_order < 6:
-                    options[f"{option_order}"].append(None)
-                    option_order += 1
+#     if response is not None:
 
-            else:
-                if current_row in list(sic_rephrased["reviewed_description"]):
-                    sic_code = sic_rephrased[
-                        sic_rephrased["reviewed_description"] == current_row
-                    ]["input_code"].item()
-                    options[f"{option_order}"].append(str(sic_code))
+#         k = 1
+#         while k < 6:
+#             current_row = response_row[
+#                 f"survey_assist_closed_question_option_{k}"
+#             ].lower()
+#             if current_row == "none of the above":
+#                 while k < 6:
+#                     options_list[f"{k}"].append(None)
+#                     k += 1
 
-                else:
-                    sic_code = get_code_by_title(sic_dictionary, current_row)
-                    options[f"{option_order}"].append(str(sic_code))
+#             else:
+#                 if current_row in list(sic_rephrased["reviewed_description"]):
+#                     sic_code = sic_rephrased[
+#                         sic_rephrased["reviewed_description"] == current_row
+#                     ]["input_code"].item()
+#                     options_list[f"{k}"].append(str(sic_code))
 
-                option_order += 1
-    else:
-        options["1"].append(None)
-        options["2"].append(None)
-        options["3"].append(None)
-        options["4"].append(None)
-        options["5"].append(None)
+#                 else:
+#                     sic_code = get_code_by_title(sic_dictionary, current_row)
+#                     options_list[f"{k}"].append(str(sic_code))
+
+#                 k += 1
+#     else:
+#         options_list["1"].append(None)
+#         options_list["2"].append(None)
+#         options_list["3"].append(None)
+#         options_list["4"].append(None)
+#         options_list["5"].append(None)
+#     return options_list
 
 # %%
 # we get "None" when the closed question was not asked or the answer was "none of the above"
 print(data[data["survey_assist_closed_question_response_code"] == "None"].shape[0])
 
 # %%
+none_of_the_above_answer = (
+    data["survey_assist_closed_question_response"] == "none of the above"
+).sum()
+
+# %%
 # asked closed question, but didn't get a code
-round(100 * none_of_the_above / len(selected_response), 2)
+print(round(100 * none_of_the_above_answer / len(selected_response), 2))
 
 # %%
-options.keys()
+options_columns = []
+for i in range(1, 6):
+    options_columns.append(f"survey_assist_closed_question_option_{i}_code")
 
 # %%
-options_df = pd.DataFrame(options)
+options = data[options_columns]
 
 # %%
 alt_codes_count = []
-for option_order in range(len(data)):
-    responses = int(options_df.iloc[option_order].count())
+for i in range(len(data)):
+    responses = int(options.iloc[i].count())
     if (
         responses != 0
-        and data["survey_assist_closed_question_response"][option_order]
-        != "none of the above"
+        and data["survey_assist_closed_question_response"][i] != "none of the above"
     ):
         alt_codes_count.append(responses)
 
 # %%
-print(alt_codes_count.count(0))
-print(alt_codes_count.count(1))
-print(alt_codes_count.count(2))
-print(alt_codes_count.count(3))
-print(alt_codes_count.count(4))
-print(alt_codes_count.count(5))
-print(alt_codes_count.count(6))
+for i in range(7):
+    print(alt_codes_count.count(i))
 
 # %%
 options_dict = {
@@ -236,16 +240,15 @@ df_options = pd.DataFrame(options_dict)
 
 
 # %%
-def chi2_test(df, response_column: str, alt_codes_column: str, n: int = 1):
+def chi2_test(df, response_column: str, alt_codes_column: str, k: int = 1):
     """Args:
-    df: DataFrame
+    df: dataframe
     response_column: a column with the respondends choice recorded as a rank
     alt_codes_column: count of alternative codes
-    n: n-th option to be tested.
+    k: k-th option to be tested.
     """
-    # The n-th option was selected, where 'none of the above' was NOT selected
-    N_P1 = df[df[response_column] == n].shape[0]
-    print(N_P1)
+    # The first option was selected, where 'none of the above' was NOT selected
+    N_P1 = df[df[response_column] == k].shape[0]
 
     # Total number of surveys asked, where 'none of the above' was NOT selected
     N_Surveys = df.shape[0]
@@ -285,57 +288,49 @@ df_grouped.sample()
 # ## SA assigned code randomness
 
 # %%
+options.count()
+
+# %%
 # selected code rank from the list
 sa_code_match: list[int | str] = []
 survey_assist_alt = "survey_assist_alt_candidate_code_"
-for data_row in range(len(data)):
-    if data["survey_assist_closed_question_response"].iloc[data_row] is None:
-        pass
-    else:
-        option_order = 1
-        while option_order < 6:
-            sa_code = survey_assist_alt + str(option_order)
-            if data["survey_assist_closed_question_response_code"][data_row] is None:
-                # sa_code_match.append(0)
-                option_order = 6
-            elif (
-                data[sa_code][data_row]
-                == data["survey_assist_closed_question_response_code"][data_row]
-            ):
-                sa_code_match.append(option_order)
-                option_order = 6
-            option_order += 1
-        if option_order == 6:
-            sa_code_match.append("None")
+for row in range(len(data)):
+    i = 1
+    while i < 6:
+        sa_code = survey_assist_alt + str(i)
+        if data["survey_assist_closed_question_response_code"][row] is None:
+            # sa_code_match.append(0)
+            i = 6
+        elif (
+            data[sa_code][row]
+            == data["survey_assist_closed_question_response_code"][row]
+        ):
+            sa_code_match.append(i)
+            i = 6
+        i += 1
+    if i == 6:
+        sa_code_match.append("None")
 
 # %%
 # alternative codes count
 sa_alt_codes_count = []
 survey_assist_alt = "survey_assist_alt_candidate_code_"
-for data_row in range(len(data)):
-    if data["survey_assist_closed_question_response"].iloc[data_row] is None:
-        pass
-    else:
-        alts = 0
-        option_order = 1
-        while option_order < 6:
-            sa_code = survey_assist_alt + str(option_order)
-            if data["survey_assist_closed_question_response_code"][data_row] is None:
-                option_order = 6
-            elif data[sa_code][data_row] is not None:
-                alts += 1
-            option_order += 1
-        sa_alt_codes_count.append(alts)
+for row in range(len(data)):
+    alts = 0
+    i = 1
+    while i < 6:
+        sa_code = survey_assist_alt + str(i)
+        if data["survey_assist_closed_question_response_code"][row] is None:
+            i = 6
+        elif data[sa_code][row] is not None:
+            alts += 1
+        i += 1
+    sa_alt_codes_count.append(alts)
 
 # %%
-# rank of the selected code
-print("1:", sa_code_match.count(1))
-print("2:", sa_code_match.count(2))
-print("3:", sa_code_match.count(3))
-print("4:", sa_code_match.count(4))
-print("5:", sa_code_match.count(5))
-print("6:", sa_code_match.count(6))
-print("None:", sa_code_match.count("None"))
+for i in range(6):
+    print(sa_code_match.count(i))
+print(sa_code_match.count("None"))
 
 # %% [markdown]
 # Note that 6th rank is either not presented or is a "none of the above", which is not a valid code.
@@ -343,12 +338,8 @@ print("None:", sa_code_match.count("None"))
 
 # %%
 # count of alternative codes
-print("0:", sa_alt_codes_count.count(0))
-print("1:", sa_alt_codes_count.count(1))
-print("2:", sa_alt_codes_count.count(2))
-print("3:", sa_alt_codes_count.count(3))
-print("4:", sa_alt_codes_count.count(4))
-print("5:", sa_alt_codes_count.count(5))
+for i in range(6):
+    print(sa_alt_codes_count.count(i))
 
 # %% [markdown]
 # Zero alternative codes, when final code is found. No 1 alternative codes, as that means the final code is found.
@@ -364,11 +355,8 @@ sa_codes = {"selected_code": sa_code_match, "alt_codes_count": sa_alt_codes_coun
 df_sa_codes = pd.DataFrame(sa_codes)
 
 # %%
-print("1:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 1))
-print("2:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 2))
-print("3:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 3))
-print("4:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 4))
-print("5:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 5))
+for i in range(1, 6):
+    print(f"{i}:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", i))
 
 # %% [markdown]
 # For all number of optins presented, the p-value is belov 0.5, which means the null hypothesis cannot be rejected - there is a sign of bias when respondent select specific rank option. For every rank it was selected it significantly differs from what we would expect by random chance (1/k). This might be due to comparing lists of different length (not all respondents were presented with the same number of options).
@@ -378,34 +366,16 @@ print("5:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 5))
 df_sa_codes_no_none = df_sa_codes[df_sa_codes["selected_code"] != "None"]
 
 # %%
-# get p-values for each group of number of options presented vs the rank of the option selected
+print("alt codes count x rank of selected response\n")
 
-print("Alt codes count x rank of selected response\n")
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 2]
-print("number of respondents with 2 options presented:", df_group_sa.shape[0])
-print("2x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("2x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2), "\n")
-
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 3]
-print("number of respondents with 3 options presented:", df_group_sa.shape[0])
-print("3x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("3x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2))
-print("3x3:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 3), "\n")
-
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 4]
-print("number of respondents with 4 options presented:", df_group_sa.shape[0])
-print("4x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("4x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2))
-print("4x3:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 3))
-print("4x4:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 4), "\n")
-
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 5]
-print("number of respondents with 5 options presented:", df_group_sa.shape[0])
-print("5x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("5x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2))
-print("5x3:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 3))
-print("5x4:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 4))
-print("5x5:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 5))
+for i in range(2, 6):
+    df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == i]
+    print(df_group_sa.shape[0])
+    for n in range(1, i + 1):
+        print(
+            f"{i}x{n}: {chi2_test(df_group_sa, "selected_code", "alt_codes_count", n)}"
+        )
+    print()
 
 # %% [markdown]
 # #### 2 options presented
@@ -428,23 +398,20 @@ print("5x5:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 5))
 
 
 # %%
-def chi2_gof(df: pd.DataFrame, n: int) -> float:
+def chi2_gof(df: pd.DataFrame, k: int) -> float:
     """Calculates chi-square goodness-of-fit for a specific subset of data with n options presented.
 
     Args:
         df (pd.DataFrame): DataFrame with columns
-        n (int): number of options presented.
+        k (int): number of options presented.
 
     Returns:
         p_value (float): the p-value for the goodness-of-fit test.
 
     """
-    group_df = df[df["alt_codes_count"] == n]
-    # n_total = len(group_df)
+    group_df = df[df["alt_codes_count"] == k]
 
     observed_counts = group_df["selected_code"].value_counts().values
-
-    # expected = n_total / n
 
     p_value = stats.chisquare(f_obs=observed_counts).pvalue
 
@@ -481,7 +448,7 @@ print("5:", chi2_gof(df_sa_codes_no_none, 5))
 
 # %%
 full_data = pd.read_parquet(
-    f"{analysis_bucket}evaluation_df_with_sa_clean_codes.parquet"
+    f"{analysis_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
 )
 
 # %%
@@ -507,27 +474,27 @@ def count_others(df: pd.DataFrame) -> tuple:
     column_placeholder = "survey_assist_closed_question_option_"
     options_presented = []
     others = []
-    for row in range(len(df)):
-        i = 1
+    for response_row in range(len(df)):
+        k = 1
         other_count = 0
-        while i < 7:
+        while k < 7:
             column_name = column_placeholder + str(i)
-            row_string = df[column_name].iloc[row]
+            row_string = df[column_name].iloc[response_row]
             if row_string.lower() == "none of the above":
-                options_presented.append(i)
+                options_presented.append(k)
                 others.append(other_count)
-                i = 7
+                k = 7
             else:
                 if "other" in row_string.lower():
                     other_count += 1
-                i += 1
+                k += 1
     return_df = pd.DataFrame(
         {"options_count": options_presented, "other_count": others}
     )
 
     count = 0
-    for row in range(len(return_df)):
-        if return_df["other_count"].iloc[row] == 0:
+    for response_row in range(len(return_df)):
+        if return_df["other_count"].iloc[response_row] == 0:
             count += 1
     other_percentage = count / len(return_df)
 
@@ -572,19 +539,19 @@ def possible_sections(df: pd.DataFrame):
     unique_section_list_by_row = []
     codes_count = []
 
-    for row in range(len(df)):
+    for response_row in range(len(df)):
         section_list = []
         codes = 0
-        i = 1
-        while i < 6:
-            column_name = column_placeholder + str(i)
-            row_string = df[column_name].iloc[row]
+        k = 1
+        while k < 6:
+            column_name = column_placeholder + str(k)
+            row_string = df[column_name].iloc[response_row]
             if row_string is not None:
                 codes += 1
                 section = sic[row_string].sic_code.alpha_code[0]
                 if section not in section_list:
                     section_list.append(section)
-            i += 1
+            k += 1
         unique_section_list_by_row.append(section_list)
         codes_count.append(codes)
     df["unique_sections"] = unique_section_list_by_row
@@ -708,10 +675,10 @@ time_data_no_closed_question = full_data[
 
 # %%
 time_nota = pd.Timedelta(0)
-for option_order in range(len(time_data_nota)):
+for option in range(len(time_data_nota)):
     time_nota += (
-        time_data_nota["time_end"].iloc[option_order]
-        - time_data_nota["time_start"].iloc[option_order]
+        time_data_nota["time_end"].iloc[option]
+        - time_data_nota["time_start"].iloc[option]
     )
 print(
     f"Average time for finishing a survey when NOTA is selected {time_nota / len(time_data_nota)}"
@@ -719,10 +686,10 @@ print(
 
 # %%
 time_not_nota = pd.Timedelta(0)
-for option_order in range(len(time_data_not_nota)):
+for option in range(len(time_data_not_nota)):
     time_not_nota += (
-        time_data_not_nota["time_end"].iloc[option_order]
-        - time_data_not_nota["time_start"].iloc[option_order]
+        time_data_not_nota["time_end"].iloc[option]
+        - time_data_not_nota["time_start"].iloc[option]
     )
 print(
     f"Average time for finishing a survey when NOTA is not selected {time_not_nota / len(time_data_not_nota)}"
@@ -730,10 +697,10 @@ print(
 
 # %%
 time_no_closed_question = pd.Timedelta(0)
-for option_order in range(len(time_data_no_closed_question)):
+for option in range(len(time_data_no_closed_question)):
     time_no_closed_question += (
-        time_data_no_closed_question["time_end"].iloc[option_order]
-        - time_data_no_closed_question["time_start"].iloc[option_order]
+        time_data_no_closed_question["time_end"].iloc[option]
+        - time_data_no_closed_question["time_start"].iloc[option]
     )
 print(
     f"Average time for finishing a survey when no closed question is asked {time_no_closed_question / len(time_data_no_closed_question)}"
