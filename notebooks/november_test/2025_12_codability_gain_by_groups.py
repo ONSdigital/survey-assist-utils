@@ -48,225 +48,280 @@ combined_df = pd.merge(
     how="outer",
 )
 
-# %%
-# set the level of codability to consider
-NUM_DIGITS = 5  # 2,0,..
-
-labels_considered_coded = [y for x, y in CODABILITY_LEVELS if x >= NUM_DIGITS]
-x_axis_title = f"Proportion of Responses Codable Unambiguously to {NUM_DIGITS}-digits"
 
 # %%
-coding_method = "cc"  #  'sa' or 'cc'
-
-initial_code_col = f"{coding_method}_initial_codability_level"
-final_code_col1 = f"{coding_method}_final_codability_level_open_q"
-final_code_col2 = "sa_final_codability_level_closed_q"
-
-initial_label = f"{coding_method.upper()} Initial Codability"
-final_label1 = f"{coding_method.upper()} Final Codability (Open Q)"
-final_label2 = "SA Final Codability (Closed Q)"
-
-# %%
-# create groups by which we want to visualise codability gain/loss
-temp_df = combined_df.copy()
-if coding_method == "cc":
-    temp_df = temp_df[
-        temp_df["batch_num"].notna()
-    ]  # only consider rows with cc final code
-
-group_col = "SIC Section"
-section_sizes = temp_df.most_likely_sic_section.value_counts(dropna=False)
-size_thr = 10
-temp_df1 = temp_df.copy()
-temp_df1[group_col] = temp_df1.most_likely_sic_section
-too_small = sorted(section_sizes[section_sizes < size_thr].index.tolist())
-msk = temp_df1.most_likely_sic_section.isin(too_small)
-temp_df1.loc[msk, group_col] = "+".join(too_small)
-temp_df2 = temp_df.copy()
-temp_df2[group_col] = "Total"
-temp_df = pd.concat([temp_df1, temp_df2], axis=0, ignore_index=True)
-
-# aggregate - group size, percentage of each codability at desired level
-plot_df = (
-    temp_df.groupby([group_col])
-    .agg(
-        {
-            "user": "count",
-            initial_code_col: lambda x: (x.isin(labels_considered_coded)).mean(),
-            final_code_col1: lambda x: (x.isin(labels_considered_coded)).mean(),
-            final_code_col2: lambda x: (x.isin(labels_considered_coded)).mean(),
-        }
-    )
-    .rename(
-        columns={
-            "user": "num_responses",
-            initial_code_col: "code0",
-            final_code_col1: "code1",
-            final_code_col2: "code2",
-        }
-    )
-    .sort_values(group_col, ascending=False)
-    .reset_index()
-)
-
-plot_df_melted = (
-    plot_df.melt(
-        id_vars=[group_col, "num_responses"],
-        value_vars=["code0", "code1", "code2"],
-        var_name="Stage",
-        value_name="prop",
-    )
-    .sort_values("Stage")
-    .reset_index(drop=True)
-)
 
 
-# add confidence intervals for proportions
 def add_proportion_confint(prop: float, nobs: int, alpha=0.05):
     """Calculate confidence interval for a proportion."""
     ci = binomtest(int(prop * nobs), nobs).proportion_ci(confidence_level=1 - alpha)
     return ci.low, ci.high, prop - ci.low, ci.high - prop
 
 
-plot_df_melted[["ci_low", "ci_upp", "ci_low_err", "ci_upp_err"]] = plot_df_melted.apply(
-    lambda row: add_proportion_confint(prop=row["prop"], nobs=row["num_responses"]),
-    axis=1,
-    result_type="expand",
-)
+def combine_small_groups(
+    input_df: pd.DataFrame,
+    group_col: str = "SIC Section",
+    group_size_threshold: int = 10,
+    add_total: bool = True,
+) -> pd.DataFrame:
+    """Combine small groups in the specified column into an 'Other' category.
 
-plot_df_melted_ci = plot_df_melted.melt(
-    id_vars=[group_col, "Stage", "num_responses"],
-    value_vars=["ci_low", "ci_upp", "prop"],
-    var_name="Metric",
-    value_name=x_axis_title,
-)
+    Args:
+        input_df: DataFrame containing the groups.
+        group_col: Name of the column representing groups.
+        group_size_threshold: Minimum size of group to be shown separately. Groups smaller than this will be combined.
+        add_total: Whether to add a 'Total' group aggregating all data.
 
-plot_df_melted_ci["size"] = plot_df_melted_ci["num_responses"]  # for size mapping
+    Returns:
+        DataFrame with small groups combined into 'Other'.
+    """
+    temp_df = input_df.copy()
+    section_sizes = temp_df[group_col].value_counts(dropna=False)
+    temp_df1 = temp_df.copy()
+    too_small = sorted(
+        section_sizes[section_sizes < group_size_threshold].index.tolist()
+    )
+    msk = temp_df1[group_col].isin(too_small)
+    temp_df1.loc[msk, group_col] = "+".join(too_small)
+    if not add_total:
+        return temp_df1
 
-plot_df_melted_ci = plot_df_melted_ci.sort_values(
-    [group_col, "Stage"], ascending=[False, True]
-).reset_index(drop=True)
+    temp_df2 = temp_df.copy()
+    temp_df2[group_col] = "Total"
+    temp_df = pd.concat([temp_df1, temp_df2], axis=0, ignore_index=True)
 
-# %%
-# based on the plot_df I want a figure where each group will be horizontall, with two connected dots - one for inital codability, one for final codability
-# Slightly offset each Stage vertically for better separation
-stage_offsets = {
-    initial_code_col: 0,
-    final_code_col1: +0.05,
-    final_code_col2: -0.05,
-}
-plot_df_melted_ci["y_offset"] = plot_df_melted_ci.apply(
-    lambda row: plot_df[group_col].tolist().index(row[group_col])
-    + stage_offsets.get(row["Stage"], 0),
-    axis=1,
-)
+    return temp_df
 
-fig = px.line(
-    plot_df_melted_ci[plot_df_melted_ci["Metric"] != "prop"],
-    x=x_axis_title,
-    y="y_offset",
-    color="Stage",
-    markers=True,
-    line_group=group_col,
-    template="plotly_white",
-    title=f"{coding_method.upper()} Codability (to {NUM_DIGITS}-digits) by SIC Section",
-)
 
-# Update y-axis ticks to show group names at correct positions
-fig.update_yaxes(
-    tickvals=list(range(len(plot_df[group_col]))),
-    ticktext=plot_df[group_col].tolist(),
-    title_text=None,
-)
-# use percentage on x axis
-fig.update_xaxes(tickformat=".0%", range=[-0.01, 1.045])
+def create_codability_by_section_figure(
+    input_df: pd.DataFrame,
+    coding_method: str,
+    num_digits: int,
+    group_size_threshold: int = 10,
+    group_col: str = "SIC Section",
+):
+    """Create a figure visualising codability by SIC sections.
 
-# make lines dashed and symbols just vertical line
-fig.update_traces(marker={"symbol": "line-ns-open"}, line={"width": 1})  # dash='2',
+    Args:
+        input_df: DataFrame containing both SA and CC codings.
+        coding_method: 'sa' or 'cc' to indicate which coding method to use.
+        num_digits: Number of digits to consider for codability.
+        group_size_threshold: Minimum size of group to be shown separately. Groups smaller than this will be combined.
+        group_col: Name of the column representing groups.
 
-fig.add_traces(
-    px.scatter(
-        plot_df_melted_ci[plot_df_melted_ci["Metric"] == "prop"],
+    Returns:
+        A Plotly Figure object representing the codability by SIC sections.
+    """
+    labels_considered_coded = [y for x, y in CODABILITY_LEVELS if x >= num_digits]
+    x_axis_title = (
+        f"Proportion of Responses Codable Unambiguously to {num_digits}-digits"
+    )
+
+    # create groups by which we want to visualise codability gain/loss
+    temp_df = input_df.copy().rename(
+        columns={
+            f"{coding_method}_initial_codability_level": "code0",
+            f"{coding_method}_final_codability_level_open_q": "code1",
+            "sa_final_codability_level_closed_q": "code2",
+            "most_likely_sic_section": "SIC Section",
+        }
+    )
+    if coding_method == "cc":
+        temp_df = temp_df[
+            temp_df["batch_num"].notna()
+        ]  # only consider rows with cc final code
+
+    temp_df = combine_small_groups(
+        temp_df,
+        group_col=group_col,
+        group_size_threshold=group_size_threshold,
+        add_total=True,
+    )
+
+    # aggregate - group size, percentage of each codability at desired level
+    plot_df = (
+        temp_df.groupby([group_col])
+        .agg(
+            {
+                "user": "count",
+                "code0": lambda x: (x.isin(labels_considered_coded)).mean(),
+                "code1": lambda x: (x.isin(labels_considered_coded)).mean(),
+                "code2": lambda x: (x.isin(labels_considered_coded)).mean(),
+            }
+        )
+        .rename(
+            columns={
+                "user": "num_responses",
+            }
+        )
+        .sort_values(group_col, ascending=False)
+        .reset_index()
+    )
+
+    plot_df_melted = (
+        plot_df.melt(
+            id_vars=[group_col, "num_responses"],
+            value_vars=["code0", "code1", "code2"],
+            var_name="Stage",
+            value_name="prop",
+        )
+        .sort_values("Stage")
+        .reset_index(drop=True)
+    )
+
+    plot_df_melted[["ci_low", "ci_upp", "ci_low_err", "ci_upp_err"]] = (
+        plot_df_melted.apply(
+            lambda row: add_proportion_confint(
+                prop=row["prop"], nobs=row["num_responses"]
+            ),
+            axis=1,
+            result_type="expand",
+        )
+    )
+
+    plot_df_melted_ci = plot_df_melted.melt(
+        id_vars=[group_col, "Stage", "num_responses"],
+        value_vars=["ci_low", "ci_upp", "prop"],
+        var_name="Metric",
+        value_name=x_axis_title,
+    )
+
+    plot_df_melted_ci["size"] = plot_df_melted_ci["num_responses"]  # for size mapping
+
+    plot_df_melted_ci = plot_df_melted_ci.sort_values(
+        [group_col, "Stage"], ascending=[False, True]
+    ).reset_index(drop=True)
+
+    # Slightly offset each Stage vertically for better separation
+    stage_offsets = {
+        "code0": 0,
+        "code1": +0.05,
+        "code2": -0.05,
+    }
+    plot_df_melted_ci["y_offset"] = plot_df_melted_ci.apply(
+        lambda row: plot_df[group_col].tolist().index(row[group_col])
+        + stage_offsets.get(row["Stage"], 0),
+        axis=1,
+    )
+
+    fig = px.line(
+        plot_df_melted_ci[plot_df_melted_ci["Metric"] != "prop"],
         x=x_axis_title,
         y="y_offset",
         color="Stage",
-        size="size",  # use opacity instead of alpha
-    ).data
-)
-# increse size of markers
-fig.update_traces(
-    selector={"type": "scatter", "mode": "markers"}, marker={"size": 10, "opacity": 0.9}
-)  # , symbol= 'cross'))
+        markers=True,
+        line_group=group_col,
+        template="plotly_white",
+        title=f"{coding_method.upper()} Codability (to {num_digits}-digits) by SIC Section",
+    )
 
-# add text above top categor saying Initial (in blue) Open Q (in red) Closed Q (in green) 0 use same colors as in the scatter
-fig.add_annotation(
-    x=0.15,
-    y=len(plot_df[group_col]) + 0.5,
-    text=initial_label,
-    showarrow=False,
-    font={"color": px.colors.qualitative.Plotly[0], "size": 14},
-    xref="paper",
-)
-fig.add_annotation(
-    x=0.5,
-    y=len(plot_df[group_col]) + 0.5,
-    text=final_label1,
-    showarrow=False,
-    font={"color": px.colors.qualitative.Plotly[1], "size": 14},
-    xref="paper",
-)
-fig.add_annotation(
-    x=0.93,
-    y=len(plot_df[group_col]) + 0.5,
-    text=final_label2,
-    showarrow=False,
-    font={"color": px.colors.qualitative.Plotly[2], "size": 14},
-    xref="paper",
-)
-fig.add_annotation(
-    x=0,
-    y=len(plot_df[group_col]) + 0.5,
-    text="SIC Section",
-    showarrow=False,
-    font={"color": "black", "size": 14},
-    xanchor="right",
-    xref="paper",
-)
-# add annoptation on the right hand side with total number of responses
-fig.add_annotation(
-    x=1.02,
-    y=len(plot_df[group_col]) + 0.5,
-    text="Count",
-    showarrow=False,
-    font={"color": "black", "size": 14},
-    xanchor="right",
-    xref="paper",
-)
+    # Update y-axis ticks to show group names at correct positions
+    fig.update_yaxes(
+        tickvals=list(range(len(plot_df[group_col]))),
+        ticktext=plot_df[group_col].tolist(),
+        title_text=None,
+    )
+    # use percentage on x axis
+    fig.update_xaxes(tickformat=".0%", range=[-0.01, 1.045])
+    fig.update_traces(marker={"symbol": "line-ns-open"}, line={"width": 1})  # dash='2',
 
-for i, row in plot_df.iterrows():
+    fig.add_traces(
+        px.scatter(
+            plot_df_melted_ci[plot_df_melted_ci["Metric"] == "prop"],
+            x=x_axis_title,
+            y="y_offset",
+            color="Stage",
+            size="size",
+        ).data
+    )
+    fig.update_traces(
+        selector={"type": "scatter", "mode": "markers"},
+        marker={"size": 10, "opacity": 0.9},
+    )
+
+    # add text above top category based on the stage of classification
     fig.add_annotation(
-        x=1,
-        y=i,
-        text=f"{row['num_responses']}",
+        x=0.15,
+        y=len(plot_df[group_col]) + 0.5,
+        text=f"{coding_method.upper()} Initial Codability",
         showarrow=False,
-        font={"color": "black", "size": 10},
+        font={"color": px.colors.qualitative.Plotly[0], "size": 14},
+        xref="paper",
+    )
+    fig.add_annotation(
+        x=0.5,
+        y=len(plot_df[group_col]) + 0.5,
+        text=f"{coding_method.upper()} Final Codability (Open Q)",
+        showarrow=False,
+        font={"color": px.colors.qualitative.Plotly[1], "size": 14},
+        xref="paper",
+    )
+    fig.add_annotation(
+        x=0.93,
+        y=len(plot_df[group_col]) + 0.5,
+        text="SA Final Codability (Closed Q)",
+        showarrow=False,
+        font={"color": px.colors.qualitative.Plotly[2], "size": 14},
+        xref="paper",
+    )
+    fig.add_annotation(
+        x=0,
+        y=len(plot_df[group_col]) + 0.5,
+        text="SIC Section",
+        showarrow=False,
+        font={"color": "black", "size": 14},
+        xanchor="right",
+        xref="paper",
+    )
+    # add annoptation on the right hand side with total number of responses
+    fig.add_annotation(
+        x=1.02,
+        y=len(plot_df[group_col]) + 0.5,
+        text="Count",
+        showarrow=False,
+        font={"color": "black", "size": 14},
         xanchor="right",
         xref="paper",
     )
 
-fig.update_layout(
-    width=1000,
-    height=600,
-    showlegend=False,
-)
-fig.show()
+    for i, row in plot_df.iterrows():
+        fig.add_annotation(
+            x=1,
+            y=i,
+            text=f"{row['num_responses']}",
+            showarrow=False,
+            font={"color": "black", "size": 10},
+            xanchor="right",
+            xref="paper",
+        )
 
-if out_dir:
-    fig.write_image(
-        os.path.join(
-            out_dir, f"{coding_method}_codability_{NUM_DIGITS}digits_by_sic_section.png"
-        ),
-        scale=2,
+    fig.update_layout(
+        width=1000,
+        height=600,
+        showlegend=False,
     )
+
+    return fig
+
+
+# %%
+for classification_method in ["sa", "cc"]:
+    for num_dig in [2, 5]:
+        out_fig = create_codability_by_section_figure(
+            input_df=combined_df,
+            coding_method=classification_method,
+            num_digits=num_dig,
+        )
+
+        out_fig.show()
+
+        if out_dir:
+            out_fig.write_image(
+                os.path.join(
+                    out_dir,
+                    f"{classification_method}_codability_{num_dig}digits_by_sic_section.png",
+                ),
+                scale=2,
+            )
 
 # %%

@@ -41,19 +41,21 @@ sa_closed_q = pd.read_parquet(
 cc_coded_df = pd.read_parquet(
     work_dir + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
 )
-repeated_cols = [
-    "job_title",
-    "job_description",
-    "org_description",
-    "survey_assist_open_question",
-    "survey_assist_open_question_response",
-]
+
 combined_df = sa_coded_df.merge(
-    sa_closed_q.drop(columns=repeated_cols[0:3]),
+    sa_closed_q.drop(
+        columns=sa_closed_q.columns.intersection(sa_coded_df.columns).difference(
+            ["unique_id", "user"]
+        )
+    ),
     on=["unique_id", "user"],
     how="outer",
 ).merge(
-    cc_coded_df.drop(columns=repeated_cols),
+    cc_coded_df.drop(
+        columns=cc_coded_df.columns.intersection(sa_coded_df.columns).difference(
+            ["unique_id", "user"]
+        )
+    ),
     on=["unique_id", "user"],
     how="outer",
 )
