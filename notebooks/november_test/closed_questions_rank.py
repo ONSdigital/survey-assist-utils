@@ -16,7 +16,7 @@ import re
 # %%
 import dotenv
 import pandas as pd
-from scipy import stats
+from scipy.stats import chi2, chisquare
 
 from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
 
@@ -231,7 +231,7 @@ def chi2_test(df, response_column: str, alt_codes_column: str, k: int = 1):
 
     # Chi-square stats
     chi2_st = (O_Pk - E_Pk) ** 2 / E_Pk + (O_Po - E_Po) ** 2 / E_Po
-    p_value = stats.chi2.sf(chi2_st, 1)
+    p_value = chi2.sf(chi2_st, 1)
 
     return p_value
 
@@ -416,7 +416,7 @@ def chi2_gof(df: pd.DataFrame, k: int) -> float:
 
     observed_count = group_df["selected_rank"].value_counts().values
 
-    p_value = stats.chisquare(f_obs=observed_count).pvalue
+    p_value = chisquare(f_obs=observed_count).pvalue
 
     return p_value
 
