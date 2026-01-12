@@ -231,7 +231,7 @@ def chi2_test(df, response_column: str, alt_codes_column: str, k: int = 1):
 
     # Chi-square stats
     chi2_st = (O_Pk - E_Pk) ** 2 / E_Pk + (O_Po - E_Po) ** 2 / E_Po
-    p_value = chi2.sf(chi2_st, 1)
+    p_value = chi2.sf(chi2_st, 1)  # type: ignore
 
     return p_value
 
