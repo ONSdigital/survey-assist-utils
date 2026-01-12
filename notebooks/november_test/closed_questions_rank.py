@@ -16,13 +16,9 @@ import re
 # %%
 import dotenv
 import pandas as pd
-from industrial_classification.hierarchy.sic_hierarchy import load_hierarchy
-from industrial_classification_utils.embed.embedding import get_config
-from industrial_classification_utils.utils.sic_data_access import (
-    load_sic_index,
-    load_sic_structure,
-)
 from scipy import stats
+
+from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
 
 # %%
 evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
@@ -39,46 +35,43 @@ data = pd.read_parquet(
 
 
 # %%
-def get_selected_responses(df: pd.DataFrame) -> list:
-    """Creates a list of the ranks the responses were selected by user.
+def get_selected_responses(response_row: pd.Series) -> int | None:
+    """Finds the rank the response selected by user.
 
     Args:
-        df: dataframe with survey responses.
+        response_row: survey responses.
 
     Return:
-        response_list: list
+        code_rank: int | None
     """
     column = "survey_assist_closed_question_option_"
-    response_list = []
-    # iterate through all rows of the data
-    for response_row in range(len(df)):
-        # save the response selected by the user
-        response = df["survey_assist_closed_question_response"][response_row]
 
-        # check only when closed question was asked
-        if response is not None and response != "none of the above":
+    # save the response selected by the user
+    response = response_row["survey_assist_closed_question_response"]
 
-            # change options from closed questions to lower case (matching the selected response)
-            for k in range(1, 7):
-                column_name = column + str(k)
-                if df[column_name][response_row] is not None:
-                    df.loc[response_row, column_name] = df[column_name][
-                        response_row
-                    ].lower()
+    # check only when closed question was asked
+    if response is not None and response != "none of the above":
 
-            # find the order of the selected response
-            j = 1
-            while j < 7:
-                column_name = column + str(j)
-                if response == data[column_name][response_row]:
-                    response_list.append(j)
-                    j = 7
-                j += 1
-    return response_list
+        # change options from closed questions to lower case (matching the selected response)
+        for k in range(1, 7):
+            column_name = column + str(k)
+            if response_row[column_name] is not None:
+                response_row[column_name] = response_row[column_name].lower()
+
+        # find the order of the selected response
+        code_rank = 1
+        while code_rank < 7:
+            column_name = column + str(code_rank)
+            if response == response_row[column_name]:
+                return code_rank
+            code_rank += 1
+    return None
 
 
 # %%
-selected_response = get_selected_responses(data)
+selected_response = (
+    data.apply(get_selected_responses, axis=1).dropna().astype(int).to_list()
+)
 
 # %%
 # percentage of codes found using closed quesiton for all surveys
@@ -141,61 +134,6 @@ sic_rephrased["llm_rephrased_description"] = sic_rephrased[
     "llm_rephrased_description"
 ].str.lower()
 
-
-# %%
-def get_code_by_title(dictionary, title):
-    for item in dictionary:
-        if item.get("Title") == title:
-            return item.get("Code")
-    return "XXXXX"
-
-
-# %%
-# def get_options_codes(response_row):
-
-#     options_list: dict[str, list[str | None]] = {
-#         "1": [],
-#         "2": [],
-#         "3": [],
-#         "4": [],
-#         "5": [],
-#     }
-#     sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
-
-#     response = response_row["survey_assist_closed_question_response"]
-
-#     if response is not None:
-
-#         k = 1
-#         while k < 6:
-#             current_row = response_row[
-#                 f"survey_assist_closed_question_option_{k}"
-#             ].lower()
-#             if current_row == "none of the above":
-#                 while k < 6:
-#                     options_list[f"{k}"].append(None)
-#                     k += 1
-
-#             else:
-#                 if current_row in list(sic_rephrased["reviewed_description"]):
-#                     sic_code = sic_rephrased[
-#                         sic_rephrased["reviewed_description"] == current_row
-#                     ]["input_code"].item()
-#                     options_list[f"{k}"].append(str(sic_code))
-
-#                 else:
-#                     sic_code = get_code_by_title(sic_dictionary, current_row)
-#                     options_list[f"{k}"].append(str(sic_code))
-
-#                 k += 1
-#     else:
-#         options_list["1"].append(None)
-#         options_list["2"].append(None)
-#         options_list["3"].append(None)
-#         options_list["4"].append(None)
-#         options_list["5"].append(None)
-#     return options_list
-
 # %%
 # we get "None" when the closed question was not asked or the answer was "none of the above"
 print(data[data["survey_assist_closed_question_response_code"] == "None"].shape[0])
@@ -215,17 +153,39 @@ for i in range(1, 6):
     options_columns.append(f"survey_assist_closed_question_option_{i}_code")
 
 # %%
-options = data[options_columns]
+# options = data[options_columns]
+
 
 # %%
-alt_codes_count = []
-for i in range(len(data)):
-    responses = int(options.iloc[i].count())
-    if (
-        responses != 0
-        and data["survey_assist_closed_question_response"][i] != "none of the above"
-    ):
-        alt_codes_count.append(responses)
+def get_alt_codes_count(response_row: pd.Series) -> int | None:
+    """Get count of alternative codes presented to the user.
+
+    Args:
+        response_row (pd.Series): row with survey response
+
+    Return:
+        alt_count (int | None): alternative codes count
+    """
+    alt_count = 0
+    for k in range(1, 6):
+        if (
+            response_row[f"survey_assist_closed_question_option_{k}_code"] is not None
+            and (response_row["survey_assist_closed_question_response"]).lower()
+            != "none of the above"
+        ):
+            alt_count += 1
+
+    return alt_count if alt_count > 0 else None
+
+
+# %%
+alt_codes_count = data.apply(get_alt_codes_count, axis=1).dropna().astype(int).to_list()
+
+# %%
+len(alt_codes_count)
+
+# %%
+len(selected_response)
 
 # %%
 for i in range(7):
@@ -248,7 +208,7 @@ def chi2_test(df, response_column: str, alt_codes_column: str, k: int = 1):
     k: k-th option to be tested.
     """
     # The first option was selected, where 'none of the above' was NOT selected
-    N_P1 = df[df[response_column] == k].shape[0]
+    N_Pk = df[df[response_column] == k].shape[0]
 
     # Total number of surveys asked, where 'none of the above' was NOT selected
     N_Surveys = df.shape[0]
@@ -259,78 +219,98 @@ def chi2_test(df, response_column: str, alt_codes_column: str, k: int = 1):
     # null hypothesis: P_Expected = N_Surveys / N_Opportunities; how many 1st options are we expecting
     P_Expected = N_Surveys / N_Opportunities
 
-    # Expected first responses
-    E_P1 = P_Expected * N_Surveys
+    # Expected k-th responses
+    E_Pk = P_Expected * N_Surveys
 
     # Expected other responses than first
-    E_P2_P5 = N_Surveys - E_P1
+    E_Po = N_Surveys - E_Pk
 
     # Observed values
-    O_P1 = N_P1
-    O_P2_P5 = N_Surveys - N_P1
+    O_Pk = N_Pk
+    O_Po = N_Surveys - N_Pk
 
     # Chi-square stats
-    chi2_st = (O_P1 - E_P1) ** 2 / E_P1 + (O_P2_P5 - E_P2_P5) ** 2 / E_P2_P5
+    chi2_st = (O_Pk - E_Pk) ** 2 / E_Pk + (O_Po - E_Po) ** 2 / E_Po
     p_value = stats.chi2.sf(chi2_st, 1)
 
     return p_value
 
 
-# %%
-df_grouped = df_options[df_options["alt_codes_count"] == 2]
-print(chi2_test(df_grouped, "selected_response", "alt_codes_count"))
-# print(chi2_test(df_options, 'selected_response', 'alt_codes_count'))
-
-# %%
-df_grouped.sample()
-
 # %% [markdown]
 # ## SA assigned code randomness
 
 # %%
-options.count()
+# selected code rank from the list
+
+
+def get_code_rank(response_row: pd.Series) -> int | None:
+    """Get the rank of the code selected by the user.
+
+    Args:
+        response_row (pd.Series): row with survey response
+
+    Return:
+        rank (int | None): rank of the code selected.
+    """
+    survey_assist_alt = "survey_assist_alt_candidate_code_"
+    k = 1
+    rank = 0
+    while k < 6:
+        sa_code = survey_assist_alt + str(k)
+        if response_row["survey_assist_closed_question_response_code"] is None:
+            k = 6
+
+        elif (
+            response_row[sa_code]
+            == response_row["survey_assist_closed_question_response_code"]
+        ):
+            rank = k
+            k = 6
+        k += 1
+
+    if k == 6:
+        rank = k
+
+    return rank if rank != 6 else None
+
 
 # %%
-# selected code rank from the list
-sa_code_match: list[int | str] = []
-survey_assist_alt = "survey_assist_alt_candidate_code_"
-for row in range(len(data)):
-    i = 1
-    while i < 6:
-        sa_code = survey_assist_alt + str(i)
-        if data["survey_assist_closed_question_response_code"][row] is None:
-            # sa_code_match.append(0)
-            i = 6
-        elif (
-            data[sa_code][row]
-            == data["survey_assist_closed_question_response_code"][row]
-        ):
-            sa_code_match.append(i)
-            i = 6
-        i += 1
-    if i == 6:
-        sa_code_match.append("None")
+sa_code_match = data.apply(get_code_rank, axis=1).to_list()
 
 # %%
 # alternative codes count
-sa_alt_codes_count = []
-survey_assist_alt = "survey_assist_alt_candidate_code_"
-for row in range(len(data)):
+
+
+def get_alternative_codes_count(response_row: pd.Series) -> int:
+    """Get count of alternative codes presented to the user.
+
+    Args:
+        response_row (pd.Series): row with survey response
+
+    Return:
+        alts (int): alternative codes count
+    """
+    k = 1
     alts = 0
-    i = 1
-    while i < 6:
-        sa_code = survey_assist_alt + str(i)
-        if data["survey_assist_closed_question_response_code"][row] is None:
-            i = 6
-        elif data[sa_code][row] is not None:
+    survey_assist_alt = "survey_assist_alt_candidate_code_"
+
+    while k < 6:
+        sa_code = survey_assist_alt + str(k)
+        if response_row["survey_assist_closed_question_response_code"] is None:
+            k = 6
+        elif response_row[sa_code] is not None:
             alts += 1
-        i += 1
-    sa_alt_codes_count.append(alts)
+        k += 1
+    return alts
+
+
+# %%
+sa_alt_codes_count = data.apply(get_alternative_codes_count, axis=1).to_list()
 
 # %%
 for i in range(6):
     print(sa_code_match.count(i))
-print(sa_code_match.count("None"))
+print(sa_code_match.count(None))
 
 # %% [markdown]
 # Note that 6th rank is either not presented or is a "none of the above", which is not a valid code.
@@ -347,48 +327,71 @@ for i in range(6):
 
 # %% [markdown]
 # #### Chi square: Tendency to favouring a specific rank option.
-# Hypothesis: "Respondents tend to favour the n-th option".
+# Hypothesis: "Respondents don't favour the n-th option".
 
 # %%
 # create a DF for checking the chi square
-sa_codes = {"selected_code": sa_code_match, "alt_codes_count": sa_alt_codes_count}
+sa_codes = {"selected_rank": sa_code_match, "alt_codes_count": sa_alt_codes_count}
 df_sa_codes = pd.DataFrame(sa_codes)
 
 # %%
-for i in range(1, 6):
-    print(f"{i}:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", i))
+(df_options[df_options["alt_codes_count"] == 2]["selected_response"] == 2).sum()
+
+# %%
+# check for primacy effect
+
+for i in range(2, 6):
+    # df_grouped = df_sa_codes[df_sa_codes["alt_codes_count"] == i]
+    # print(
+    #     f"Presented codes count: {i}, primacy effect p-value: {chi2_test(df_grouped, "selected_rank", "alt_codes_count", 1)}"
+    # )
+    df_grouped = df_options[df_options["alt_codes_count"] == i]
+    print(
+        f"Presented codes count: {i}, primacy effect p-value: {chi2_test(df_grouped, "selected_response", "alt_codes_count", 1)}"
+    )
 
 # %% [markdown]
-# For all number of optins presented, the p-value is belov 0.5, which means the null hypothesis cannot be rejected - there is a sign of bias when respondent select specific rank option. For every rank it was selected it significantly differs from what we would expect by random chance (1/k). This might be due to comparing lists of different length (not all respondents were presented with the same number of options).
+# For all number of options presented, the p-value is below 0.5, which means the null hypothesis cannot be rejected - there is a sign of bias when respondent select specific rank option. For every rank it was selected it significantly differs from what we would expect by random chance (1/k). This might be due to comparing lists of different length (not all respondents were presented with the same number of options).
 
 # %%
 # remove all rows that didn't get the closed question asked
-df_sa_codes_no_none = df_sa_codes[df_sa_codes["selected_code"] != "None"]
+df_sa_codes_no_none = df_sa_codes[df_sa_codes["selected_rank"] != "None"]
 
 # %%
 print("alt codes count x rank of selected response\n")
 
 for i in range(2, 6):
     df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == i]
-    print(df_group_sa.shape[0])
+    print(f"Surveys where {i} options were presented: {df_group_sa.shape[0]}")
+    print(f"Corrected alpha: {round(0.05 / i, 4)}")
     for n in range(1, i + 1):
         print(
-            f"{i}x{n}: {chi2_test(df_group_sa, "selected_code", "alt_codes_count", n)}"
+            f"{i}x{n}: {chi2_test(df_group_sa, "selected_rank", "alt_codes_count", n)}"
         )
     print()
 
 # %% [markdown]
+# Use Bonferroni correction for alpha to avoid type I errors (false positive).
+#
 # #### 2 options presented
-# Both p-values are above 0.5, which suggests the null hypothesis can be rejected. The share of answers is randomly selected.
+# Corrected alpha: 0.025
+#
+# Both p-values are above 0.025, which suggests the null hypothesis can be rejected. The share of answers is randomly selected.
 #
 # #### 3 options presented
+# Corrected alpha: 0.0167
+#
 # For rank 2, the p-value is equal to 1. This is because the number of times this rank was selected is equal to the expected value (26).
-# For ranks 1 and 3, p-value < 0.05 - there is some bias. Further test will need to be run.
+# For ranks 1 and 3, p-value < 0.0167 - there is some bias. Further test will need to be run.
 #
 # #### 4 options presented
-# All values are > 0.05. There is no bias for 4 options presented.
+# Corrected alpha: 0.0125
+#
+# All values are > 0.0125. There is no bias for 4 options presented.
 #
 # #### 5 options presented
+# Corrected alpha: 0.01
+#
 # 4 of 5 p-values are low. One of the p-values is 0.49 Similar case as with 3 options presented.
 
 # %% [markdown]
@@ -411,12 +414,19 @@ def chi2_gof(df: pd.DataFrame, k: int) -> float:
     """
     group_df = df[df["alt_codes_count"] == k]
 
-    observed_counts = group_df["selected_code"].value_counts().values
+    observed_count = group_df["selected_rank"].value_counts().values
 
-    p_value = stats.chisquare(f_obs=observed_counts).pvalue
+    p_value = stats.chisquare(f_obs=observed_count).pvalue
 
     return p_value
 
+
+# %%
+# group_df = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 3]
+observed_counts = df_sa_codes_no_none["selected_rank"].value_counts().values
+
+# %%
+print(observed_counts)
 
 # %%
 # goodness-of-fit for each number of presented options
@@ -459,108 +469,43 @@ data_nota = data[data["survey_assist_closed_question_response"] == "none of the 
 data_not = data[data["survey_assist_closed_question_response"] != "none of the above"]
 data_not_nota = data_not[data_not["survey_assist_closed_question_response"].notna()]
 
-
-# %%
-def count_others(df: pd.DataFrame) -> tuple:
-    """Counts the number of option descriptions that contains word 'other'.
-
-    Args:
-        df (pd.DataFrame): a dataframe containing survey assist closed question options.
-
-    Returns:
-        return_df (pd.DataFrame): a DataFrame with the count of all options presented to the use and count of answers with a word'other'.
-        other_percentage (float): percentage of options containing 'other' out of all options for a row.
-    """
-    column_placeholder = "survey_assist_closed_question_option_"
-    options_presented = []
-    others = []
-    for response_row in range(len(df)):
-        k = 1
-        other_count = 0
-        while k < 7:
-            column_name = column_placeholder + str(i)
-            row_string = df[column_name].iloc[response_row]
-            if row_string.lower() == "none of the above":
-                options_presented.append(k)
-                others.append(other_count)
-                k = 7
-            else:
-                if "other" in row_string.lower():
-                    other_count += 1
-                k += 1
-    return_df = pd.DataFrame(
-        {"options_count": options_presented, "other_count": others}
-    )
-
-    count = 0
-    for response_row in range(len(return_df)):
-        if return_df["other_count"].iloc[response_row] == 0:
-            count += 1
-    other_percentage = count / len(return_df)
-
-    return return_df, other_percentage
-
-
-nota_other_count_df, nota_perc = count_others(data_nota)
-not_nota_other_count_df, not_nota_perc = count_others(data_not_nota)
-
-# %%
-print(f"percentage of 'other' in possible answers when nota: {round(nota_perc * 100)}%")
-print(
-    f"percentage of 'other' in possible answers when not nota: {round(not_nota_perc * 100)}%"
-)
-
-# %% [markdown]
-# this suggests that the proportion of "other..." is not the reason
-
-# %%
-config = get_config()
-
-# %%
-sic_index_file = config["lookups"]["sic_index"]
-sic_index_df = load_sic_index(sic_index_file)
-
-sic_structure_file = config["lookups"]["sic_structure"]
-sic_df = load_sic_structure(sic_structure_file)
-
-sic = load_hierarchy(sic_df, sic_index_df)
-
 # %%
 # check against sections
 
 
-def possible_sections(df: pd.DataFrame):
+def possible_sections(response_row: pd.Series):
     """Checks the count of options presented to the user. Counts the number of unique sections of the presented options, and adds to the dataframe.
 
     Args:
-        df (pd.DataFrame): a DataFrame containing survey results.
+        response_row (pd.Series): a row containing survey results.
     """
     column_placeholder = "survey_assist_alt_candidate_code_"
     unique_section_list_by_row = []
-    codes_count = []
 
-    for response_row in range(len(df)):
-        section_list = []
-        codes = 0
-        k = 1
-        while k < 6:
-            column_name = column_placeholder + str(k)
-            row_string = df[column_name].iloc[response_row]
-            if row_string is not None:
-                codes += 1
-                section = sic[row_string].sic_code.alpha_code[0]
-                if section not in section_list:
-                    section_list.append(section)
-            k += 1
-        unique_section_list_by_row.append(section_list)
-        codes_count.append(codes)
-    df["unique_sections"] = unique_section_list_by_row
-    df["codes_count"] = codes_count
+    codes = 0
+    row_codes = []
+    k = 1
+    while k < 6:
+        column_name = column_placeholder + str(k)
+        if response_row[column_name] is not None:
+            row_codes.append(response_row[column_name])
+            codes += 1
+        k += 1
+
+    unique_section_list_by_row = list(get_clean_n_digit_codes(row_codes, n=0)[0])
+
+    return unique_section_list_by_row, codes
 
 
 # %%
-possible_sections(data_not_nota)
-possible_sections(data_nota)
+# add columns 'unique_sections' and 'codes_count'
+
+data_not_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
+    data_not_nota.apply(possible_sections, axis=1).to_list(), index=data_not_nota.index
+)
+data_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
+    data_nota.apply(possible_sections, axis=1).to_list(), index=data_nota.index
+)
 
 # %%
 df_check = data_not_nota
@@ -593,6 +538,65 @@ print(
 
 # %% [markdown]
 # This suggests that the number of optoins isn't a significant reason for NOTA to be selected.
+
+
+# %%
+def count_others(response_row: pd.Series) -> int:
+    """Counts the number of option descriptions that contains word 'other'.
+
+    Args:
+        response_row (pd.Series): a row containing survey assist closed question options.
+
+    Returns:
+        other_count (int): count of possible options containing word "other"
+    """
+    column_placeholder = "survey_assist_closed_question_option_"
+    k = 1
+    other_count = 0
+
+    while k < 7:
+        column_name = column_placeholder + str(k)
+        row_string = response_row[column_name]
+
+        if row_string.lower() == "none of the above":
+            # options_presented = k
+            k = 7
+
+        else:
+            if "other" in row_string.lower():
+                other_count += 1
+            k += 1
+
+    return other_count
+
+
+# %%
+data_nota["options_with_other"] = pd.DataFrame(
+    data_nota.apply(count_others, axis=1).to_list(), index=data_nota.index
+)
+
+data_not_nota["options_with_other"] = pd.DataFrame(
+    data_not_nota.apply(count_others, axis=1).to_list(), index=data_not_nota.index
+)
+
+# %%
+nota_perc = float(
+    data_nota["options_with_other"].sum() / data_nota["codes_count"].sum()
+)
+not_nota_perc = float(
+    data_not_nota["options_with_other"].sum() / data_not_nota["codes_count"].sum()
+)
+
+# %%
+print(f"percentage of 'other' in possible answers when nota: {round(nota_perc * 100)}%")
+print(
+    f"percentage of 'other' in possible answers when not nota: {round(not_nota_perc * 100)}%"
+)
+
+# %% [markdown]
+# this suggests that the proportion of "other..." is not the reason
+
+# %% [markdown]
 #
 # Calculate the **odds ratio** now.
 #
@@ -808,7 +812,9 @@ print("IQR for no question:", round(iqr_no_closed_question))
 data_not_none = full_data[full_data["survey_assist_closed_question_response"].notna()]
 
 # %%
-possible_sections(data_not_none)
+data_not_none[["unique_sections", "codes_count"]] = pd.DataFrame(
+    data_not_none.apply(possible_sections, axis=1).to_list(), index=data_not_none.index
+)
 
 # %%
 # calculate time vs section
