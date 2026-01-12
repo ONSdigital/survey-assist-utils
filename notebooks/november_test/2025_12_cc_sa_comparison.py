@@ -137,6 +137,8 @@ plot_df_f1 = pd.DataFrame(
         for k, v in eval_metrics.items()
     ]
 )
+# drop "CC Final Closed Q" (as we used the open_q clerical codes for that)
+plot_df_f1 = plot_df_f1[plot_df_f1.method != "CC Final Closed Q"]
 
 # melt for easier plotting
 plot_df_f1 = plot_df_f1.melt(
@@ -460,16 +462,15 @@ if out_dir:
 
 # %%
 # get examples
-mask_diff = (
-    combined_df["sa_initial_codes"] != combined_df["cc_initial_codes"]
-) & combined_df.batch_num.notna()
+stage = "initial_codes"
+# stage = "final_codes_open_q"
+
+mask_diff = (combined_df[f"sa_{stage}"] != combined_df[f"cc_{stage}"]) & (
+    combined_df["batch_num"] <= 3 + (stage == "final")
+)
 tmp_df = combined_df[mask_diff].copy()
-tmp_df["sa_codes_str"] = tmp_df["sa_initial_codes"].apply(
-    lambda x: ", ".join(sorted(x))
-)
-tmp_df["cc_codes_str"] = tmp_df["cc_initial_codes"].apply(
-    lambda x: ", ".join(sorted(x))
-)
+tmp_df["sa_codes_str"] = tmp_df[f"sa_{stage}"].apply(lambda x: ", ".join(sorted(x)))
+tmp_df["cc_codes_str"] = tmp_df[f"cc_{stage}"].apply(lambda x: ", ".join(sorted(x)))
 frequent_mistakes = (
     tmp_df.groupby(["cc_codes_str", "sa_codes_str"])
     .size()
@@ -480,23 +481,24 @@ min_mistakes = 3
 print(frequent_mistakes[frequent_mistakes["count"] > min_mistakes])
 
 examples = pd.DataFrame()
+columns = [
+    "user",
+    "job_title",
+    "job_description",
+    "org_description",
+    "sa_codes_str",
+    "cc_codes_str",
+    "batch_num",
+]
 for _, row in frequent_mistakes[frequent_mistakes["count"] > min_mistakes].iterrows():
     msk = (tmp_df["sa_codes_str"] == row.sa_codes_str) & (
         tmp_df["cc_codes_str"] == row.cc_codes_str
     )
-    examples = pd.concat([examples, tmp_df[msk]])
+    examples = pd.concat([examples, tmp_df.loc[msk, columns]])
 
-print(
-    examples[
-        [
-            "unique_id",
-            "job_title",
-            "job_description",
-            "org_description",
-            "clerical_code_initial",
-            "sa_codes_str",
-            "batch_num",
-        ]
-    ]
-)
+# set pandas to print all columns
+pd.set_option("display.max_columns", None)
+pd.set_option("display.max_colwidth", None)
+print(examples)
+
 # %%
