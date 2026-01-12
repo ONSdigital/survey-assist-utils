@@ -194,8 +194,8 @@ fig.update_layout(height=500, width=1000)
 fig.show()
 
 if out_dir:
-    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
     fig.write_image(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.png")
+    fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
 
 
 # %%
@@ -260,9 +260,8 @@ fig.update_layout(height=500, width=770)
 fig.show()
 
 if out_dir:
-    # fig.write_html(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.html")
     fig.write_image(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.png")
-
+    fig.write_html(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.html")
 
 # %%
 # create confusion matrix for section (0-digit) and subset of 5-digit
@@ -349,9 +348,11 @@ for DIGITS in [5, 2]:
         fig.show()
 
         if out_dir:
-            # fig.write_html(f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix.html")
             fig.write_image(
                 f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix_{DIGITS}digits.png"
+            )
+            fig.write_html(
+                f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix_{DIGITS}digits.html"
             )
 
 
@@ -456,8 +457,8 @@ fig.update_layout(height=500, width=1400)
 fig.show()
 
 if out_dir:
-    # fig.write_html(f"{out_dir}/cc_sa_sic_section_distribution.html")
     fig.write_image(f"{out_dir}/cc_sa_sic_section_distribution.png")
+    fig.write_html(f"{out_dir}/cc_sa_sic_section_distribution.html")
 
 
 # %%

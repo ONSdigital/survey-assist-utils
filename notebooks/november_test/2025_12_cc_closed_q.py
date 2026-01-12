@@ -294,5 +294,41 @@ fig.show()
 
 if out_dir:
     fig.write_image(out_dir + "/closed_q_rank_distributions.png")
+    fig.write_html(out_dir + "/closed_q_rank_distributions.html")
+
+
+# %%
+
+# how often 'none of the above' and cc/sa final code was listed?
+method = "cc"
+msk = (
+    combined_df[f"{method}_final_codability_level_open_q"] == "Sub-class (5-digits)"
+) & ~combined_df["survey_assist_open_question"].isna()
+combined_df[f"{method}_final_codes_open_q_within_initial_options"] = combined_df.apply(
+    lambda row: row[f"{method}_final_codes_open_q"].issubset(row["sa_initial_codes"]),
+    axis=1,
+)
+combined_df[f"{method}_final_codes_open_q_selected_by_user_in_closed"] = (
+    combined_df.apply(
+        lambda row: (
+            "none of the above"
+            if len(row["sa_final_codes_closed_q"]) == 0
+            else (
+                "same code selected"
+                if row[f"{method}_final_codes_open_q"].issubset(
+                    row["sa_final_codes_closed_q"]
+                )
+                else "different selected"
+            )
+        ),
+        axis=1,
+    )
+)
+combined_df[msk].groupby(
+    [
+        f"{method}_final_codes_open_q_selected_by_user_in_closed",
+        f"{method}_final_codes_open_q_within_initial_options",
+    ]
+).size().unstack(fill_value=0)
 
 # %%

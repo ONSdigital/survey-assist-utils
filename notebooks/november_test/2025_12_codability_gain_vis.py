@@ -178,6 +178,9 @@ for subset_name, msk in subset_msk.items():
         fig.write_image(
             f"{out_dir}/cc_codability_gain_sankey_followup_{subset_name}_q.png"
         )
+        fig.write_html(
+            f"{out_dir}/cc_codability_gain_sankey_followup_{subset_name}_q.html"
+        )
 
 # %%
 # create sankey diagram for SA codes
@@ -210,6 +213,9 @@ for question_type in ["open", "closed"]:
     if out_dir:
         fig.write_image(
             f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.png"
+        )
+        fig.write_html(
+            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.html"
         )
 
 
@@ -291,5 +297,6 @@ if "time_start" in sa_coded_df.columns:
 
     if out_dir:
         fig.write_image(f"{out_dir}/user_numbers_vs_time_start.png")
+        fig.write_html(f"{out_dir}/user_numbers_vs_time_start.html")
 
 # %%

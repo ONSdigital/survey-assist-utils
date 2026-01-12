@@ -90,6 +90,8 @@ clerical_codes_df = initial_cc_df.merge(
     how="outer",
     suffixes=("_initial", "_final"),
 )
+clerical_codes_df = clerical_codes_df[~clerical_codes_df.user.isna()]
+
 print(f"Total records with clerical codes: {len(clerical_codes_df)}")
 
 # %%

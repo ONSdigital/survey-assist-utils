@@ -50,8 +50,6 @@ combined_df = pd.merge(
 
 
 # %%
-
-
 def add_proportion_confint(prop: float, nobs: int, alpha=0.05):
     """Calculate confidence interval for a proportion."""
     ci = binomtest(int(prop * nobs), nobs).proportion_ci(confidence_level=1 - alpha)
@@ -322,6 +320,12 @@ for classification_method in ["sa", "cc"]:
                     f"{classification_method}_codability_{num_dig}digits_by_sic_section.png",
                 ),
                 scale=2,
+            )
+            out_fig.write_html(
+                os.path.join(
+                    out_dir,
+                    f"{classification_method}_codability_{num_dig}digits_by_sic_section.html",
+                )
             )
 
 # %%
