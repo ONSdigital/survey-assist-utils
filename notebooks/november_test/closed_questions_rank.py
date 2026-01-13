@@ -16,7 +16,7 @@ import re
 # %%
 import dotenv
 import pandas as pd
-from scipy.stats import chi2, chisquare
+from scipy.stats import chisquare, contingency
 
 from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
 
@@ -75,6 +75,7 @@ selected_response = (
 
 # %%
 # percentage of codes found using closed quesiton for all surveys
+
 print(round(100 * len(selected_response) / len(data), 2))
 
 # %%
@@ -86,6 +87,7 @@ for i in range(1, 7):
 # %%
 # order, which answer was seleceted
 print(selected_response_order)
+
 # order of the question selected
 for i in range(1, 7):
     option_order = "option_" + str(i)
@@ -152,9 +154,6 @@ options_columns = []
 for i in range(1, 6):
     options_columns.append(f"survey_assist_closed_question_option_{i}_code")
 
-# %%
-# options = data[options_columns]
-
 
 # %%
 def get_alt_codes_count(response_row: pd.Series) -> int | None:
@@ -197,44 +196,6 @@ options_dict = {
     "alt_codes_count": alt_codes_count,
 }
 df_options = pd.DataFrame(options_dict)
-
-
-# %%
-def chi2_test(df, response_column: str, alt_codes_column: str, k: int = 1):
-    """Args:
-    df: dataframe
-    response_column: a column with the respondends choice recorded as a rank
-    alt_codes_column: count of alternative codes
-    k: k-th option to be tested.
-    """
-    # The first option was selected, where 'none of the above' was NOT selected
-    N_Pk = df[df[response_column] == k].shape[0]
-
-    # Total number of surveys asked, where 'none of the above' was NOT selected
-    N_Surveys = df.shape[0]
-
-    # Total number of potential answers (other than 'none of the above') was presented
-    N_Opportunities = df[alt_codes_column].sum()
-
-    # null hypothesis: P_Expected = N_Surveys / N_Opportunities; how many 1st options are we expecting
-    P_Expected = N_Surveys / N_Opportunities
-
-    # Expected k-th responses
-    E_Pk = P_Expected * N_Surveys
-
-    # Expected other responses than first
-    E_Po = N_Surveys - E_Pk
-
-    # Observed values
-    O_Pk = N_Pk
-    O_Po = N_Surveys - N_Pk
-
-    # Chi-square stats
-    chi2_st = (O_Pk - E_Pk) ** 2 / E_Pk + (O_Po - E_Po) ** 2 / E_Po
-    p_value = chi2.sf(chi2_st, 1)  # type: ignore
-
-    return p_value
-
 
 # %% [markdown]
 # ## SA assigned code randomness
@@ -331,125 +292,92 @@ for i in range(6):
 
 # %%
 # create a DF for checking the chi square
-sa_codes = {"selected_rank": sa_code_match, "alt_codes_count": sa_alt_codes_count}
+sa_codes = {"selected_response": sa_code_match, "alt_codes_count": sa_alt_codes_count}
 df_sa_codes = pd.DataFrame(sa_codes)
 
 # %%
 (df_options[df_options["alt_codes_count"] == 2]["selected_response"] == 2).sum()
 
+
 # %%
 # check for primacy effect
+def check_primacy(df: pd.DataFrame):
 
-for i in range(2, 6):
-    # df_grouped = df_sa_codes[df_sa_codes["alt_codes_count"] == i]
-    # print(
-    #     f"Presented codes count: {i}, primacy effect p-value: {chi2_test(df_grouped, "selected_rank", "alt_codes_count", 1)}"
-    # )
-    df_grouped = df_options[df_options["alt_codes_count"] == i]
-    print(
-        f"Presented codes count: {i}, primacy effect p-value: {chi2_test(df_grouped, "selected_response", "alt_codes_count", 1)}"
-    )
+    for k in range(2, 6):
+        df_grouped_sa = df[df["alt_codes_count"] == k]
+        observed = df_grouped_sa["selected_response"].value_counts().values
+        expected = observed.sum() / k
+        residual = round((observed[0] - expected) / (expected**0.5), 3)
+        print(
+            f"Presented codes count: {k}, primacy effect using standardised residual: {residual}"
+        )
+
+
+# %%
+check_primacy(df_options)
 
 # %% [markdown]
-# For all number of options presented, the p-value is below 0.5, which means the null hypothesis cannot be rejected - there is a sign of bias when respondent select specific rank option. For every rank it was selected it significantly differs from what we would expect by random chance (1/k). This might be due to comparing lists of different length (not all respondents were presented with the same number of options).
+# For all number of options presented, the residual values are within -1.96 < residual < 1.96, which means there is not enough evidence that respondents favour the first option presented (primacy effect).
 
 # %%
 # remove all rows that didn't get the closed question asked
-df_sa_codes_no_none = df_sa_codes[df_sa_codes["selected_rank"] != "None"]
+df_sa_codes_no_none = df_sa_codes[df_sa_codes["selected_response"] != "None"]
 
 # %%
-print("alt codes count x rank of selected response\n")
+# check if any of the options was selected more often than others. If p-values are > 0.05, then there is no significant difference in the responses seleted.
+# Goodness-of-fit
 
 for i in range(2, 6):
+    df_group_sa = df_options[df_options["alt_codes_count"] == i]
+
+    observed_count = df_group_sa["selected_response"].value_counts().values
+    chi_pvalue = chisquare(f_obs=observed_count).pvalue
+
+    print(f"Options presented: {i}")
+    print(f"Surveys count: {df_group_sa.shape[0]}")
+    print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05 {chi_pvalue > 0.05}\n")
+
+# %% [markdown]
+# ### Check LLM's assumption regarding most likely code.
+#
+# Use the ordered list, to check if the first option was favoured - this is good, because this will means that the respondent selects what SA thinks is most likely.
+# When comapring options that were selected by respondents with the order of those options determined by the LLM, we expect the first option to be most popular, as LLM decide it has the highest likelihood.
+# Null hypothesis: "Respondents don't favour the first option".
+
+# %%
+df_sa_codes_no_none.sample()
+
+# %%
+for i in range(2, 6):
     df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == i]
-    print(f"Surveys where {i} options were presented: {df_group_sa.shape[0]}")
-    print(f"Corrected alpha: {round(0.05 / i, 4)}")
-    for n in range(1, i + 1):
-        print(
-            f"{i}x{n}: {chi2_test(df_group_sa, "selected_rank", "alt_codes_count", n)}"
-        )
-    print()
+
+    observed_count = df_group_sa["selected_response"].value_counts().values
+    chi_pvalue = chisquare(f_obs=observed_count).pvalue
+
+    print(f"Options presented: {i}")
+    print(f"Surveys count: {df_group_sa.shape[0]}")
+    print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05 {chi_pvalue > 0.05}\n")
+
 
 # %% [markdown]
-# Use Bonferroni correction for alpha to avoid type I errors (false positive).
+# When 2 and 4 options were presented, we do not reject the null hypothesis (pvalue > 0.05).
+# When 3 and 5 options were presented, we can reject the null hypothesis (pvalue > 0.05), suggesting that one of the options was selected more often.
 #
-# #### 2 options presented
-# Corrected alpha: 0.025
+# (possibly not noticable, because 2 and 4 options were presented only in small number of surveys, unlike 3 and 5)
 #
-# Both p-values are above 0.025, which suggests the null hypothesis can be rejected. The share of answers is randomly selected.
-#
-# #### 3 options presented
-# Corrected alpha: 0.0167
-#
-# For rank 2, the p-value is equal to 1. This is because the number of times this rank was selected is equal to the expected value (26).
-# For ranks 1 and 3, p-value < 0.0167 - there is some bias. Further test will need to be run.
-#
-# #### 4 options presented
-# Corrected alpha: 0.0125
-#
-# All values are > 0.0125. There is no bias for 4 options presented.
-#
-# #### 5 options presented
-# Corrected alpha: 0.01
-#
-# 4 of 5 p-values are low. One of the p-values is 0.49 Similar case as with 3 options presented.
+# Check for primacy effect (we want that).
+
+# %%
+check_primacy(df_sa_codes_no_none)
 
 # %% [markdown]
-# ### Goodnes-of-fit
-#
-# For further investingation, run goodness-of-fit test with null hypothesis "the answers selected follow the expected distribution (1/k)" wih k being the number of surveys. This will be considered for groups, where the data will be split based on the number of options presented (not including NOTA answers). Alternative hypothesis: the number of answers selected deviates from the expected 1/k.
-
-
-# %%
-def chi2_gof(df: pd.DataFrame, k: int) -> float:
-    """Calculates chi-square goodness-of-fit for a specific subset of data with n options presented.
-
-    Args:
-        df (pd.DataFrame): DataFrame with columns
-        k (int): number of options presented.
-
-    Returns:
-        p_value (float): the p-value for the goodness-of-fit test.
-
-    """
-    group_df = df[df["alt_codes_count"] == k]
-
-    observed_count = group_df["selected_rank"].value_counts().values
-
-    p_value = chisquare(f_obs=observed_count).pvalue
-
-    return p_value
-
-
-# %%
-# group_df = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 3]
-observed_counts = df_sa_codes_no_none["selected_rank"].value_counts().values
-
-# %%
-print(observed_counts)
-
-# %%
-# goodness-of-fit for each number of presented options
-print("2:", chi2_gof(df_sa_codes_no_none, 2))
-print("3:", chi2_gof(df_sa_codes_no_none, 3))
-print("4:", chi2_gof(df_sa_codes_no_none, 4))
-print("5:", chi2_gof(df_sa_codes_no_none, 5))
+# The residual value for first option being selected confirms that it was selected more often in cases, when 3 and 5 options were presented. For all options, the first option was selected more often than expected.
 
 # %% [markdown]
-# ### goodness-of-fit for 2 options presented
-# The p-value is greater than 0.05, which means there is evidence to reject the null hypothesis. The differences between observed and expected values are due to noise.
+# Null hypothesis: "Respondents do not favour one of the options over other options".
+# All p-values, regardles of the count of options presented, are above alpha=0.05. Therefore, the null hypothesis cannot be rejected, and it is possible that respondents don't favour any option.
 #
-# ### goodness-of-fit for 3 options presented
-# The p-value is lower than 0.05, which means the null hypothesis cannot be rejected. There is a primacy bias.
-#
-# ### goodness-of-fit for 4 options presented
-# Same as for 2 options.
-#
-# ### goodness-of-fit for 5 options presented
-# Same as for 3 options.
-#
-#
-# Overall, it is uncertain if there is bias throughout the whole survey.
+# Order of the options doesn't seem to influence the number of times, the option was selected.
 
 # %% [markdown]
 # ## None of the above (NOTA)
@@ -608,32 +536,21 @@ print(
 # OR = (a * d) / (b * c)
 
 # %%
-a = 0
-for data_row in range(len(data_nota)):
-    if len(data_nota["unique_sections"].iloc[data_row]) == 1:
-        a += 1
-
-b = 0
-for data_row in range(len(data_not_nota)):
-    if len(data_not_nota["unique_sections"].iloc[data_row]) == 1:
-        b += 1
-
-c = 0
-for data_row in range(len(data_nota)):
-    if len(data_nota["unique_sections"].iloc[data_row]) != 1:
-        c += 1
-
-d = 0
-for data_row in range(len(data_not_nota)):
-    if len(data_not_nota["unique_sections"].iloc[data_row]) != 1:
-        d += 1
+nota_sections_count = data_nota["unique_sections"].str.len()
+not_nota_sections_count = data_not_nota["unique_sections"].str.len()
 
 # %%
-print(a, b)
-print(c, d)
+nota_one_section = (nota_sections_count == 1).sum()
+nota_many_sections = (nota_sections_count > 1).sum()
+
+not_nota_one_section = (not_nota_sections_count == 1).sum()
+not_nota_many_sections = (not_nota_sections_count > 1).sum()
 
 # %%
-OR = (a * d) / (b * c)
+row1 = [nota_one_section, not_nota_one_section]
+row2 = [nota_many_sections, not_nota_many_sections]
+
+OR = contingency.odds_ratio([row1, row2])
 
 # %%
 print(OR)
@@ -644,8 +561,10 @@ print(OR)
 # %%
 # Success rate
 
-same_section = b / (a + b)
-multiple_sections = d / (c + d)
+same_section = not_nota_one_section / (nota_one_section + not_nota_one_section)
+multiple_sections = not_nota_many_sections / (
+    nota_many_sections + not_nota_many_sections
+)
 
 # %%
 print(f"Success rate when options presented from the same section: {same_section}")
