@@ -295,9 +295,6 @@ for i in range(6):
 sa_codes = {"selected_response": sa_code_match, "alt_codes_count": sa_alt_codes_count}
 df_sa_codes = pd.DataFrame(sa_codes)
 
-# %%
-(df_options[df_options["alt_codes_count"] == 2]["selected_response"] == 2).sum()
-
 
 # %%
 # check for primacy effect
@@ -345,9 +342,6 @@ for i in range(2, 6):
 # Null hypothesis: "Respondents don't favour the first option".
 
 # %%
-df_sa_codes_no_none.sample()
-
-# %%
 for i in range(2, 6):
     df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == i]
 
@@ -371,7 +365,7 @@ for i in range(2, 6):
 check_primacy(df_sa_codes_no_none)
 
 # %% [markdown]
-# The residual value for first option being selected confirms that it was selected more often in cases, when 3 and 5 options were presented. For all options, the first option was selected more often than expected.
+# The residual value for first option being selected confirms that it was selected more often in cases, when 3 and 5 options were presented.For all options, the first option was selected more often than expected. This suggests that LLM was generally correct with its hierarchical codes selection.
 
 # %% [markdown]
 # Null hypothesis: "Respondents do not favour one of the options over other options".
@@ -553,7 +547,7 @@ row2 = [nota_many_sections, not_nota_many_sections]
 OR = contingency.odds_ratio([row1, row2])
 
 # %%
-print(OR)
+print(OR.statistic)
 
 # %% [markdown]
 # OR < 1, which means there is a negative association between homogeneity and failure (NOTA answer), i.e. when potential answers shown to the respondent are from the same section, the respondent is more likely to select an answer associated with a code, not a NOTA.
