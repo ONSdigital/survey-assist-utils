@@ -43,19 +43,21 @@ sa_closed_q = pd.read_parquet(
 cc_coded_df = pd.read_parquet(
     work_dir + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
 )
-repeated_cols = [
-    "job_title",
-    "job_description",
-    "org_description",
-    "survey_assist_open_question",
-    "survey_assist_open_question_response",
-]
+
 combined_df = sa_coded_df.merge(
-    sa_closed_q.drop(columns=repeated_cols[0:3]),
+    sa_closed_q.drop(
+        columns=sa_closed_q.columns.intersection(sa_coded_df.columns).difference(
+            ["unique_id", "user"]
+        )
+    ),
     on=["unique_id", "user"],
     how="outer",
 ).merge(
-    cc_coded_df.drop(columns=repeated_cols),
+    cc_coded_df.drop(
+        columns=cc_coded_df.columns.intersection(sa_coded_df.columns).difference(
+            ["unique_id", "user"]
+        )
+    ),
     on=["unique_id", "user"],
     how="outer",
 )
@@ -466,9 +468,7 @@ if out_dir:
 stage = "initial_codes"
 # stage = "final_codes_open_q"
 
-mask_diff = (combined_df[f"sa_{stage}"] != combined_df[f"cc_{stage}"]) & (
-    combined_df["batch_num"] <= 3 + (stage == "final")
-)
+mask_diff = combined_df[f"sa_{stage}"] != combined_df[f"cc_{stage}"]
 tmp_df = combined_df[mask_diff].copy()
 tmp_df["sa_codes_str"] = tmp_df[f"sa_{stage}"].apply(lambda x: ", ".join(sorted(x)))
 tmp_df["cc_codes_str"] = tmp_df[f"cc_{stage}"].apply(lambda x: ", ".join(sorted(x)))
@@ -502,4 +502,46 @@ pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", None)
 print(examples)
 
+# %%
+# look at examples where clerical coders were initially sure and sa not
+mask_not_needed = (combined_df["sa_initial_codes"].apply(len) > 1) & (
+    combined_df["cc_initial_codes"].apply(len) == 1
+)
+tmp_df = combined_df[mask_not_needed].copy()
+print(tmp_df["cc_initial_codes"].value_counts())
+top_two = tmp_df["cc_initial_codes"].value_counts().index[:2]
+# %%
+msk = tmp_df["cc_initial_codes"].isin(top_two) & (
+    tmp_df["sa_initial_codes"].apply(len) > 1
+)
+print(msk.sum())
+print(
+    "cc_final_open_q == 88990 for {(tmp_df.loc[msk,'cc_final_codes_open_q']!={'88990'}).sum()}"
+)
+sub_df = tmp_df.loc[
+    msk,
+    [
+        *columns[:4],
+        "sa_initial_codes",
+        "sa_final_codes_open_q",
+        "sa_final_codes_closed_q",
+        "cc_initial_codes",
+        "cc_final_codes_open_q",
+        "clerical_code_initial",
+    ],
+]
+print(sub_df)
+sub_df["cc_changed"] = sub_df["cc_initial_codes"] != sub_df["cc_final_codes_open_q"]
+sub_df["sa_final_agree_open_q"] = (
+    sub_df["cc_initial_codes"] == sub_df["sa_final_codes_open_q"]
+)
+sub_df["sa_final_agree_closed_q"] = (
+    sub_df["cc_initial_codes"] == sub_df["sa_final_codes_closed_q"]
+)
+sub_df["nota"] = sub_df["sa_final_codes_closed_q"] == set()
+print(
+    sub_df.groupby(["clerical_code_initial"])[
+        ["cc_changed", "sa_final_agree_open_q", "sa_final_agree_closed_q", "nota"]
+    ].sum()
+)
 # %%

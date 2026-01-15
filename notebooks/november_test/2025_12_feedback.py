@@ -21,7 +21,9 @@ if out_dir:
 
 # %%
 # load combined df with codability levels
-sa_coded_df = pd.read_parquet(work_dir + "/evaluation_df_with_sa_clean_codes.parquet")
+sa_coded_df = pd.read_parquet(
+    work_dir + "/evaluation_df_with_sa_clean_codes_and_sic_section.parquet"
+)
 sa_coded_df = sa_coded_df[sa_coded_df["feedback_survey_ease"] != ""].reset_index(
     drop=True
 )
@@ -34,11 +36,11 @@ sa_coded_df["nota"] = (
 sa_coded_df.loc[~sa_coded_df["dynamic_q"], "nota"] = None
 sa_coded_df["generic_open_q"] = sa_coded_df[
     "survey_assist_open_question"
-].str.startswith("What is your employer's main business activity")
+].str.startswith("What is your employer's main business activity?")
 groups = [
     "feedback_age_range",
     "dynamic_q",
-    "most_likely_sic_section",
+    "SIC Section",
     "nota",
     "generic_open_q",
 ]
@@ -89,7 +91,7 @@ titles = {
     "nota": '"None of the above" response to closed question',
     "dynamic_q": "Presented with dynamic question",
     "feedback_age_range": "Age groups",
-    "most_likely_sic_section": "SIC sections",
+    "SIC Section": "SIC sections",
 }
 for gr in groups:
     df_list = []

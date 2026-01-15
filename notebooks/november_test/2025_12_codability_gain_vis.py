@@ -144,9 +144,8 @@ def create_sankey_codability_gain_loss(
 # %%
 # create sankey diagram for CC codes
 subset_msk = {
-    "(batch 1&2)": cc_coded_df["batch_num"].isin([1, 2]),
-    "(follow-up&batch1&2)": (cc_coded_df["batch_num"].isin([1, 2]))
-    & ~cc_coded_df["survey_assist_open_question"].isna(),
+    "": cc_coded_df["batch_num"].isin([1, 2, 3]),  # clerical coding now finished
+    "(follow-up)": cc_coded_df["survey_assist_open_question"].notna(),
 }
 for subset_name, msk in subset_msk.items():
     temp_df = (
