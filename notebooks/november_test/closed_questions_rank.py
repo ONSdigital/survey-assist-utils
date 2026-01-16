@@ -15,8 +15,9 @@ import re
 
 # %%
 import dotenv
+import numpy as np
 import pandas as pd
-from scipy.stats import chisquare, contingency
+from scipy.stats import chisquare, contingency, mannwhitneyu
 
 from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
 
@@ -211,11 +212,11 @@ def get_code_rank(response_row: pd.Series) -> int | None:
         response_row (pd.Series): row with survey response
 
     Return:
-        rank (int | None): rank of the code selected.
+        code_rank (int | None): rank of the code selected.
     """
     survey_assist_alt = "survey_assist_alt_candidate_code_"
     k = 1
-    rank = 0
+    code_rank = 0
     while k < 6:
         sa_code = survey_assist_alt + str(k)
         if response_row["survey_assist_closed_question_response_code"] is None:
@@ -225,14 +226,14 @@ def get_code_rank(response_row: pd.Series) -> int | None:
             response_row[sa_code]
             == response_row["survey_assist_closed_question_response_code"]
         ):
-            rank = k
+            code_rank = k
             k = 6
         k += 1
 
     if k == 6:
-        rank = k
+        code_rank = k
 
-    return rank if rank != 6 else None
+    return code_rank if code_rank != 6 else None
 
 
 # %%
@@ -334,6 +335,25 @@ for i in range(2, 6):
     print(f"Surveys count: {df_group_sa.shape[0]}")
     print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05 {chi_pvalue > 0.05}\n")
 
+# %%
+# for the whole group, using weighted expected frequencies
+
+obs_all = df_options["selected_response"].value_counts().sort_index().values
+expected_prob = []
+for rank in range(1, 6):
+    prob = (
+        1 / df_options[df_options["alt_codes_count"] >= rank]["alt_codes_count"]
+    ).sum()
+    expected_prob.append(prob)
+exp_all = np.array(expected_prob)
+
+# %%
+chi_pvalue_all = chisquare(f_obs=obs_all, f_exp=exp_all).pvalue
+print(chi_pvalue_all)
+
+# %% [markdown]
+# Using weighted expected frequency, the p-value for the whole data collected is 0.59, which is >0.05. There is no significant deviation - the position of the options did not influence the respondents choice.
+
 # %% [markdown]
 # ### Check LLM's assumption regarding most likely code.
 #
@@ -351,7 +371,6 @@ for i in range(2, 6):
     print(f"Options presented: {i}")
     print(f"Surveys count: {df_group_sa.shape[0]}")
     print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05 {chi_pvalue > 0.05}\n")
-
 
 # %% [markdown]
 # When 2 and 4 options were presented, we do not reject the null hypothesis (pvalue > 0.05).
@@ -545,12 +564,14 @@ row1 = [nota_one_section, not_nota_one_section]
 row2 = [nota_many_sections, not_nota_many_sections]
 
 OR = contingency.odds_ratio([row1, row2])
-
-# %%
 print(OR.statistic)
 
+# %%
+CI = OR.confidence_interval(confidence_level=0.95)
+print(CI)
+
 # %% [markdown]
-# OR < 1, which means there is a negative association between homogeneity and failure (NOTA answer), i.e. when potential answers shown to the respondent are from the same section, the respondent is more likely to select an answer associated with a code, not a NOTA.
+# Odds Ratio <1, with Confidence Interval (0.33, 1.14). This suggests the difference between groups (respondents who selected NOTA and those who did not select NOTA) is not statistically significant.
 
 # %%
 # Success rate
@@ -696,7 +717,21 @@ print(
 )
 
 # %% [markdown]
-# The median response time when the closed question was asked for both, NOTA and not NOTA answers were very similar (4 seconds difference), suggesting that respondents spent the same amount of time reading and considering possible answers; neither NOTA answers came from respondents skipping through, nor the quality of the options was a problem (no options lead to respondents needing to think too much on the answers).
+# Mann-Whitney test to check for difference between median time when NOTA selected and NOTA not selected.
+# Null hypothesis: "There is no difference in the distribution of time spent between two groups".
+
+# %%
+pvalue_time = mannwhitneyu(
+    time_data_not_nota["response_time"],
+    time_data_nota["response_time"],
+    alternative="two-sided",
+).pvalue
+print(pvalue_time)
+
+# %% [markdown]
+# The median response time when the closed question was asked for both, NOTA and not NOTA answers were very similar (4 seconds difference). The p-value (0.87) using Mann-Whitney U-test suggests there is no difference between two groups.
+#
+# Respondents spent the same amount of time reading and considering possible answers; neither NOTA answers came from respondents skipping through, nor the quality of the options was a problem (no options lead to respondents needing to think too much on the answers).
 
 # %%
 # IQRs (interquartile range)
