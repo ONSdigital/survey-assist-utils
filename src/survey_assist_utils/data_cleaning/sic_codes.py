@@ -167,7 +167,6 @@ def get_clean_n_digit_codes(
         )
         return set(), set()
 
-    # Was an item in the input list invalid?
     cleaned_set: set[str] = set()
     invalid_set: set[str] = set()
 
