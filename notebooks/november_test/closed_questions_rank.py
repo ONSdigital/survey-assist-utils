@@ -17,7 +17,7 @@ import re
 import dotenv
 import numpy as np
 import pandas as pd
-from scipy.stats import chisquare, contingency, mannwhitneyu
+from scipy.stats import chisquare, contingency, mannwhitneyu, shapiro, ttest_ind
 
 from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
 
@@ -477,8 +477,23 @@ print(
     f"Average count of codes presented to the respondent when NOTA was not selected {avg_codes_count_not_nota}"
 )
 
+# %%
+# check statistical signifcance of those averages
+
+pvalue_average_options_count = ttest_ind(
+    data_nota["codes_count"], data_not_nota["codes_count"], equal_var=False
+).pvalue
+
+# %%
+print(f"p-value for average options count: {pvalue_average_options_count}")
+
 # %% [markdown]
 # This suggests that the number of optoins isn't a significant reason for NOTA to be selected.
+
+# %% [markdown]
+# Check if the ratio of options with "other" in the description had impact on the selected response.
+#
+# Null hypothesis: There is no relationship between the frequency of the word "other" in the description presented to the respondent and the respondent's final selection (one of the descriptions or NOTA).
 
 
 # %%
@@ -521,18 +536,55 @@ data_not_nota["options_with_other"] = pd.DataFrame(
 )
 
 # %%
-nota_perc = float(
-    data_nota["options_with_other"].sum() / data_nota["codes_count"].sum()
-)
-not_nota_perc = float(
-    data_not_nota["options_with_other"].sum() / data_not_nota["codes_count"].sum()
+data_nota["other_ratio"] = data_nota["options_with_other"] / data_nota["codes_count"]
+
+data_not_nota["other_ratio"] = (
+    data_not_nota["options_with_other"] / data_not_nota["codes_count"]
 )
 
 # %%
-print(f"percentage of 'other' in possible answers when nota: {round(nota_perc * 100)}%")
+pvalue_other_ratios = ttest_ind(
+    data_nota["other_ratio"], data_not_nota["other_ratio"], equal_var=False
+).pvalue
+
+# %%
+print(pvalue_other_ratios)
+
+# %% [markdown]
+# The p-value (0.047) is very close to the alpha 0.05. Check for normality of the data using Shapiro-Wilk test.
+
+# %%
+pvalue_shapiro_nota_other = shapiro(data_nota["other_ratio"]).pvalue
+pvalue_shapiro_not_nota_other = shapiro(data_not_nota["other_ratio"]).pvalue
+
+# %%
+print(pvalue_shapiro_not_nota_other)
+print(pvalue_shapiro_nota_other)
+
+# %% [markdown]
+# The data is not normally distributed (p values from Shapiro-Wilk tests for nota and not nota data subsets are close to 0). Use Mann-Whitney U test.
+
+# %%
+p_value_whitney_other = mannwhitneyu(
+    data_nota["other_ratio"], data_not_nota["other_ratio"], alternative="two-sided"
+).pvalue
+
+# %%
+print(p_value_whitney_other)
+
+# %% [markdown]
+# Again, the p-value obtained from Mann-Whitney test (0.043) is close but below to 0.05. This allows to reject the hypothesis - there is a difference.
+
+# %%
 print(
-    f"percentage of 'other' in possible answers when not nota: {round(not_nota_perc * 100)}%"
+    f"Average percentage of options containing 'other' in the options presented when NOTA selected: {data_nota['other_ratio'].mean()}"
 )
+print(
+    f"Average percentage of options containing 'other' in the options presented when NOTA not selected: {data_not_nota['other_ratio'].mean()}"
+)
+
+# %% [markdown]
+# The word 'other' appeared more often when NOTA was selected (25% v 20%). The Mann-Whitney test p value confirms that this difference is statistically significant, i.e. the more often the word 'other' appears in the descriptions presented, respondents tend to select NOTA.
 
 # %% [markdown]
 # this suggests that the proportion of "other..." is not the reason
