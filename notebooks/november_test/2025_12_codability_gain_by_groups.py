@@ -122,9 +122,9 @@ def extract_sic_section(row):
 
 combined_df["SIC Section"] = combined_df.apply(extract_sic_section, axis=1)
 
-sa_coded_df.merge(combined_df[["unique_id", "SIC Section"]]).to_parquet(
-    work_dir + "/evaluation_df_with_sa_clean_codes_and_sic_section.parquet"
-)
+# sa_coded_df.merge(combined_df[["unique_id", "SIC Section"]]).to_parquet(
+#     work_dir + "/evaluation_df_with_sa_clean_codes_and_sic_section.parquet"
+# )
 
 
 # %%
@@ -338,7 +338,7 @@ def create_codability_by_section_figure(
     fig.add_annotation(
         x=0.01,
         y=len(plot_df[group_col]) + 0.5,
-        text="SIC Section",
+        text=group_col,
         showarrow=False,
         font={"color": "black", "size": 14},
         xanchor="right",
@@ -379,7 +379,10 @@ def create_codability_by_section_figure(
 for classification_method in ["sa", "cc"]:
     for num_dig in [2, 5]:
         out_fig = create_codability_by_section_figure(
-            input_df=combined_df,
+            input_df=combined_df.rename(
+                columns={"SIC Section": "Most Likely<br>SIC Section"}
+            ),
+            group_col="Most Likely<br>SIC Section",
             coding_method=classification_method,
             num_digits=num_dig,
         )
