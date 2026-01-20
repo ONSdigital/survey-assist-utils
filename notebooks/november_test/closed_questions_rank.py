@@ -11,13 +11,19 @@ and PREPROD_DATA_BUCKET similarly.
 # pylint: disable=C0103, C0116, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
-import re
 
 # %%
 import dotenv
 import numpy as np
 import pandas as pd
-from scipy.stats import chisquare, contingency, mannwhitneyu, shapiro, ttest_ind
+from scipy.stats import (
+    chi2_contingency,
+    chisquare,
+    contingency,
+    mannwhitneyu,
+    shapiro,
+    ttest_ind,
+)
 
 from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
 
@@ -98,44 +104,6 @@ for i in range(1, 7):
 
 # %% [markdown]
 # Note, "none of the above" is always presented at the bottom of the list, which means the 6th option never brings a code. Options 1 and 2 will always have possible codes.
-
-# %%
-sic_rephrased = pd.read_csv(
-    f"{evaluation_bucket}sic_rephrased_descriptions_2025_02_03.csv", dtype=str
-)
-
-
-# %%
-def convert_to_dict(dict_string):
-    clean_string = dict_string.strip().strip("'")
-
-    code = re.search(r"{Code: \s*(.*?),\s*Title: ", clean_string, re.DOTALL)
-    code_value = code.group(1).strip() if code else ""
-
-    title = re.search(
-        r"Title: \s*(.*?),\s*Example activities: ", clean_string, re.DOTALL
-    )
-    title_value = title.group(1).strip() if title else ""
-    title_value = title_value.lower()
-
-    activities = re.search(r"Example activities: \s*(.*?)\s*}", clean_string, re.DOTALL)
-    activities_value = activities.group(1).strip() if activities else ""
-
-    result_dictionary = {
-        "Code": code_value,
-        "Title": title_value,
-        "Example activities": activities_value,
-    }
-    return result_dictionary
-
-
-# %%
-sic_rephrased["reviewed_description"] = sic_rephrased[
-    "reviewed_description"
-].str.lower()
-sic_rephrased["llm_rephrased_description"] = sic_rephrased[
-    "llm_rephrased_description"
-].str.lower()
 
 # %%
 # we get "None" when the closed question was not asked or the answer was "none of the above"
@@ -587,9 +555,6 @@ print(
 # The word 'other' appeared more often when NOTA was selected (25% v 20%). The Mann-Whitney test p value confirms that this difference is statistically significant, i.e. the more often the word 'other' appears in the descriptions presented, respondents tend to select NOTA.
 
 # %% [markdown]
-# this suggests that the proportion of "other..." is not the reason
-
-# %% [markdown]
 #
 # Calculate the **odds ratio** now.
 #
@@ -619,6 +584,10 @@ OR = contingency.odds_ratio([row1, row2])
 print(OR.statistic)
 
 # %%
+print(row1)
+print(row2)
+
+# %%
 CI = OR.confidence_interval(confidence_level=0.95)
 print(CI)
 
@@ -626,7 +595,7 @@ print(CI)
 # Odds Ratio <1, with Confidence Interval (0.33, 1.14). This suggests the difference between groups (respondents who selected NOTA and those who did not select NOTA) is not statistically significant.
 
 # %%
-# Success rate
+# Success rate with one v multiple sections
 
 same_section = not_nota_one_section / (nota_one_section + not_nota_one_section)
 multiple_sections = not_nota_many_sections / (
@@ -639,10 +608,21 @@ print(
     f"Success rate when options presented from multiple sections: {multiple_sections}"
 )
 
+# %%
+contingency_table = np.array(
+    [
+        [not_nota_one_section, nota_one_section],
+        [not_nota_many_sections, nota_many_sections],
+    ]
+)
+
+p_value_success_rate = chi2_contingency(contingency_table).pvalue
+
+# %%
+print(p_value_success_rate)
+
 # %% [markdown]
-# same section > multiple sections, which suggests that the codes prsented are 84% successful when from the same section, and 77% success when from multiple sections.
-#
-# All above, suggest that sections are **not** the reason for respondent selecting NOTA.
+# The p-value for success rate is 0.15. There is no statistical significance between number of secctions the presented options came from.
 
 # %% [markdown]
 # ### Time it took the respondent to answer the survey
