@@ -18,10 +18,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 from scipy.stats import binomtest, chisquare
 
-from survey_assist_utils.data_cleaning.prep_data import (
-    get_clean_n_digit_codes,
-    parse_numerical_code,
-)
+from notebooks.november_test.helper_load_data import load_data
 
 # %%
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
@@ -32,60 +29,7 @@ out_dir = (
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
-# %%
-# load combined df with codability levels
-sa_coded_df = pd.read_parquet(
-    work_dir + "/evaluation_df_with_sa_clean_codes_and_sic_section.parquet"
-)
-sa_closed_q = pd.read_parquet(
-    work_dir + "/closed_questions/closed_questions_codes.parquet"
-)
-cc_coded_df = pd.read_parquet(
-    work_dir + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
-)
-
-combined_df = sa_coded_df.merge(
-    sa_closed_q.drop(
-        columns=sa_closed_q.columns.intersection(sa_coded_df.columns).difference(
-            ["unique_id", "user"]
-        )
-    ),
-    on=["unique_id", "user"],
-    how="outer",
-).merge(
-    cc_coded_df.drop(
-        columns=cc_coded_df.columns.intersection(sa_coded_df.columns).difference(
-            ["unique_id", "user"]
-        )
-    ),
-    on=["unique_id", "user"],
-    how="outer",
-)
-
-print(
-    f"Loaded data with {combined_df.shape[0]} records. "
-    f"Merging clerical ({cc_coded_df.shape[0]}) with model data ({sa_coded_df.shape[0]}) "
-    f"and closed q data ({sa_closed_q.shape[0]})."
-)
-
-# %%
-# parquet doesn't like sets it saves it as arrays, convert back
-set_cols = [
-    "sa_initial_codes",
-    "sa_final_codes_open_q",
-    "cc_initial_codes",
-    "cc_final_codes_open_q",
-]
-
-for col in set_cols:
-    msk = combined_df[col].notna()
-    combined_df.loc[msk, col] = combined_df.loc[msk, col].apply(set)
-    combined_df.loc[~msk, col] = [set() for _ in range(msk.sum(), combined_df.shape[0])]
-
-# and convert closed q codes to set for consistency
-combined_df["sa_final_codes_closed_q"] = combined_df[
-    "survey_assist_closed_question_response_code"
-].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
+combined_df = load_data(work_dir)
 
 
 # %%
