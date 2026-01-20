@@ -90,6 +90,8 @@ clerical_codes_df = initial_cc_df.merge(
     how="outer",
     suffixes=("_initial", "_final"),
 )
+clerical_codes_df = clerical_codes_df[~clerical_codes_df.user.isna()]
+
 print(f"Total records with clerical codes: {len(clerical_codes_df)}")
 
 # %%
@@ -102,11 +104,14 @@ clerical_codes_df = clerical_codes_df.merge(
 print(clerical_codes_df[clerical_codes_df["cc_initial_codes_invalid"].apply(len) > 0])
 
 # %%
-# deal with invalid codes manually
+# deal with invalid codes manually (in initial clerical codes column)
 replace_dict = {
     "62xxx, 63xxx, 95100": "62xxx, 63xxx, 951xx",
     "86xx": "86xxx",
     "71229": "71129",
+    "86101, 86222, 86210, 86900": "86101, 86220, 86210, 86900",
+    "86101, 47330": "86101, 47730",
+    "10890, 21100, 21200, 47729, 47910, 46380, 46460,47290,46180": "10890, 21100, 21200, 47910, 46380, 46460, 47290, 46180",
 }
 clerical_codes_df["sic_ind_occ1"] = clerical_codes_df["sic_ind_occ1"].replace(
     replace_dict
@@ -131,7 +136,7 @@ print(
 )
 
 # %%
-# deal with invalid codes manually
+# deal with invalid codes manually (in final clerical codes column)
 replace_dict = {
     "52301, 52302, 52290": "53201, 53202, 52290",
     "84xx": "84xxx",
