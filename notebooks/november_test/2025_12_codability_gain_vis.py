@@ -145,7 +145,7 @@ def create_sankey_codability_gain_loss(
 # create sankey diagram for CC codes
 subset_msk = {
     "": cc_coded_df["batch_num"].isin([1, 2, 3]),  # clerical coding now finished
-    "(follow-up)": cc_coded_df["survey_assist_open_question"].notna(),
+    "(follow-up subset)": cc_coded_df["survey_assist_open_question"].notna(),
 }
 for subset_name, msk in subset_msk.items():
     temp_df = (
@@ -174,12 +174,8 @@ for subset_name, msk in subset_msk.items():
     )
     fig.show()
     if out_dir:
-        fig.write_image(
-            f"{out_dir}/cc_codability_gain_sankey_followup_{subset_name}_q.png"
-        )
-        fig.write_html(
-            f"{out_dir}/cc_codability_gain_sankey_followup_{subset_name}_q.html"
-        )
+        fig.write_image(f"{out_dir}/cc_codability_gain_sankey_{subset_name}.png")
+        fig.write_html(f"{out_dir}/cc_codability_gain_sankey_{subset_name}.html")
 
 # %%
 # create sankey diagram for SA codes
@@ -210,12 +206,8 @@ for question_type in ["open", "closed"]:
     )
     fig.show()
     if out_dir:
-        fig.write_image(
-            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.png"
-        )
-        fig.write_html(
-            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.html"
-        )
+        fig.write_image(f"{out_dir}/sa_codability_gain_sankey_{question_type}_q.png")
+        fig.write_html(f"{out_dir}/sa_codability_gain_sankey_{question_type}_q.html")
 
 
 # %%
