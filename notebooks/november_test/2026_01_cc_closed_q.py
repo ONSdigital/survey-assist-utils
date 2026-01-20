@@ -34,19 +34,18 @@ combined_df = load_data(work_dir)
 
 # %%
 # is the answer to the closed question in CC initial/final codes?
-mask_closed_q_selected = combined_df["sa_final_codes_closed_q"].apply(len) == 1
-cc_coded_batches = {"initial": (1, 2), "final": (1, 2)}
+mask_closed_q_selected = (
+    combined_df["sa_final_codes_closed_q"].apply(len) == 1
+) & combined_df["survey_assist_open_question"].notna()
 for method in ["sa", "cc"]:
-    for stage, batches in cc_coded_batches.items():
+    for stage in ["initial", "final"]:
         out_col_name = f"closed_q_in_{method}_{stage}_codes"
         cc_col_name = (
             f"{method}_initial_codes"
             if stage == "initial"
             else f"{method}_final_codes_open_q"
         )
-        closed_df = combined_df[
-            mask_closed_q_selected & (combined_df["batch_num"].isin(batches))
-        ].copy()
+        closed_df = combined_df[mask_closed_q_selected].copy()
         closed_df[out_col_name] = closed_df.apply(
             lambda row, cc_col_name=cc_col_name: row[
                 "sa_final_codes_closed_q"
@@ -55,14 +54,12 @@ for method in ["sa", "cc"]:
         )
         prop_in_codes = closed_df[out_col_name].mean()
         print(
-            f"Proportion of closed question codes found in {method} {stage} codes "
-            f"for batches {batches}: {prop_in_codes:.3f} "
-            f"({closed_df.shape[0]} records considered)"
+            f"Proportion of closed question codes found in {method} {stage} codes: "
+            f"{prop_in_codes:.3f} ({closed_df.shape[0]} records considered)"
         )
 
 # %%
 # get rank distributions
-
 closed_df = combined_df[mask_closed_q_selected].copy()
 
 closed_df["closed_q_num_options"] = closed_df["sa_initial_codes"].apply(len)
