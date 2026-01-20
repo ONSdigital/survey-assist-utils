@@ -40,8 +40,9 @@ group_df = combine_small_groups(
 # %%
 eval_metrics = {}
 stage_cols = {
-    "Initial": ("cc_initial_codes", "sa_initial_codes"),
-    "Final (Open Question)": ("cc_final_codes_open_q", "sa_final_codes_open_q"),
+    "SA Initial": ("cc_initial_codes", "sa_initial_codes"),
+    "SA Final Open Q": ("cc_final_codes_open_q", "sa_final_codes_open_q"),
+    "SA Final Closed Q": ("cc_final_codes_open_q", "sa_final_codes_closed_q"),
 }
 for stage, col_names in stage_cols.items():
     for DIGITS in [2, 5]:
@@ -108,7 +109,7 @@ def create_codability_by_section_figure(
         A Plotly Figure object representing the codability by SIC sections.
     """
     plot_df_melted = input_df.melt(
-        id_vars=[group_col, "num_responses"],
+        id_vars=[group_col, "num_responses", "Stage"],
         value_vars=metrics,
         var_name="Metrics",
     ).reset_index(drop=True)
@@ -122,30 +123,28 @@ def create_codability_by_section_figure(
         plot_df_melted,
         x="value",
         y=group_col,
-        color="Metrics",
+        color="Stage",
+        symbol="Stage",
         template="plotly_white",
         facet_col="Metrics",
         title=title,
     )
     fig.update_traces(
-        marker={"size": 10, "opacity": 0.9},
+        marker={"size": 10, "opacity": 0.8},
     )
-    # remove axis lable
     fig.update_yaxes(title_text="")
     fig.update_xaxes(tickformat=".0%", title_text="")
-    # facet annotations - drop initial part
     for annotation in fig.layout.annotations:
         annotation.text = annotation.text.split("=", 1)[1]
         annotation.font.size = 15
         for trace in fig.data:
-            if trace.name == annotation.text:
+            if trace.name.startswith(annotation.text):
                 annotation.font.color = trace.marker.color
-            # move lower
-            annotation.y -= 0.017
+            annotation.y -= 0.006
 
     fig.add_annotation(
         x=0,
-        y=len(plot_df[group_col]) / 4 + 0.5,
+        y=len(plot_df[group_col]) / 6 + 0.5,
         text=group_col,
         showarrow=False,
         font={"color": "black", "size": 14},
@@ -155,7 +154,7 @@ def create_codability_by_section_figure(
     # add annoptation on the right hand side with total number of responses
     fig.add_annotation(
         x=1.06,
-        y=len(plot_df[group_col]) / 4 + 0.5,
+        y=len(plot_df[group_col]) / 6 + 0.5,
         text="Count",
         showarrow=False,
         font={"color": "black", "size": 14},
@@ -175,9 +174,16 @@ def create_codability_by_section_figure(
         )
 
     fig.update_layout(
-        width=1000,
+        width=400 + 150 * len(metrics),
         height=600,
-        showlegend=False,
+        legend={
+            "title_text": "",
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
     )
 
     return fig
@@ -190,6 +196,7 @@ metrics_list = [
         "Precision",
         "Recall",
         "F1",
+        "Accuracy",
     ],
     [
         "OO Accuracy",
@@ -198,35 +205,31 @@ metrics_list = [
         "MM Accuracy",
     ],
 ]
-for stage in stage_cols:
-    for num_dig in [2, 5]:
-        subplot_df = plot_df[
-            (plot_df["Stage"] == stage) & (plot_df["digits"] == str(num_dig))
-        ].reset_index(drop=True)
-        print(f"Creating figures for stage {stage} and {num_dig} digits...")
-        for metric in metrics_list:
-            out_fig = create_codability_by_section_figure(
-                subplot_df,
-                metrics=metric,
-                group_col="Most Likely<br>SIC Section",
-                title=f"CC-SA Agreement metrics to {num_dig}-digits by SIC Section at {stage} stage",
+
+for num_dig in [2, 5]:
+    for metric in metrics_list:
+        out_fig = create_codability_by_section_figure(
+            plot_df[plot_df["digits"] == str(num_dig)].reset_index(drop=True),
+            metrics=metric,
+            group_col="Most Likely<br>SIC Section",
+            title=f"CC-SA Agreement metrics to {num_dig}-digits by SIC Section",
+        )
+
+        out_fig.show()
+
+        if out_dir:
+            file_name = f"cc_sa_comparison_by_sic_{num_dig}digits_" + "_".join(
+                [m.lower().replace(" ", "_") for m in metric]
             )
-
-            out_fig.show()
-
-            if out_dir:
-                file_name = f"cc_sa_comparison_by_sic_{num_dig}digits_" + "_".join(
-                    [m.lower().replace(" ", "_") for m in metric]
-                )
-                out_fig.write_image(
-                    os.path.join(
-                        out_dir,
-                        file_name + ".png",
-                    ),
-                    scale=2,
-                )
-                out_fig.write_html(
-                    os.path.join(out_dir, file_name + ".html"),
-                )
+            out_fig.write_image(
+                os.path.join(
+                    out_dir,
+                    file_name + ".png",
+                ),
+                scale=2,
+            )
+            out_fig.write_html(
+                os.path.join(out_dir, file_name + ".html"),
+            )
 
 # %%

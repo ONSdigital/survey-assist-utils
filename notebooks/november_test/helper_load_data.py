@@ -63,6 +63,11 @@ def load_data(work_dir: str) -> pd.DataFrame:
     combined_df["sa_final_codes_closed_q"] = combined_df[
         "survey_assist_closed_question_response_code"
     ].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
+    # use initial codes where no closed q asked
+    msk = combined_df["survey_assist_open_question"].isna()
+    combined_df.loc[msk, "sa_final_codes_closed_q"] = combined_df.loc[
+        msk, "sa_initial_codes"
+    ]
 
     return combined_df
 
