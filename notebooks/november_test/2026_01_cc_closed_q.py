@@ -87,6 +87,10 @@ closed_df["closed_q_rank_llm"] = closed_df.apply(
 )
 print(closed_df["closed_q_rank_llm"].value_counts())
 
+tmp_df = combined_df[combined_df["survey_assist_open_question"].notna()].copy()
+tmp_df["closed_q_num_options"] = tmp_df["sa_initial_codes"].apply(len)
+tmp_df["sa_closed_q_responded"] = tmp_df["sa_final_codes_closed_q"].apply(len) > 0
+print(tmp_df.groupby(tmp_df["closed_q_num_options"])["sa_closed_q_responded"].mean())
 
 # %%
 # chi-square tests for rank distributions by option size
@@ -140,6 +144,18 @@ print(
 print(
     f"  LLM rank: statistic={chisq_llm.statistic:.2f}, p-value={chisq_llm.pvalue:.4f} "
 )
+
+# chi-square for how likely they are to select none of the above by option size
+obs_counts = tmp_df.groupby(tmp_df["closed_q_num_options"])[
+    "sa_closed_q_responded"
+].sum()
+exp_counts = (
+    tmp_df.groupby(tmp_df["closed_q_num_options"]).size()
+    * tmp_df["sa_closed_q_responded"].mean()
+)
+chisq_nota = chisquare(obs_counts, f_exp=exp_counts)
+print("Chi-square test for selecting none of the above by option size: ")
+print(f"  statistic={chisq_nota.statistic:.2f}, p-value={chisq_nota.pvalue:.4f} ")
 
 # %%
 # visualise rank distributions
@@ -247,11 +263,11 @@ method = "cc"
 msk = (
     combined_df[f"{method}_final_codability_level_open_q"] == "Sub-class (5-digits)"
 ) & ~combined_df["survey_assist_open_question"].isna()
-combined_df[f"{method}_final_codes_open_q_within_initial_options"] = combined_df.apply(
+combined_df[f"{method}_final_codes_open_q_within_offered_options"] = combined_df.apply(
     lambda row: row[f"{method}_final_codes_open_q"].issubset(row["sa_initial_codes"]),
     axis=1,
 )
-combined_df[f"{method}_final_codes_open_q_selected_by_user_in_closed"] = (
+combined_df[f"{method}_final_codes_open_q_vs_selected_by_user_in_closed"] = (
     combined_df.apply(
         lambda row: (
             "none of the above"
@@ -269,8 +285,8 @@ combined_df[f"{method}_final_codes_open_q_selected_by_user_in_closed"] = (
 )
 combined_df[msk].groupby(
     [
-        f"{method}_final_codes_open_q_selected_by_user_in_closed",
-        f"{method}_final_codes_open_q_within_initial_options",
+        f"{method}_final_codes_open_q_vs_selected_by_user_in_closed",
+        f"{method}_final_codes_open_q_within_offered_options",
     ]
 ).size().unstack(fill_value=0)
 
