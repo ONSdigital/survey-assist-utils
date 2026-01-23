@@ -287,7 +287,7 @@ check_primacy(df_options)
 
 # %%
 # remove all rows that didn't get the closed question asked
-df_sa_codes_no_none = df_sa_codes[df_sa_codes["selected_response"] != "None"]
+df_sa_codes_no_none = df_sa_codes[~df_sa_codes["selected_response"].isna()]
 
 # %%
 # check if any of the options was selected more often than others. If p-values are > 0.05, then there is no significant difference in the responses seleted.
@@ -301,7 +301,9 @@ for i in range(2, 6):
 
     print(f"Options presented: {i}")
     print(f"Surveys count: {df_group_sa.shape[0]}")
-    print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05 {chi_pvalue > 0.05}\n")
+    print(
+        f"p-value: {round(chi_pvalue, 2)}\nGreater than alpha 0.05: {chi_pvalue > 0.05}\n"
+    )
 
 # %%
 # for the whole group, using weighted expected frequencies
@@ -331,6 +333,9 @@ print(chi_pvalue_all)
 
 # %%
 for i in range(2, 6):
+    df_sa_codes_no_none = df_sa_codes_no_none[
+        ~df_sa_codes_no_none["selected_response"].isna()
+    ]
     df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == i]
 
     observed_count = df_group_sa["selected_response"].value_counts().values
@@ -338,7 +343,7 @@ for i in range(2, 6):
 
     print(f"Options presented: {i}")
     print(f"Surveys count: {df_group_sa.shape[0]}")
-    print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05 {chi_pvalue > 0.05}\n")
+    print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05: {chi_pvalue > 0.05}\n")
 
 # %% [markdown]
 # When 2 and 4 options were presented, we do not reject the null hypothesis (pvalue > 0.05).
@@ -374,9 +379,15 @@ full_data = pd.read_parquet(
 data["sa_initial_codes"] = full_data["sa_initial_codes"]
 
 # %%
-data_nota = data[data["survey_assist_closed_question_response"] == "none of the above"]
-data_not = data[data["survey_assist_closed_question_response"] != "none of the above"]
-data_not_nota = data_not[data_not["survey_assist_closed_question_response"].notna()]
+data_closed_question = data[data["survey_assist_closed_question_response"].notna()]
+data_nota = data_closed_question[
+    data_closed_question["survey_assist_closed_question_response"]
+    == "none of the above"
+]
+data_not_nota = data_closed_question[
+    data_closed_question["survey_assist_closed_question_response"]
+    != "none of the above"
+]
 
 # %%
 # check against sections
@@ -425,7 +436,7 @@ count_codes = 0
 for data_row in range(len(df_check)):
     sections += len(df_check["unique_sections"].iloc[data_row])
     count_codes += df_check["codes_count"].iloc[data_row]
-print(sections / count_codes)
+print(count_codes / sections)
 
 # %%
 # Average number of codes shown
@@ -437,12 +448,12 @@ avg_codes_count_nota = data_nota["codes_count"].sum() / len(data_nota)
 avg_codes_count_not_nota = data_not_nota["codes_count"].sum() / len(data_not_nota)
 
 # %%
-print(f"Average count of codes presented to the respondent {avg_codes_count}")
+print(f"Average count of codes presented to the respondent {round(avg_codes_count, 5)}")
 print(
-    f"Average count of codes presented to the respondent when NOTA was selected {avg_codes_count_nota}"
+    f"Average count of codes presented to the respondent when NOTA was selected {round(avg_codes_count_nota, 5)}"
 )
 print(
-    f"Average count of codes presented to the respondent when NOTA was not selected {avg_codes_count_not_nota}"
+    f"Average count of codes presented to the respondent when NOTA was not selected {round(avg_codes_count_not_nota, 5)}"
 )
 
 # %%
@@ -556,7 +567,7 @@ print(
 
 # %% [markdown]
 #
-# Calculate the **odds ratio** now.
+# Calculate the **odds ratio** for sections.
 #
 # ||NOTA selected|Othar than NOTA|
 # |---|---|---|
@@ -622,7 +633,7 @@ p_value_success_rate = chi2_contingency(contingency_table).pvalue
 print(p_value_success_rate)
 
 # %% [markdown]
-# The p-value for success rate is 0.15. There is no statistical significance between number of secctions the presented options came from.
+# The p-value for success rate is 0.15. There is no statistical significance between number of sections the presented options came from.
 
 # %% [markdown]
 # ### Time it took the respondent to answer the survey
@@ -844,6 +855,14 @@ print(
     round(data_not_none_multi_section["response_time"].median()),
     "seconds",
 )
+
+# %%
+pvalue_time_sections = mannwhitneyu(
+    data_not_none_one_section["response_time"],
+    data_not_none_multi_section["response_time"],
+    alternative="two-sided",
+).pvalue
+print(pvalue_time_sections)
 
 # %% [markdown]
 # There is 16 seconds difference between the median time it takes to select any answer (one associated with a code, or NOTA). When options are from multiple sections, the time it takes to make a decision is longer (152s), than when all options are from one section (136s).
