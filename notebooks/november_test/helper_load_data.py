@@ -77,6 +77,7 @@ def combine_small_groups(
     group_col: str = "SIC Section",
     group_size_threshold: int = 30,
     add_total: bool = True,
+    manual_groups: tuple | None = (("B", "D", "E"), ("R", "S", "T")),
 ) -> pd.DataFrame:
     """Combine small groups in the specified column into an 'Other' category.
 
@@ -86,18 +87,33 @@ def combine_small_groups(
         group_size_threshold: Minimum size of group to be shown separately.
             Groups smaller than this will be combined.
         add_total: Whether to add a 'Total' group aggregating all data.
+        manual_groups: List of lists, where each sublist contains group names
+            to be combined together manually before applying the size threshold.
 
     Returns:
         DataFrame with small groups combined into 'Other'.
     """
     temp_df = input_df.copy()
+
+    if manual_groups:
+        for group in manual_groups:
+            msk = temp_df[group_col].isin(group)
+            temp_df.loc[msk, group_col] = ",".join(group)
+
     section_sizes = temp_df[group_col].value_counts(dropna=False)
     temp_df1 = temp_df.copy()
     too_small = sorted(
         section_sizes[section_sizes < group_size_threshold].index.tolist()
     )
-    msk_small = temp_df1[group_col].isin(too_small)
-    temp_df1.loc[msk_small, group_col] = "Suppressed:<br>" + ",".join(too_small)
+
+    if too_small:
+        print(
+            f"Combining {len(too_small)} groups smaller than {group_size_threshold} together:"
+            f"{section_sizes[section_sizes < group_size_threshold].to_dict()}"
+        )
+        msk_small = temp_df1[group_col].isin(too_small)
+        temp_df1.loc[msk_small, group_col] = "Suppressed:<br>" + ",".join(too_small)
+
     if not add_total:
         return temp_df1
 

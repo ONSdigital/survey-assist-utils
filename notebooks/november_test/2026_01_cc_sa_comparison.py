@@ -15,7 +15,6 @@ import os
 import dotenv
 import pandas as pd
 import plotly.express as px
-from scipy.stats import binomtest
 
 from notebooks.november_test.helper_load_data import load_data
 from survey_assist_utils.data_cleaning.prep_data import get_clean_n_digit_codes
@@ -295,111 +294,6 @@ for DIGITS in [5, 2]:
             fig.write_html(
                 f"{out_dir}/cc_sa_initial_codes_{lab.lower().replace('-', '_')}_confusion_matrix_{DIGITS}digits.html"
             )
-
-
-# %%
-# histogram by section (digits=0)
-df_section = {}
-for i, (stage, cols) in enumerate(stage_cols.items()):
-    for col in cols:
-        if col in df_section:
-            continue
-        print(f"Processing section distribution for column {col}...")
-        msk = combined_df[col + "_to_0digits"].notna()
-        df_section[col] = (
-            combined_df.loc[msk, col + "_to_0digits"]
-            .map(lambda x: next(iter(x)) if len(x) == 1 else None)
-            .dropna()
-            .to_frame(name="sic_section")
-        )
-        df_section[col]["source"] = f"{col.split('_')[0].upper()} {stage}"
-        df_section[col]["ind"] = i  # for ordering traces in plot
-
-
-plot_df_section = (
-    pd.concat(df_section.values(), ignore_index=True)
-    .dropna(subset=["sic_section"])
-    .groupby(
-        [
-            "sic_section",
-            "ind",
-            "source",
-        ]
-    )
-    .size()
-    .reset_index()
-    .rename(columns={0: "count"})
-)
-
-plot_df_section["sample_size"] = plot_df_section.groupby("source")["count"].transform(
-    "sum"
-)
-plot_df_section["Frequency"] = plot_df_section.groupby("source")["count"].transform(
-    lambda x: x / x.sum()
-)
-
-
-def add_proportion_confint(prop: float, nobs: int, alpha=0.05):
-    """Calculate confidence interval for a proportion."""
-    ci = binomtest(int(prop * nobs), nobs).proportion_ci(confidence_level=1 - alpha)
-    return prop - ci.low, ci.high - prop
-
-
-plot_df_section[["error_y_minus", "error_y_plus"]] = plot_df_section.apply(
-    lambda row: pd.Series(
-        add_proportion_confint(prop=row["Frequency"], nobs=row["sample_size"])
-    ),
-    axis=1,
-)
-
-fig = px.bar(
-    plot_df_section,
-    x="sic_section",
-    y="Frequency",
-    color="source",
-    barmode="group",
-    title="Distribution of unambiguously coded responses at SIC Section level",
-    template="simple_white",
-    error_y="error_y_plus",
-    error_y_minus="error_y_minus",
-    hover_data={"count": True, "sample_size": True},
-)
-
-fig.update_xaxes(
-    title="SIC Section",
-    categoryorder="category ascending",
-    showgrid=True,
-    gridcolor="lightgrey",
-    ticks="outside",
-    showline=True,
-    mirror=True,
-    zeroline=False,
-    dtick=1,
-    tickson="boundaries",
-)
-
-# make the ci lines thinner
-fig.update_traces(error_y={"thickness": 1, "width": 2})
-fig.update_yaxes(showgrid=True, gridcolor="lightgrey", tickformat=".0%")
-
-# legend on top, no title
-fig.update_layout(
-    legend={
-        "title_text": "",
-        "orientation": "h",
-        "yanchor": "bottom",
-        "y": 1.02,
-        "xanchor": "right",
-        "x": 1,
-    }
-)
-
-fig.update_layout(height=500, width=1400)
-fig.show()
-
-if out_dir:
-    fig.write_image(f"{out_dir}/cc_sa_sic_section_distribution.png")
-    fig.write_html(f"{out_dir}/cc_sa_sic_section_distribution.html")
 
 
 # %%
