@@ -11,7 +11,6 @@ and PREPROD_DATA_BUCKET similarly.
 # pylint: disable=C0103, C0116, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
-
 # %%
 import dotenv
 import numpy as np
@@ -20,6 +19,7 @@ from scipy.stats import (
     chi2_contingency,
     chisquare,
     contingency,
+    fisher_exact,
     mannwhitneyu,
     shapiro,
     ttest_ind,
@@ -393,11 +393,12 @@ data_not_nota = data_closed_question[
 # check against sections
 
 
-def possible_sections(response_row: pd.Series):
+def possible_sections(response_row: pd.Series, code_digits: int = 0):
     """Checks the count of options presented to the user. Counts the number of unique sections of the presented options, and adds to the dataframe.
 
     Args:
         response_row (pd.Series): a row containing survey results.
+        code_digits (int): number of SIC code digits
     """
     column_placeholder = "survey_assist_alt_candidate_code_"
     unique_section_list_by_row = []
@@ -412,7 +413,9 @@ def possible_sections(response_row: pd.Series):
             codes += 1
         k += 1
 
-    unique_section_list_by_row = list(get_clean_n_digit_codes(row_codes, n=0)[0])
+    unique_section_list_by_row = list(
+        get_clean_n_digit_codes(row_codes, n=code_digits)[0]
+    )
 
     return unique_section_list_by_row, codes
 
@@ -431,40 +434,59 @@ data_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
 df_check = data_not_nota
 # df_check = data_nota
 
-sections = 0
-count_codes = 0
-for data_row in range(len(df_check)):
-    sections += len(df_check["unique_sections"].iloc[data_row])
-    count_codes += df_check["codes_count"].iloc[data_row]
-print(count_codes / sections)
+# sections = 0
+# count_codes = 0
+# for data_row in range(len(df_check)):
+#     sections += len(df_check["unique_sections"].iloc[data_row])
+#     count_codes += df_check["codes_count"].iloc[data_row]
+# print(count_codes / sections)
 
 # %%
-# Average number of codes shown
+codes_count = {}
+for i in range(2, 6):
+    success = len(data_not_nota[data_not_nota["codes_count"] == i])
+    failure = len(data_nota[data_nota["codes_count"] == i])
+    codes_count[i] = [success]
+    codes_count[i].append(failure)
+df_codes_count = pd.DataFrame(codes_count, index=["success", "failure"]).T
 
-avg_codes_count = (
-    data_not_nota["codes_count"].sum() + data_nota["codes_count"].sum()
-) / (len(data_not_nota) + len(data_nota))
-avg_codes_count_nota = data_nota["codes_count"].sum() / len(data_nota)
-avg_codes_count_not_nota = data_not_nota["codes_count"].sum() / len(data_not_nota)
-
-# %%
-print(f"Average count of codes presented to the respondent {round(avg_codes_count, 5)}")
-print(
-    f"Average count of codes presented to the respondent when NOTA was selected {round(avg_codes_count_nota, 5)}"
-)
-print(
-    f"Average count of codes presented to the respondent when NOTA was not selected {round(avg_codes_count_not_nota, 5)}"
-)
 
 # %%
-# check statistical signifcance of those averages
-
-pvalue_average_options_count = ttest_ind(
-    data_nota["codes_count"], data_not_nota["codes_count"], equal_var=False
-).pvalue
+pvalue_codes_count = chi2_contingency(df_codes_count).pvalue
 
 # %%
-print(f"p-value for average options count: {pvalue_average_options_count}")
+print(pvalue_codes_count)
+
+# %% [markdown]
+# The p-value for the number of codes presented vs success (selecting one of the options, not NOTA) is 0.57, which means there is no evidence that the number of options influenced the decision.
+
+# %%
+# # Average number of codes shown
+
+# avg_codes_count = (
+#     data_not_nota["codes_count"].sum() + data_nota["codes_count"].sum()
+# ) / (len(data_not_nota) + len(data_nota))
+# avg_codes_count_nota = data_nota["codes_count"].sum() / len(data_nota)
+# avg_codes_count_not_nota = data_not_nota["codes_count"].sum() / len(data_not_nota)
+
+# %%
+# print(f"Average count of codes presented to the respondent {round(avg_codes_count, 5)}")
+# print(
+#     f"Average count of codes presented to the respondent when NOTA was selected {round(avg_codes_count_nota, 5)}"
+# )
+# print(
+#     f"Average count of codes presented to the respondent when NOTA was not selected {round(avg_codes_count_not_nota, 5)}"
+# )
+
+# %%
+# # check statistical signifcance of those averages
+
+# pvalue_average_options_count = ttest_ind(
+#     data_nota["codes_count"], data_not_nota["codes_count"], equal_var=False
+# ).pvalue
+
+# %%
+# print(f"p-value for average options count: {pvalue_average_options_count}")
 
 # %% [markdown]
 # This suggests that the number of optoins isn't a significant reason for NOTA to be selected.
@@ -582,14 +604,14 @@ not_nota_sections_count = data_not_nota["unique_sections"].str.len()
 
 # %%
 nota_one_section = (nota_sections_count == 1).sum()
-nota_many_sections = (nota_sections_count > 1).sum()
+nota_many_section = (nota_sections_count > 1).sum()
 
 not_nota_one_section = (not_nota_sections_count == 1).sum()
-not_nota_many_sections = (not_nota_sections_count > 1).sum()
+not_nota_many_section = (not_nota_sections_count > 1).sum()
 
 # %%
 row1 = [nota_one_section, not_nota_one_section]
-row2 = [nota_many_sections, not_nota_many_sections]
+row2 = [nota_many_section, not_nota_many_section]
 
 OR = contingency.odds_ratio([row1, row2])
 print(OR.statistic)
@@ -606,24 +628,80 @@ print(CI)
 # Odds Ratio <1, with Confidence Interval (0.33, 1.14). This suggests the difference between groups (respondents who selected NOTA and those who did not select NOTA) is not statistically significant.
 
 # %%
-# Success rate with one v multiple sections
+# check the same for 2-digit codes
+# prepare division unique codes
 
-same_section = not_nota_one_section / (nota_one_section + not_nota_one_section)
-multiple_sections = not_nota_many_sections / (
-    nota_many_sections + not_nota_many_sections
+data_not_nota[["unique_divisions", "codes_count_division"]] = pd.DataFrame(
+    data_not_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
+    index=data_not_nota.index,
+)
+data_nota[["unique_divisions", "codes_count_division"]] = pd.DataFrame(
+    data_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
+    index=data_nota.index,
 )
 
 # %%
-print(f"Success rate when options presented from the same section: {same_section}")
-print(
-    f"Success rate when options presented from multiple sections: {multiple_sections}"
+nota_divisions_count = data_nota["unique_divisions"].str.len()
+not_nota_divisions_count = data_not_nota["unique_divisions"].str.len()
+
+# %%
+nota_one_division = (nota_divisions_count == 1).sum()
+nota_many_division = (nota_divisions_count > 1).sum()
+
+not_nota_one_division = (not_nota_divisions_count == 1).sum()
+not_nota_many_division = (not_nota_divisions_count > 1).sum()
+
+# %%
+row1_division = [nota_one_division, not_nota_one_division]
+row2_division = [nota_many_division, not_nota_many_division]
+
+OR_division = contingency.odds_ratio([row1_division, row2_division])
+print(OR_division.statistic)
+
+# %%
+print(row1_division)
+print(row2_division)
+
+# %%
+CI_division = OR_division.confidence_interval(confidence_level=0.95)
+print(CI_division)
+
+# %%
+success_one_division = not_nota_one_division / (
+    nota_one_division + not_nota_one_division
 )
+success_multiple_division = not_nota_many_division / (
+    nota_many_division + not_nota_many_division
+)
+
+# %%
+print(round(success_one_division * 100, 1))
+print(round(success_multiple_division * 100, 1))
+
+# %%
+# Fisher's exact test
+
+fisher_array = np.array([row1_division, row2_division])
+p_value_fishers = fisher_exact(fisher_array).pvalue
+
+# %%
+print(p_value_fishers)
+
+# %%
+# Success rate with one v multiple sections
+
+same_section = not_nota_one_section / (nota_one_section + not_nota_one_section)
+multiple_section = not_nota_many_section / (nota_many_section + not_nota_many_section)
+
+# %%
+print(f"Success rate when options presented from the same section: {same_section}")
+print(f"Success rate when options presented from multiple sections: {multiple_section}")
 
 # %%
 contingency_table = np.array(
     [
         [not_nota_one_section, nota_one_section],
-        [not_nota_many_sections, nota_many_sections],
+        [not_nota_many_section, nota_many_section],
     ]
 )
 
