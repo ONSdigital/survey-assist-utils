@@ -28,6 +28,33 @@ cleaned_evaluation_df = pd.read_parquet(
     work_dir + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
 )
 
+export_df = cleaned_evaluation_df.copy()
+export_df.columns = export_df.columns.str.replace(r"\n", " ", regex=True)
+export_cols = [
+    "unique_id",
+    "user",
+    "job_title",
+    "job_description",
+    "org_description",
+    "survey_assist_open_question",
+    "survey_assist_open_question_response",
+    "comments_initial",
+    "qa_initial",
+    "qa_comments_final",
+    "rag_status",
+    "rag_status_ (red,_amber,_green,_unnecessary)",
+    "rationale_for_rag_status",
+    "is_the_follow-up_question_(col_f)_useful? y/n",
+    "how_useful_is_the_question_that_was_asked?",
+    "is_a_follow-up_question_needed_to_code_the_standard_tlfs_responses?_ y/n",
+    "is_a_follow-up_question_needed_to_code_the_survey_assist_response?_ y/n",
+    "do_you_think_it_is_possible_to_get_a_single_5-digit_code_with_a_single,_open_question,_based_on_the_initial_tlfs_responses?",
+    "is_there_an_alternative_question_you_would_ask?__ y/n",
+    "if_yes:_what_question_should_be_asked?",
+]
+export_df[export_cols].to_csv(
+    "CC_coded_public_test_responses_with_comments.csv", index=False
+)
 # %%
 # RAG Status Distributions
 
@@ -85,7 +112,9 @@ for c in comments_cols:
 def clean_yn_col(ans):
     """Clean yes/no columns."""
     if isinstance(ans, str) and len(ans.strip()) > 0:
-        return ans.lower().strip()
+        ans = ans.lower().strip()
+        if ans in ("y", "n"):
+            return ans
     return ""
 
 
@@ -105,10 +134,12 @@ general_yn_responses = {}
 requires_dyn_yn_responses = {}
 
 for c in general_yes_no_cols:
-    cleaned_evaluation_df[c] = cleaned_evaluation_df[c].apply(clean_yn_col)
-    yays = cleaned_evaluation_df[c] == "y"
-    nays = cleaned_evaluation_df[c] == "n"
-    missings = cleaned_evaluation_df[c] == ""
+    cleaned_evaluation_with_cc_openQs[c] = cleaned_evaluation_with_cc_openQs[c].apply(
+        clean_yn_col
+    )
+    yays = cleaned_evaluation_with_cc_openQs[c] == "y"
+    nays = cleaned_evaluation_with_cc_openQs[c] == "n"
+    missings = cleaned_evaluation_with_cc_openQs[c] == ""
     general_yn_responses[c] = (yays.sum(), nays.sum(), missings.sum())
     print(
         f"""\n{c}:
@@ -140,7 +171,7 @@ fig, (ax1, ax2) = plt.subplots(
 
 def make_label_tidy(colname: str):
     """Makes a column name readable."""
-    return "\n".join(wrap(colname.replace("_", " "), width=14))
+    return "\n".join(wrap(colname.replace("_", " "), width=15))
 
 
 # General subplot
@@ -242,7 +273,98 @@ ax2.set_xticks(
 )
 
 plt.tight_layout()
-plt.savefig("cc_yn_distributions.png", dpi=275)
+plt.savefig("cc_yn_distributions.png", dpi=275, transparent=True)
+
+# %%
+# Combined Yes/No/Missing stacked bar plot
+
+all_yn_responses = {**general_yn_responses, **requires_dyn_yn_responses}
+
+questions = list(all_yn_responses.keys())
+yes_counts = [all_yn_responses[q][0] for q in questions]
+no_counts = [all_yn_responses[q][1] for q in questions]
+missing_counts = [all_yn_responses[q][2] for q in questions]
+
+question_labels = [make_label_tidy(q) for q in questions]
+
+x = range(len(question_labels))
+
+fig, ax = plt.subplots(figsize=(12, 7))
+
+# Stacked bars
+bar_yes = ax.bar(x, yes_counts, label="Yes", color="#28A197")
+bar_no = ax.bar(x, no_counts, bottom=yes_counts, label="No", color="#F46A25")
+bar_missing = ax.bar(
+    x,
+    missing_counts,
+    bottom=[i + j for i, j in zip(yes_counts, no_counts)],
+    label="Missing",
+    color="#A285D1",
+)
+
+ax.set_ylabel("Number of Responses", fontsize=18)
+ax.set_title(
+    f"Clerical Coder Yes/No Responses (n={len(cleaned_evaluation_with_cc_openQs)})",
+    fontsize=22,
+)
+ax.set_xticks(x)
+ax.set_xticklabels(question_labels, rotation=0, fontsize=14)
+ax.tick_params(axis="y", labelsize=14)
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(reversed(handles), reversed(labels), fontsize=14)
+
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+
+# Add text labels on bars
+for i in range(len(x)):
+    # Yes
+    if yes_counts[i] > 0:
+        ax.text(
+            i,
+            yes_counts[i] / 2,
+            f"{yes_counts[i]} ({yes_counts[i]*100/len(cleaned_evaluation_with_cc_openQs):.0f}%)",
+            ha="center",
+            va="center",
+            color="white",
+            fontsize=16,
+        )
+    # No
+    if no_counts[i] > 0:
+        ax.text(
+            i,
+            yes_counts[i] + no_counts[i] / 2,
+            f"{no_counts[i]} ({no_counts[i]*100/len(cleaned_evaluation_with_cc_openQs):.0f}%)",
+            ha="center",
+            va="center",
+            color="white",
+            fontsize=16,
+        )
+    # Missing
+    if missing_counts[i] > 0:
+        ax.text(
+            i,
+            yes_counts[i] + no_counts[i] + missing_counts[i] / 2,
+            f"{missing_counts[i]} ({missing_counts[i]*100/len(cleaned_evaluation_with_cc_openQs):.0f}%)",
+            ha="center",
+            va="center",
+            color="white",
+            fontsize=16,
+        )
+
+
+# total_counts = [y+n+m for y,n,m in zip(yes_counts, no_counts, missing_counts)]
+# for i, total in enumerate(total_counts):
+#     ax.text(i, total, str(total), ha='center', va='bottom', fontsize=14)
+
+
+plt.tight_layout()
+plt.savefig("cc_yn_distributions_stacked.png", dpi=275, transparent=True)
+plt.show()
+
+
+# %%
+
 
 # %%
 
@@ -284,11 +406,12 @@ ax.set_yticks([0, 50, 100, 150, 200, 250, 300, 350])
 ax.set_yticklabels([0, 50, 100, 150, 200, 250, 300, 350], size=14)  # type: ignore[list-item]
 
 plt.tight_layout()
-plt.savefig("cc_rag_distributions.png", dpi=275)
+plt.savefig("cc_rag_distributions.png", dpi=275, transparent=True)
+
 
 # %%
 comments_initial_df = cleaned_evaluation_df[
-    cleaned_evaluation_df["comments_initial"].notnull()
+    cleaned_evaluation_df["how_useful_is_the_question_that_was_asked?"].notnull()
 ].copy()
 # msk = comments_initial_df["comments_initial"].notna() & (
 #     comments_initial_df["comments_initial"].isin(["", " " "", " ", "-", "n0", "None"])
@@ -297,13 +420,17 @@ comments_initial_df = cleaned_evaluation_df[
 # comments_initial_df = comments_initial_df[~msk].reset_index(drop=True)
 
 # %%
-len(comments_initial_df[~comments_initial_df["comments_initial"].isna()])
+len(
+    comments_initial_df[
+        ~comments_initial_df["how_useful_is_the_question_that_was_asked?"].isna()
+    ]
+)
 
 
 # %%
 initial_comments_ta = TextAnalyser(
     comments_initial_df,
-    "comments_initial",
+    "how_useful_is_the_question_that_was_asked?",
     project_id,
     additional_kwargs={
         "model_name": "text-embedding-004",
@@ -327,3 +454,5 @@ initial_comments_ta.investigate_clusters(kmin=1, kmax=30)
 
 initial_comments_ta.apply_kmeans(k=4)
 initial_comments_ta.visualise_dim_reduced()
+
+# %%
