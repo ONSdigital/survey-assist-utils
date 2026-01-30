@@ -7,7 +7,7 @@ Expects environment variable PREPROD_DATA_BUCKET to be set.
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103,R0801
+# pylint: disable=C0301,C0103,R0801,W0104
 
 # %%
 import os
@@ -182,10 +182,10 @@ fig.update_layout(margin={"b": 125})
 fig.add_annotation(
     text=(
         """
-OO: One-to-One match on a subset where the true label as well as the model's label are not ambiguous.<br>
-OM: One-to-Many match on a subset where the true label is not ambiguous. (Is the true label in the model's shortlist?)<br>
-MO: Many-to-One match on a subset where the model is not ambiguous. (Is the model's label in the true label shortlist?)<br>
-MM: Many-to-Many match on the full set. (Is there any overlap between the true label's and model's shortlists?)
+OO: One-to-One match on a subset where the clerical label as well as the model's label are not ambiguous.<br>
+OM: One-to-Many match on a subset where the clerical label is not ambiguous. (Is the clerical label in the model's shortlist?)<br>
+MO: Many-to-One match on a subset where the model is not ambiguous. (Is the model's label in the clerical label shortlist?)<br>
+MM: Many-to-Many match on the full set. (Is there any overlap between the clerical label's and model's shortlists?)
 """
     ),
     align="left",
@@ -206,7 +206,7 @@ if out_dir:
 # %%
 # create confusion matrix for section (0-digit) and subset of 5-digit
 df = combined_df[combined_df.batch_num.notna()].copy()
-for DIGITS in [5, 2]:
+for DIGITS in [5, 2, 0]:
     col1 = f"cc_initial_codes_to_{DIGITS}digits"
     col2 = f"sa_initial_codes_to_{DIGITS}digits"
     subset = {}
@@ -298,20 +298,24 @@ for DIGITS in [5, 2]:
 
 # %%
 # get examples
-stage = "initial_codes"
-# stage = "final_codes_open_q"
+digits = 2
 
-mask_diff = combined_df[f"sa_{stage}"] != combined_df[f"cc_{stage}"]
+col_cc = f"cc_initial_codes_to_{digits}digits"
+col_sa = f"sa_initial_codes_to_{digits}digits"
+mask_diff = combined_df[col_sa] != combined_df[col_cc]
+mask_excl = combined_df.apply(
+    lambda row: len(row[col_cc].intersection(row[col_sa])) == 0, axis=1
+)
 tmp_df = combined_df[mask_diff].copy()
-tmp_df["sa_codes_str"] = tmp_df[f"sa_{stage}"].apply(lambda x: ", ".join(sorted(x)))
-tmp_df["cc_codes_str"] = tmp_df[f"cc_{stage}"].apply(lambda x: ", ".join(sorted(x)))
+tmp_df["cc_codes_str"] = tmp_df[col_cc].apply(lambda x: ", ".join(sorted(x)))
+tmp_df["sa_codes_str"] = tmp_df[col_sa].apply(lambda x: ", ".join(sorted(x)))
 frequent_mistakes = (
     tmp_df.groupby(["cc_codes_str", "sa_codes_str"])
     .size()
     .sort_values(ascending=False)
     .reset_index(name="count")
 )
-min_mistakes = 3
+min_mistakes = 4
 print(frequent_mistakes[frequent_mistakes["count"] > min_mistakes])
 
 examples = pd.DataFrame()
@@ -320,9 +324,10 @@ columns = [
     "job_title",
     "job_description",
     "org_description",
-    "sa_codes_str",
     "cc_codes_str",
-    "batch_num",
+    "sa_codes_str",
+    "survey_assist_open_question",
+    "survey_assist_open_question_response",
 ]
 for _, row in frequent_mistakes[frequent_mistakes["count"] > min_mistakes].iterrows():
     msk = (tmp_df["sa_codes_str"] == row.sa_codes_str) & (
@@ -349,7 +354,7 @@ msk = tmp_df["cc_initial_codes"].isin(top_two) & (
 )
 print(msk.sum())
 print(
-    "cc_final_open_q == 88990 for {(tmp_df.loc[msk,'cc_final_codes_open_q']!={'88990'}).sum()}"
+    f"cc_final_open_q == {top_two} for {(tmp_df.loc[msk,'cc_final_codes_open_q']!={'88990'}).sum()}"
 )
 sub_df = tmp_df.loc[
     msk,
@@ -377,16 +382,54 @@ print(
         ["cc_changed", "sa_final_agree_open_q", "sa_final_agree_closed_q", "nota"]
     ].sum()
 )
+
 # %%
-msk = combined_df["survey_assist_open_question"].notna()
-diff_df = combined_df[msk].copy().reset_index()
+# some more examples for the report
+msk = combined_df.cc_initial_codes_to_0digits.map(
+    lambda x: "J" in x
+) & combined_df.sa_initial_codes_to_0digits.map(lambda x: "M" in x)
+combined_df.loc[
+    msk,
+    [
+        "job_title",
+        "job_description",
+        "org_description",
+        "cc_initial_codes_to_0digits",
+        "clerical_code_initial",
+        "sa_initial_codes_to_0digits",
+        "sa_initial_codes",
+    ],
+]
 
-diff_df["cc_initial_coded"] = diff_df["cc_initial_codes"].apply(len) == 1
-diff_df["cc_changed"] = diff_df["cc_initial_codes"] != diff_df["cc_final_codes_open_q"]
 
-print(diff_df["cc_changed"].value_counts(), diff_df["cc_changed"].mean())
-print(diff_df.groupby("cc_initial_coded")["cc_changed"].mean())
+# %%
+# section M sees decrease in CC codability at 2-digits levels
+msk = (combined_df["SIC Section"] == "M") & (
+    combined_df["cc_codability_gain_open_q"] < -1
+)
+combined_df.loc[
+    msk,
+    [
+        "job_title",
+        "job_description",
+        "org_description",
+        "cc_initial_codes_to_2digits",
+        "clerical_code_initial",
+        "cc_final_codes_open_q_to_2digits",
+        "sa_initial_codes",
+        "survey_assist_open_question",
+        "survey_assist_open_question_response",
+        "sa_final_codes_open_q",
+    ],
+]
 
-print((diff_df["cc_codability_gain_open_q"] > 0).mean())
+# %%
+msk = (combined_df.sa_final_codes_open_q.map(len) == 1) & (
+    combined_df.sa_initial_codes.map(len) > 1
+)
+combined_df["cc_shortlist"] = combined_df.apply(
+    lambda row: row.sa_final_codes_open_q.issubset(row.sa_initial_codes), axis=1
+)
+combined_df.loc[msk, "cc_shortlist"].value_counts()
 
 # %%

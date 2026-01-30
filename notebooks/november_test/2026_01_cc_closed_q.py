@@ -200,7 +200,7 @@ option_sizes = [5, 4, 3, 2]
 col_widths = [size / sum(option_sizes) for size in option_sizes]
 
 fig = make_subplots(
-    rows=1,
+    rows=2,
     cols=len(option_sizes),
     shared_yaxes=True,
     horizontal_spacing=0.1,
@@ -209,21 +209,22 @@ fig = make_subplots(
 for i, option_size in enumerate(option_sizes):
     y_min = all_groups_ci.loc[option_size, "ci_low"]
     y_max = all_groups_ci.loc[option_size, "ci_upp"]
-    fig.add_shape(
-        type="rect",
-        x0=0.2,
-        x1=option_size + 0.8,
-        y0=y_min,
-        y1=y_max,
-        fillcolor=px.colors.qualitative.D3[2],
-        opacity=0.15,
-        line_width=0,
-        row=1,
-        col=i + 1,
-        layer="below",
-        name="Confidence Interval for Uniform Distribution",
-        showlegend=i == 0,
-    )
+    for row_num in [1, 2]:
+        fig.add_shape(
+            type="rect",
+            x0=0.2,
+            x1=option_size + 0.8,
+            y0=y_min,
+            y1=y_max,
+            fillcolor=px.colors.qualitative.D3[2],
+            opacity=0.15,
+            line_width=0,
+            row=row_num,
+            col=i + 1,
+            layer="below",
+            name="Confidence Interval for Uniform Distribution",
+            showlegend=(i == 0) & (row_num == 1),
+        )
     sub_df = plot_df[plot_df["closed_q_num_options"] == option_size]
     bar_fig = px.bar(
         sub_df,
@@ -231,14 +232,20 @@ for i, option_size in enumerate(option_sizes):
         y="count",
         color="method",
         barmode="group",
+        facet_row="method",
         color_discrete_sequence=px.colors.qualitative.D3,
     )
     for trace in bar_fig.data:
         trace.showlegend = i == 0
-        fig.add_trace(trace, row=1, col=i + 1)
-        fig.update_xaxes(
-            title_text=f"Rank out of {option_size} options", dtick=1, row=1, col=i + 1
-        )
+        row_num = 2 if trace.xaxis == "x" else 1
+        fig.add_trace(trace, row=row_num, col=i + 1)
+
+    fig.update_xaxes(
+        title_text=f"Rank out of {option_size} options", dtick=1, row=2, col=i + 1
+    )
+    fig.update_xaxes(title_text="", dtick=1, row=1, col=i + 1)
+    fig.update_yaxes(title_text="Count", row=1, col=1, range=[0, 151])
+    fig.update_yaxes(title_text="Count", row=2, col=1, range=[0, 151])
 
     fig.update_layout(
         title_text="Closed Question Response Rank Distributions",
@@ -247,7 +254,6 @@ for i, option_size in enumerate(option_sizes):
         height=500,
         legend={"x": 0.64, "y": 1.21},
     )
-    fig.update_yaxes(title_text="Count", row=1, col=1)
 
 fig.show()
 
@@ -289,5 +295,70 @@ combined_df[msk].groupby(
         f"{method}_final_codes_open_q_within_offered_options",
     ]
 ).size().unstack(fill_value=0)
+
+# %%
+msk = (
+    (combined_df["cc_final_codability_level_open_q"] == "Sub-class (5-digits)")
+    & (combined_df["sa_final_codability_level_open_q"] == "Sub-class (5-digits)")
+    & ~combined_df["survey_assist_open_question"].isna()
+)
+combined_df["both_final_codes_open_q_within_offered_options"] = combined_df.apply(
+    lambda row: (
+        "both equal and offered"
+        if row["cc_final_codes_open_q"] == row["sa_final_codes_open_q"]
+        and row["cc_final_codes_open_q"].issubset(row["sa_initial_codes"])
+        else (
+            "both offered (separately)"
+            if row["cc_final_codes_open_q"].issubset(row["sa_initial_codes"])
+            and row["sa_final_codes_open_q"].issubset(row["sa_initial_codes"])
+            else (
+                "only cc offered"
+                if row["cc_final_codes_open_q"].issubset(row["sa_initial_codes"])
+                else (
+                    "only sa offered"
+                    if row["sa_final_codes_open_q"].issubset(row["sa_initial_codes"])
+                    else "neither offered"
+                )
+            )
+        )
+    ),
+    axis=1,
+)
+combined_df["both_final_codes_open_q_vs_selected_by_user_in_closed"] = (
+    combined_df.apply(
+        lambda row: (
+            "none of the above"
+            if len(row["sa_final_codes_closed_q"]) == 0
+            else (
+                "same code selected"
+                if row["cc_final_codes_open_q"].issubset(row["sa_final_codes_closed_q"])
+                and row["sa_final_codes_open_q"].issubset(
+                    row["sa_final_codes_closed_q"]
+                )
+                else (
+                    "sa_code selected"
+                    if row["sa_final_codes_open_q"].issubset(
+                        row["sa_final_codes_closed_q"]
+                    )
+                    else (
+                        "cc_code selected"
+                        if row["cc_final_codes_open_q"].issubset(
+                            row["sa_final_codes_closed_q"]
+                        )
+                        else "different selected"
+                    )
+                )
+            )
+        ),
+        axis=1,
+    )
+)
+combined_df[msk].groupby(
+    [
+        "both_final_codes_open_q_vs_selected_by_user_in_closed",
+        "both_final_codes_open_q_within_offered_options",
+    ]
+).size().unstack(fill_value=0)
+
 
 # %%
