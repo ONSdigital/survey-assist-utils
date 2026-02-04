@@ -7,7 +7,7 @@ Expects environment variable PREPROD_DATA_BUCKET to be set.
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103,R0801
+# pylint: disable=C0301,C0103,R0801,W0106
 
 # %%
 import os
@@ -360,5 +360,55 @@ combined_df[msk].groupby(
     ]
 ).size().unstack(fill_value=0)
 
+
+# %%
+def iter_options(row):
+    """Iterate over closed question options in a row."""
+    if len(row["cc_final_codes_open_q"]) != 1:
+        return None
+    for j in range(5):
+        if (
+            next(iter(row["cc_final_codes_open_q"]))
+            == row[f"survey_assist_closed_question_option_{j+1}_code"]
+        ):
+            return row[f"survey_assist_closed_question_option_{j+1}"].lower()
+    return None
+
+
+closed_df["cc_final_code_rephrased"] = closed_df.apply(iter_options, axis=1)
+
+examples_mask = (
+    closed_df["cc_final_codes_open_q"] != closed_df["sa_final_codes_closed_q"]
+) & closed_df["cc_final_code_rephrased"].notna()
+
+examples_df = closed_df.loc[
+    examples_mask,
+    [
+        "unique_id",
+        "job_title",
+        "job_description",
+        "org_description",
+        "survey_assist_open_question",
+        "survey_assist_open_question_response",
+        "survey_assist_closed_question_response",
+        "cc_final_code_rephrased",
+        "sa_final_codes_closed_q",
+        "cc_final_codes_open_q",
+    ],
+]
+
+pairs = (
+    examples_df.groupby(
+        [
+            "survey_assist_closed_question_response",
+            "cc_final_code_rephrased",
+        ]
+    )
+    .size()
+    .sort_values(ascending=False)
+)
+print(pairs[pairs > 1])
+
+examples_df[examples_df["cc_final_code_rephrased"].isin(pairs.index[0])]
 
 # %%
