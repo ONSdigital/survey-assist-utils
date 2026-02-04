@@ -15,6 +15,7 @@ import os
 import dotenv
 import numpy as np
 import pandas as pd
+import plotly.express as px
 from google import genai
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -130,7 +131,7 @@ def best_pairwise_matching(dist_mat):
     pairs = []
     while sa_indices and sayt_indices:
         max_idx = np.unravel_index(np.argmax(dist_mat, axis=None), dist_mat.shape)
-        pairs.append(max_idx)
+        pairs.append((max_idx[0], max_idx[1], dist_mat[max_idx]))
         sa_indices.remove(max_idx[0])
         sayt_indices.remove(max_idx[1])
         dist_mat[max_idx[0], :] = -1
@@ -149,5 +150,13 @@ matched_combined_df = pd.concat([matched_sayt_df, matched_sa_df], axis=1)
 matched_combined_df.loc[
     100:220, ["job_title", "SOC_2020_pt1", "job_description", "SOC_2020_pt2"]
 ]
+
+# %%
+fig = px.line(
+    [p[2] for p in best_matching],
+    title="Best pairwise matching scores between SAYT and SA job titles/descriptions",
+    template="plotly_white",
+)
+fig.show()
 
 # %%
