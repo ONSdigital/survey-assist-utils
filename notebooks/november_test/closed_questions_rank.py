@@ -1,10 +1,10 @@
 # %%
 """Work in progess.
 
-Initial analysis of survey responses, focusing on Closed Follow up questions.
+Initial analysis of survey responses, focusing on ranks in Closed Follow up questions.
 
-Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
-and PREPROD_DATA_BUCKET similarly.
+Create .env file with bucket variables, such as
+PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
 """
 
 # %%
@@ -20,20 +20,19 @@ from scipy.stats import (
 )
 
 # %%
-evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not evaluation_bucket:
-    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
-if not analysis_bucket:
+preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
+if not preprod_bucket:
     raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
 # %%
 data = pd.read_parquet(
-    f"{analysis_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
+    f"{preprod_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
 )
 
-
 # %%
+# ranks selected by repsondent
+
+
 def get_selected_responses(response_row: pd.Series) -> int | None:
     """Finds the rank the response selected by user.
 
@@ -141,9 +140,12 @@ def get_alt_codes_count(response_row: pd.Series) -> int | None:
 # %%
 alt_codes_count = data.apply(get_alt_codes_count, axis=1).dropna().astype(int).to_list()
 
+
 # %%
 for i in range(7):
-    print(alt_codes_count.count(i))
+    print(
+        f"{i} options: {alt_codes_count.count(i)} ({round(alt_codes_count.count(i)/ len(alt_codes_count) * 100,1)}%)"
+    )
 
 # %%
 options_dict = {
@@ -154,6 +156,8 @@ df_options = pd.DataFrame(options_dict)
 
 # %% [markdown]
 # ## SA assigned code randomness
+#
+# Check if the order of the options presented was random
 
 # %%
 # selected code rank from the list
@@ -224,9 +228,9 @@ def get_alternative_codes_count(response_row: pd.Series) -> int:
 sa_alt_codes_count = data.apply(get_alternative_codes_count, axis=1).to_list()
 
 # %%
-for i in range(6):
-    print(sa_code_match.count(i))
-print(sa_code_match.count(None))
+for i in range(1, 7):
+    print(f"code rank {i}: {sa_code_match.count(i)}")
+print(f"None: {int(np.isnan(sa_code_match).sum())}")
 
 # %% [markdown]
 # Note that 6th rank is either not presented or is a "none of the above", which is not a valid code.
@@ -235,7 +239,7 @@ print(sa_code_match.count(None))
 # %%
 # count of alternative codes
 for i in range(6):
-    print(sa_alt_codes_count.count(i))
+    print(f"{i} altetnative codes found: {sa_alt_codes_count.count(i)}")
 
 # %% [markdown]
 # Zero alternative codes, when final code is found. No 1 alternative codes, as that means the final code is found.
@@ -304,9 +308,6 @@ for rank in range(1, 6):
 exp_all = np.array(expected_prob)
 
 # %%
-len(df_options)
-
-# %%
 chi_pvalue_all = chisquare(f_obs=obs_all, f_exp=exp_all).pvalue
 print(chi_pvalue_all)
 
@@ -332,7 +333,7 @@ for i in range(2, 6):
 
     print(f"Options presented: {i}")
     print(f"Surveys count: {df_group_sa.shape[0]}")
-    print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05: {chi_pvalue > 0.05}\n")
+    print(f"p-value: {chi_pvalue}\nGreater than alpha 0.05:\n  {chi_pvalue > 0.05}\n")
 
 # %% [markdown]
 # When 2 and 4 options were presented, we do not reject the null hypothesis (pvalue > 0.05).
@@ -340,7 +341,7 @@ for i in range(2, 6):
 #
 # (possibly not noticable, because 2 and 4 options were presented only in small number of surveys, unlike 3 and 5)
 #
-# Check for primacy effect (we want that).
+# Check for if the LLM shortlist aligns with the respondents selection.
 
 # %%
 check_primacy(df_sa_codes_no_none)

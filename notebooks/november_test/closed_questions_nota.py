@@ -1,10 +1,11 @@
 # %%
 """Work in progess.
 
-Initial analysis of survey responses, focusing on Closed Follow up questions.
+Initial analysis of survey responses, focusing on resons for selecting
+"None of the above" as response to Closed Follow up questions.
 
-Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
-and PREPROD_DATA_BUCKET similarly.
+Create .env file with bucket variables, such as
+PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
 """
 
 # %%
@@ -27,11 +28,8 @@ from scipy.stats import (
 from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
 
 # %%
-evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not evaluation_bucket:
-    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
-if not analysis_bucket:
+preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
+if not preprod_bucket:
     raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
 # %% [markdown]
@@ -41,7 +39,7 @@ if not analysis_bucket:
 
 # %%
 data = pd.read_parquet(
-    f"{analysis_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
+    f"{preprod_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
 )
 
 # %%
@@ -54,6 +52,10 @@ data_not_nota = data_closed_question[
     data_closed_question["survey_assist_closed_question_response"]
     != "none of the above"
 ]
+
+# %%
+print(f"Repsonses with code selected: {len(data_not_nota)}")
+print(f'Repsonses with "None of the above" selected: {len(data_nota)}')
 
 # %%
 # check against sections
@@ -87,7 +89,7 @@ def possible_sections(response_row: pd.Series, code_digits: int = 0):
 
 
 # %%
-# add columns 'unique_sections' and 'codes_count'
+# Data preparation: add columns 'unique_sections' and 'codes_count'
 
 data_not_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
     data_not_nota.apply(possible_sections, axis=1).to_list(), index=data_not_nota.index
@@ -95,6 +97,9 @@ data_not_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
 data_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
     data_nota.apply(possible_sections, axis=1).to_list(), index=data_nota.index
 )
+
+# %% [markdown]
+# ## Effect of Number of Options
 
 # %%
 codes_count = {}
@@ -104,7 +109,6 @@ for i in range(2, 6):
     codes_count[i] = [success]
     codes_count[i].append(failure)
 df_codes_count = pd.DataFrame(codes_count, index=["success", "failure"]).T
-
 
 # %%
 pvalue_codes_count = chi2_contingency(df_codes_count).pvalue
@@ -116,6 +120,8 @@ print(pvalue_codes_count)
 # The p-value for the number of codes presented vs success (selecting one of the options, not NOTA) is 0.57, which means there is no evidence that the number of options influenced the decision.
 
 # %% [markdown]
+# ## Frequency of the word “other” in phrasing of options presented
+#
 # Check if the ratio of options with "other" in the description had impact on the selected response.
 #
 # Null hypothesis: There is no relationship between the frequency of the word "other" in the description presented to the respondent and the respondent's final selection (one of the descriptions or NOTA).
@@ -212,6 +218,9 @@ print(
 # The word 'other' appeared more often when NOTA was selected (25% v 20%). The Mann-Whitney test p value confirms that this difference is statistically significant, i.e. the more often the word 'other' appears in the descriptions presented, respondents tend to select NOTA.
 
 # %% [markdown]
+# ## Options from one or multiple Sections
+
+# %% [markdown]
 #
 # Calculate the **odds ratio** for sections.
 #
@@ -251,8 +260,10 @@ print(CI)
 # %% [markdown]
 # Odds Ratio <1, with Confidence Interval (0.33, 1.14). This suggests the difference between groups (respondents who selected NOTA and those who did not select NOTA) is not statistically significant.
 
+# %% [markdown]
+# ## Options from one or multiple Divisions
+
 # %%
-# check the same for 2-digit codes
 # prepare division unique codes
 
 data_not_nota[["unique_divisions", "codes_count_division"]] = pd.DataFrame(
@@ -341,7 +352,7 @@ print(p_value_success_rate)
 # The p-value for success rate is 0.15. There is no statistical significance between number of sections the presented options came from.
 
 # %% [markdown]
-# ### Time it took the respondent to answer the survey
+# ## Effect of time spent on the survey
 #
 # Check if respondents just went with NOTA, to finish the survey sooner. Use surveys that didn't get asked closed question as a baseline.
 
@@ -502,6 +513,8 @@ print("IQR for no question:", round(iqr_no_closed_question))
 # %% [markdown]
 # This suggests that there is more variety when an answer was selected, than when NOTA was selected. I.e. some matches are perfect fits (quicker answer), but other require more time to think which one fits best.
 #
+#
+# ## Time spent on the survey and Number of Sections
 # Analyse the duration time vs number of sections.
 
 # %%
