@@ -85,7 +85,7 @@ plot_df_section = (
 )
 
 # %%
-# add expected distribution from ONS LCF data
+# add expected distribution from ONS LFS data
 # source: https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/employmentbyindustryemp13
 lfs = {
     "A": 310,
@@ -110,7 +110,7 @@ df_lfs = (
     .reset_index()
     .rename(columns={"index": "sic_section"})
 )
-df_lfs["source"] = "ONS LCF 2025 Q3"
+df_lfs["source"] = "ONS LFS 2025 Q3"
 
 plot_df_section = pd.concat([plot_df_section, df_lfs], ignore_index=True)
 
@@ -135,9 +135,9 @@ plot_df_section[["error_y_minus", "error_y_plus"]] = plot_df_section.apply(
     axis=1,
 )
 
-# remove CI for the puvlished LCF data
-msk_lcf = plot_df_section["source"] == "ONS LCF 2025 Q3"
-plot_df_section.loc[msk_lcf, ["error_y_minus", "error_y_plus"]] = None
+# remove CI for the published LFS data
+msk_lfs = plot_df_section["source"] == "ONS LFS 2025 Q3"
+plot_df_section.loc[msk_lfs, ["error_y_minus", "error_y_plus"]] = None
 
 # %%
 
