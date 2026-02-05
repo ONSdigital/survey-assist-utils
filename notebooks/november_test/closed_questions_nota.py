@@ -47,11 +47,11 @@ data_closed_question = data[data["survey_assist_closed_question_response"].notna
 data_nota = data_closed_question[
     data_closed_question["survey_assist_closed_question_response"]
     == "none of the above"
-]
+].copy()
 data_not_nota = data_closed_question[
     data_closed_question["survey_assist_closed_question_response"]
     != "none of the above"
-]
+].copy()
 
 # %%
 print(f"Repsonses with code selected: {len(data_not_nota)}")
@@ -90,13 +90,21 @@ def possible_sections(response_row: pd.Series, code_digits: int = 0):
 
 # %%
 # Data preparation: add columns 'unique_sections' and 'codes_count'
+unique_sections_codes_count_not_nota = pd.DataFrame(
+    data_not_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
+    index=data_not_nota.index,
+    columns=["unique_sections", "codes_count"],
+)
+unique_sections_codes_count_nota = pd.DataFrame(
+    data_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
+    index=data_nota.index,
+    columns=["unique_sections", "codes_count"],
+)
 
-data_not_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
-    data_not_nota.apply(possible_sections, axis=1).to_list(), index=data_not_nota.index
+data_not_nota.loc[:, ["unique_sections", "codes_count"]] = (
+    unique_sections_codes_count_not_nota
 )
-data_nota[["unique_sections", "codes_count"]] = pd.DataFrame(
-    data_nota.apply(possible_sections, axis=1).to_list(), index=data_nota.index
-)
+data_nota.loc[:, ["unique_sections", "codes_count"]] = unique_sections_codes_count_nota
 
 # %% [markdown]
 # ## Effect of Number of Options
@@ -158,20 +166,27 @@ def count_others(response_row: pd.Series) -> int:
 
 
 # %%
-data_nota["options_with_other"] = pd.DataFrame(
-    data_nota.apply(count_others, axis=1).to_list(), index=data_nota.index
+options_with_other_not_nota = pd.DataFrame(
+    data_not_nota.apply(count_others, axis=1).to_list(),
+    index=data_not_nota.index,
+    columns=["options_with_other"],
+)
+options_with_other_nota = pd.DataFrame(
+    data_nota.apply(count_others, axis=1).to_list(),
+    index=data_nota.index,
+    columns=["options_with_other"],
 )
 
-data_not_nota["options_with_other"] = pd.DataFrame(
-    data_not_nota.apply(count_others, axis=1).to_list(), index=data_not_nota.index
-)
+data_not_nota.loc[:, ["options_with_other"]] = options_with_other_not_nota
+data_nota.loc[:, ["options_with_other"]] = options_with_other_nota
 
 # %%
-data_nota["other_ratio"] = data_nota["options_with_other"] / data_nota["codes_count"]
+ratio_nota = data_nota["options_with_other"] / data_nota["codes_count"]
+ratio_not_nota = data_not_nota["options_with_other"] / data_not_nota["codes_count"]
 
-data_not_nota["other_ratio"] = (
-    data_not_nota["options_with_other"] / data_not_nota["codes_count"]
-)
+
+data_nota.loc[:, "other_ratio"] = ratio_nota
+data_not_nota.loc[:, "other_ratio"] = ratio_not_nota
 
 # %%
 pvalue_other_ratios = ttest_ind(
@@ -260,19 +275,64 @@ print(CI)
 # %% [markdown]
 # Odds Ratio <1, with Confidence Interval (0.33, 1.14). This suggests the difference between groups (respondents who selected NOTA and those who did not select NOTA) is not statistically significant.
 
+# %%
+# Success rate with one v multiple sections
+
+same_section = not_nota_one_section / (nota_one_section + not_nota_one_section)
+multiple_section = not_nota_many_section / (nota_many_section + not_nota_many_section)
+
+# %%
+print(f"Success rate when options presented from the same section: {same_section}")
+print(f"Success rate when options presented from multiple sections: {multiple_section}")
+
+# %%
+contingency_table = np.array(
+    [
+        [not_nota_one_section, nota_one_section],
+        [not_nota_many_section, nota_many_section],
+    ]
+)
+
+p_value_success_rate = chi2_contingency(contingency_table).pvalue
+
+# %%
+print(p_value_success_rate)
+
+# %% [markdown]
+# The p-value for success rate is 0.15. There is no statistical significance between number of sections the presented options came from.
+
 # %% [markdown]
 # ## Options from one or multiple Divisions
 
 # %%
 # prepare division unique codes
 
-data_not_nota[["unique_divisions", "codes_count_division"]] = pd.DataFrame(
-    data_not_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
-    index=data_not_nota.index,
-)
-data_nota[["unique_divisions", "codes_count_division"]] = pd.DataFrame(
+# data_not_nota[["unique_divisions", "codes_count_division"]] = pd.DataFrame(
+#     data_not_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
+#     index=data_not_nota.index,
+# )
+# data_nota[["unique_divisions", "codes_count_division"]] = pd.DataFrame(
+#     data_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
+#     index=data_nota.index,
+# )
+
+
+divisions_codes_count_nota = pd.DataFrame(
     data_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
     index=data_nota.index,
+    columns=["unique_divisions", "codes_count_division"],
+)
+divisions_codes_count_not_nota = pd.DataFrame(
+    data_not_nota.apply(possible_sections, axis=1, args=(2,)).to_list(),
+    index=data_not_nota.index,
+    columns=["unique_divisions", "codes_count_division"],
+)
+
+data_nota.loc[:, ["unique_divisions", "codes_count_division"]] = (
+    divisions_codes_count_nota
+)
+data_not_nota.loc[:, ["unique_divisions", "codes_count_division"]] = (
+    divisions_codes_count_not_nota
 )
 
 # %%
@@ -320,36 +380,7 @@ fisher_array = np.array([row1_division, row2_division])
 p_value_fishers = fisher_exact(fisher_array).pvalue
 
 # %%
-type(fisher_array)
-
-# %%
 print(p_value_fishers)
-
-# %%
-# Success rate with one v multiple sections
-
-same_section = not_nota_one_section / (nota_one_section + not_nota_one_section)
-multiple_section = not_nota_many_section / (nota_many_section + not_nota_many_section)
-
-# %%
-print(f"Success rate when options presented from the same section: {same_section}")
-print(f"Success rate when options presented from multiple sections: {multiple_section}")
-
-# %%
-contingency_table = np.array(
-    [
-        [not_nota_one_section, nota_one_section],
-        [not_nota_many_section, nota_many_section],
-    ]
-)
-
-p_value_success_rate = chi2_contingency(contingency_table).pvalue
-
-# %%
-print(p_value_success_rate)
-
-# %% [markdown]
-# The p-value for success rate is 0.15. There is no statistical significance between number of sections the presented options came from.
 
 # %% [markdown]
 # ## Effect of time spent on the survey
@@ -359,16 +390,16 @@ print(p_value_success_rate)
 # %%
 time_data_nota = data[
     data["survey_assist_closed_question_response"] == "none of the above"
-]
+].copy()
 time_data_not = data[
     data["survey_assist_closed_question_response"] != "none of the above"
-]
+].copy()
 time_data_not_nota = time_data_not[
     time_data_not["survey_assist_closed_question_response"].notna()
-]
+].copy()
 time_data_no_closed_question = data[
     data["survey_assist_closed_question_response"].isna()
-]
+].copy()
 
 # %%
 time_nota = pd.Timedelta(0)
@@ -405,7 +436,14 @@ print(
 
 
 # %%
-def get_duration_minutes(df: pd.DataFrame) -> pd.Series:
+def get_duration_seconds(df: pd.DataFrame) -> pd.Timedelta:
+    """Calculate time differennce between start and end of the survey.
+
+    Args:
+        df: dataframe with 'time_start' and 'time_end' columns
+
+    Return: total time in seconds
+    """
     start = df["time_start"]
     end = df["time_end"]
     return (end - start).dt.total_seconds()  # time in seconds
@@ -413,11 +451,13 @@ def get_duration_minutes(df: pd.DataFrame) -> pd.Series:
 
 # %%
 # get response time for nota / not nota / no question
-time_data_nota["response_time"] = get_duration_minutes(time_data_nota)
-time_data_not_nota["response_time"] = get_duration_minutes(time_data_not_nota)
-time_data_no_closed_question["response_time"] = get_duration_minutes(
-    time_data_no_closed_question
-)
+time_nota = get_duration_seconds(time_data_nota)
+time_not_nota = get_duration_seconds(time_data_not_nota)
+time_no_closed_question = get_duration_seconds(time_data_no_closed_question)
+
+time_data_nota.loc[:, "response_time"] = time_nota
+time_data_not_nota.loc[:, "response_time"] = time_not_nota
+time_data_no_closed_question.loc[:, "response_time"] = time_no_closed_question
 
 # %%
 print(
@@ -521,24 +561,28 @@ print("IQR for no question:", round(iqr_no_closed_question))
 data_not_none = data[data["survey_assist_closed_question_response"].notna()]
 
 # %%
-data_not_none[["unique_sections", "codes_count"]] = pd.DataFrame(
-    data_not_none.apply(possible_sections, axis=1).to_list(), index=data_not_none.index
+not_none_unique_section = pd.DataFrame(
+    data_not_none.apply(possible_sections, axis=1).to_list(),
+    index=data_not_none.index,
+    columns=["unique_sections", "codes_count"],
 )
+
+data_not_none.loc[:, ["unique_sections", "codes_count"]] = not_none_unique_section
 
 # %%
 # calculate time vs section
 
 list_length = data_not_none["unique_sections"].str.len() == 1
-data_not_none_one_section = data_not_none[list_length]
-data_not_none_multi_section = data_not_none[~list_length]
+data_not_none_one_section = data_not_none[list_length].copy()
+data_not_none_multi_section = data_not_none[~list_length].copy()
 
 # %%
-data_not_none_one_section["response_time"] = get_duration_minutes(
-    data_not_none_one_section
-)
-data_not_none_multi_section["response_time"] = get_duration_minutes(
-    data_not_none_multi_section
-)
+one_sec_response_time = get_duration_seconds(data_not_none_one_section)
+multi_sec_response_time = get_duration_seconds(data_not_none_multi_section)
+
+
+data_not_none_one_section.loc[:, "response_time"] = one_sec_response_time
+data_not_none_multi_section.loc[:, "response_time"] = multi_sec_response_time
 
 # %%
 print(
