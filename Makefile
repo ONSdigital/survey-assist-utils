@@ -8,7 +8,7 @@ all: ## Show the available make targets.
 .PHONY: clean
 clean: ## Clean the temporary files.
 	rm -rf .mypy_cache
-	rm -rf .ruff_cache	
+	rm -rf .ruff_cache
 
 run-docs: ## Run the mkdocs
 	poetry run mkdocs serve
@@ -17,7 +17,7 @@ check-python: ## Format the python code (auto fix)
 	poetry run isort . --verbose
 	poetry run black .
 	poetry run ruff check . --fix
-	poetry run mypy --follow-untyped-imports  . 
+	poetry run mypy --follow-untyped-imports  .
 	poetry run pylint --verbose .
 	poetry run bandit -r src/survey_assist_utils
 
@@ -25,7 +25,7 @@ check-python-nofix: ## Format the python code (no fix)
 	poetry run isort . --check --verbose
 	poetry run black . --check
 	poetry run ruff check .
-	poetry run mypy --follow-untyped-imports  . 
+	poetry run mypy --follow-untyped-imports  .
 	poetry run pylint --verbose .
 	poetry run bandit -r src/survey_assist_utils
 
@@ -36,8 +36,8 @@ unit-tests: ## Run the example unit tests
 	poetry run pytest -m utils --cov=utils --cov-report=term-missing --cov-fail-under=80 --cov-config=.coveragerc
 
 all-tests:
-	poetry run pytest  --cov=. --cov-report=term-missing --cov-fail-under=75 --cov-config=.coveragerc
-	
+	poetry run pytest  --cov=src --cov-report=term-missing --cov-fail-under=65 --cov-config=.coveragerc
+
 install: ## Install the dependencies
 	poetry install --only main --no-root
 

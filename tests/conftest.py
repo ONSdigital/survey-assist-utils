@@ -29,13 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, ClassVar
 
-import numpy as np
-import pandas as pd
 import pytest
 from pytest import MonkeyPatch
-
-# REFACTOR: Import the config class to be used in the shared fixture.
-from survey_assist_utils.configs.column_config import ColumnConfig
 
 # Add src directory to Python path
 SRC_PATH = str(Path(__file__).parent.parent / "src")
@@ -94,34 +89,6 @@ def pytest_sessionfinish(session, exitstatus):  # pylint: disable=unused-argumen
         warnings for unused arguments in this function.
     """
     logger.info("=== Test Session Finished ===")
-
-
-# REFACTOR: The sample_data_and_config fixture has been moved here from the
-# test_coder_alignment.py file so it can be shared across all test files.
-# It is now renamed to 'raw_data_and_config' for clarity.
-@pytest.fixture
-def raw_data_and_config() -> tuple[pd.DataFrame, ColumnConfig]:
-    """A pytest fixture to create a standard set of RAW test data and config."""
-    test_data = pd.DataFrame(
-        {
-            "unique_id": ["A", "B", "C", "D", "E"],
-            "clerical_label_1": ["12345", "1234", "-9", "nan", "5432x"],
-            "clerical_label_2": ["23456", np.nan, "4+", "", "54321"],
-            "model_label_1": ["12345", "01234", "99999", "54321", "54322"],
-            "model_label_2": ["99999", "12300", "54322", "88888", "54322"],
-            "model_score_1": [0.9, 0.8, 0.99, 0.7, 0.85],
-            "model_score_2": [0.1, 0.7, 0.98, 0.6, 0.80],
-            "Unambiguous": [True, True, False, True, True],
-        }
-    )
-
-    config = ColumnConfig(
-        model_label_cols=["model_label_1", "model_label_2"],
-        model_score_cols=["model_score_1", "model_score_2"],
-        clerical_label_cols=["clerical_label_1", "clerical_label_2"],
-        id_col="unique_id",
-    )
-    return test_data, config
 
 
 @dataclass(slots=True)
