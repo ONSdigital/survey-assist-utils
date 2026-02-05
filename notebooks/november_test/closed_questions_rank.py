@@ -8,7 +8,7 @@ PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
 """
 
 # %%
-# pylint: disable=C0103, C0116, C0301, C0114, R0801
+# pylint: disable=C0103, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
 # %%
@@ -140,7 +140,6 @@ def get_alt_codes_count(response_row: pd.Series) -> int | None:
 # %%
 alt_codes_count = data.apply(get_alt_codes_count, axis=1).dropna().astype(int).to_list()
 
-
 # %%
 for i in range(7):
     print(
@@ -258,7 +257,11 @@ df_sa_codes = pd.DataFrame(sa_codes)
 # %%
 # check for primacy effect
 def check_primacy(df: pd.DataFrame):
+    """Checks if there is a selection bias in the subset, based on the number of options presented.
 
+    Args:
+        df (pd.DataFrame): a dataframe with 'alt_codes_count' and 'selected_response' columns.
+    """
     for k in range(2, 6):
         df_grouped_sa = df[df["alt_codes_count"] == k]
         observed = df_grouped_sa["selected_response"].value_counts().values
@@ -294,6 +297,12 @@ for i in range(2, 6):
     print(
         f"p-value: {round(chi_pvalue, 2)}\nGreater than alpha 0.05: {chi_pvalue > 0.05}\n"
     )
+
+# %% [markdown]
+# Null hypothesis: "Respondents do not favour one of the options over other options".
+# All p-values, regardles of the count of options presented, are above alpha=0.05. Therefore, the null hypothesis cannot be rejected, and it is possible that respondents don't favour any option.
+#
+# Order of the options doesn't seem to influence the number of times, the option was selected.
 
 # %%
 # for the whole group, using weighted expected frequencies
@@ -348,9 +357,3 @@ check_primacy(df_sa_codes_no_none)
 
 # %% [markdown]
 # The residual value for first option being selected confirms that it was selected more often in cases, when 3 and 5 options were presented.For all options, the first option was selected more often than expected. This suggests that LLM was generally correct with its hierarchical codes selection.
-
-# %% [markdown]
-# Null hypothesis: "Respondents do not favour one of the options over other options".
-# All p-values, regardles of the count of options presented, are above alpha=0.05. Therefore, the null hypothesis cannot be rejected, and it is possible that respondents don't favour any option.
-#
-# Order of the options doesn't seem to influence the number of times, the option was selected.
