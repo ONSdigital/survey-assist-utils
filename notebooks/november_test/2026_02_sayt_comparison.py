@@ -7,19 +7,26 @@ Expects environment variable PREPROD_DATA_BUCKET to be set.
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103,R0801,W0104,W0106
+# pylint: disable=C0301,C0103,R0801,W0104,W0106, C0121
+# flake8: noqa: B023, E712
 
 # %%
 import os
 
 import dotenv
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
 from google import genai
+from matplotlib_venn import venn3
 from sklearn.metrics.pairwise import cosine_similarity
 
 from notebooks.november_test.helper_load_data import load_data
+from survey_assist_utils.data_cleaning.sic_codes import (
+    get_clean_n_digit_codes,
+    get_codability_level,
+)
 
 # %%
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
@@ -35,8 +42,11 @@ if out_dir:
 sa_combined_df = load_data(work_dir)
 
 # %%
-id1_df = pd.read_excel(work_dir + "/SAYT/PFR-Crossover IDs - UPDATED 26.01.26.xlsx")
-id1_df["user"] = id1_df["ONS Participant ID"] + "-01"
+# get sheet names
+id1_df = pd.read_excel(
+    work_dir + "/SAYT/PFR-Crossover IDs.xlsx", sheet_name="Matched Crossover IDs"
+)
+id1_df["user"] = id1_df["ONS ID (Industry) "] + "-01"
 sa_cross_df = sa_combined_df[sa_combined_df["user"].isin(id1_df["user"])].reset_index(
     drop=True
 )
@@ -45,7 +55,7 @@ sa_cross_df = sa_combined_df[sa_combined_df["user"].isin(id1_df["user"])].reset_
 sayt_df = pd.read_excel(work_dir + "/SAYT/SAYT_and_SA_crossover_respondent_data.xlsx")
 id2_df = pd.read_excel(work_dir + "/SAYT/matched_serials.xlsx")
 lookup = (
-    id1_df.rename(columns={"SAYT ID ": "UAC"})
+    id1_df.rename(columns={"SAYT ID": "UAC"})
     .merge(id2_df, on="UAC", how="left")
     .reset_index(drop=True)[["user", "serial_number"]]
     .rename(columns={"serial_number": "UAC"})
@@ -64,16 +74,9 @@ combined_df = sayt_cross_df.merge(
 print(combined_df.shape)
 
 # %%
-match_term = "university professor"
-# match_term = 'director'
-combined_df.loc[
-    (combined_df["job_title"].str.lower() == match_term)
-    | (combined_df["SOC_2020_pt1"].str.lower() == match_term),
-    ["job_title", "SOC_2020_pt1", "job_description", "SOC_2020_pt2"],
-]
-
 #####################
-# so we see same people buton different rows - so the linkage is wrong, lets do it ourselves
+# initial the lines were misaligned so the linkage was wrong, and we used semantic best matching to find the best pairs,
+# and then check how many of them are correct based on the true pairs from the combined_df.
 ######################
 # %%
 vectoriser = genai.Client(vertexai=True, project=project_id, location="europe-west1")
@@ -145,18 +148,253 @@ matched_sa_indices = [p[0] for p in best_matching]
 matched_sayt_indices = [p[1] for p in best_matching]
 matched_sa_df = sa_cross_df.iloc[matched_sa_indices].reset_index(drop=True)
 matched_sayt_df = sayt_cross_df.iloc[matched_sayt_indices].reset_index(drop=True)
-matched_combined_df = pd.concat([matched_sayt_df, matched_sa_df], axis=1)
-
-matched_combined_df.loc[
-    100:220, ["job_title", "SOC_2020_pt1", "job_description", "SOC_2020_pt2"]
-]
+matched_df = pd.concat(
+    [matched_sayt_df.rename(columns={"user": "user_sayt"}), matched_sa_df], axis=1
+)
 
 # %%
-fig = px.line(
-    [p[2] for p in best_matching],
+true_pairs = [(row["user"], row["UAC"]) for _, row in combined_df.iterrows()]
+my_pairs = [
+    (sa_cross_df.iloc[x[0]]["user"], int(sayt_cross_df.iloc[x[1]]["UAC"]))
+    for x in best_matching
+]
+sum(pair in true_pairs for pair in my_pairs) / len(true_pairs)
+matched_df["is_true_pair"] = [pair in true_pairs for pair in my_pairs]
+matched_df["matching_score"] = [p[2] for p in best_matching]
+
+# %%
+fig = px.scatter(
+    matched_df,
+    y="matching_score",
+    color="is_true_pair",
     title="Best pairwise matching scores between SAYT and SA job titles/descriptions",
     template="plotly_white",
+    hover_data=[
+        "user",
+        "UAC",
+        "job_title",
+        "SOC_2020_pt1",
+        "job_description",
+        "SOC_2020_pt2",
+    ],
 )
 fig.show()
 
+# print few mismatches for inspection
+matched_df.loc[
+    matched_df.is_true_pair == False,
+    ["job_title", "SOC_2020_pt1", "job_description", "SOC_2020_pt2", "matching_score"],
+].head()
+
+
+# %%
+###############
+# after update, we got the corrected matching IDs, so use the from now on
+###############
+# %%
+def get_sayt_codes(input_str):
+    """Get SAYT codes from input string."""
+    if pd.isna(input_str):
+        return set()
+    stripped = input_str.strip().replace(".", "")
+
+    for i in range(5):
+        good, bad = get_clean_n_digit_codes(stripped[: (6 - i)] + "x" * i, n=5)
+        if len(bad) == 0 and len(good) > 0:
+            return good
+    return {}
+
+
+combined_df["sayt_codes"] = combined_df["SAYT_code"].apply(get_sayt_codes)
+# %%
+combined_df["SAYT_code"].apply(lambda x: len(x) if pd.notna(x) else 0).value_counts()
+combined_df["sayt_codability_level"] = combined_df["sayt_codes"].apply(
+    get_codability_level
+)
+combined_df["sayt_codability_level"].value_counts()
+
+# %%
+combined_df["sa_final_codability_level_closed_q"].value_counts()
+
+# %%
+combined_df.groupby(
+    ["sa_final_codability_level_closed_q", "sayt_codability_level"]
+).size().unstack(fill_value=0)
+
+# %%
+# calculate agreement for different SIC levels
+for digits in [0, 2, 5]:
+    combined_df[f"sayt_codes_{digits}_digit"] = combined_df["sayt_codes"].apply(
+        lambda x, n=digits: get_clean_n_digit_codes(x, n=n)[0]
+    )
+    combined_df[f"sa_final_codes_closed_q_{digits}_digit"] = combined_df[
+        "sa_final_codes_closed_q"
+    ].apply(lambda x, n=digits: get_clean_n_digit_codes(x, n=n)[0])
+    combined_df[f"both_codable_{digits}_digit"] = combined_df[
+        f"sayt_codes_{digits}_digit"
+    ].apply(lambda x: len(x) == 1) & combined_df[
+        f"sa_final_codes_closed_q_{digits}_digit"
+    ].apply(
+        lambda x: len(x) == 1
+    )
+    combined_df[f"cc_codes_{digits}_digit"] = combined_df["cc_initial_codes"].apply(
+        lambda x: get_clean_n_digit_codes(x, n=digits)[0]
+    )
+    combined_df[f"sayt_closed_match_{digits}_digit"] = (
+        combined_df[f"sayt_codes_{digits}_digit"]
+        == combined_df[f"sa_final_codes_closed_q_{digits}_digit"]
+    )
+    combined_df[f"sayt_in_cc_{digits}_digit"] = combined_df.apply(
+        lambda row: len(
+            row[f"sayt_codes_{digits}_digit"].intersection(
+                row[f"cc_codes_{digits}_digit"]
+            )
+        )
+        > 0,
+        axis=1,
+    )
+    combined_df[f"closed_in_cc_{digits}_digit"] = combined_df.apply(
+        lambda row: len(
+            row[f"sa_final_codes_closed_q_{digits}_digit"].intersection(
+                row[f"cc_codes_{digits}_digit"]
+            )
+        )
+        > 0,
+        axis=1,
+    )
+
+    combined_df[combined_df[f"both_codable_{digits}_digit"]].groupby(
+        [
+            f"sayt_closed_match_{digits}_digit",
+            f"closed_in_cc_{digits}_digit",
+            f"sayt_in_cc_{digits}_digit",
+        ]
+    ).size()
+
+# %%
+for digits in [0, 2, 5]:
+    msk = combined_df[f"both_codable_{digits}_digit"]
+    subsets = {}
+    subsets["111"] = sum(
+        msk
+        & (combined_df[f"sayt_closed_match_{digits}_digit"] == True)
+        & (combined_df[f"closed_in_cc_{digits}_digit"] == True)
+    )
+    subsets["110"] = sum(
+        msk
+        & (combined_df[f"sayt_closed_match_{digits}_digit"] == True)
+        & (combined_df[f"closed_in_cc_{digits}_digit"] == False)
+    )
+    subsets["101"] = sum(
+        msk
+        & (combined_df[f"sayt_closed_match_{digits}_digit"] == False)
+        & (combined_df[f"sayt_in_cc_{digits}_digit"] == True)
+    )
+    subsets["011"] = sum(
+        msk
+        & (combined_df[f"sayt_closed_match_{digits}_digit"] == False)
+        & (combined_df[f"closed_in_cc_{digits}_digit"] == True)
+    )
+    subsets["100"] = sum(
+        msk
+        & (combined_df[f"sayt_closed_match_{digits}_digit"] == False)
+        & (combined_df[f"sayt_in_cc_{digits}_digit"] == False)
+    )
+    subsets["010"] = sum(
+        msk
+        & (combined_df[f"sayt_closed_match_{digits}_digit"] == False)
+        & (combined_df[f"closed_in_cc_{digits}_digit"] == False)
+    )
+    subsets["001"] = sum(msk) - subsets["111"] - subsets["101"] - subsets["011"]
+    venn3(
+        subsets=subsets,
+        set_labels=(
+            f"SAYT (codable at {digits} digits)",
+            "SA (closed q codable)",
+            "CC (standard tlfs, OM plausible)",
+        ),
+    )
+
+    plt.show()
+
+# %%
+# most frequent 2-digit disagreements between SA and SAYT
+digits = 2
+msk = (
+    combined_df[f"both_codable_{digits}_digit"]
+    & ~combined_df[f"sayt_closed_match_{digits}_digit"]
+)
+disagree_2_digit = combined_df[msk].copy()
+disagree_2_digit["sayt_str"] = disagree_2_digit[f"sayt_codes_{digits}_digit"].apply(
+    lambda x: next(iter(x)) if len(x) == 1 else None
+)
+disagree_2_digit["sa_str"] = disagree_2_digit[
+    f"sa_final_codes_closed_q_{digits}_digit"
+].apply(lambda x: next(iter(x)) if len(x) == 1 else None)
+aggr = (
+    disagree_2_digit.groupby(["sayt_str", "sa_str"])
+    .size()
+    .reset_index(name="count")
+    .sort_values("count", ascending=False)
+)
+aggr.head(10)
+
+# %%
+examples = combined_df[
+    (combined_df[f"sayt_codes_{digits}_digit"] == {aggr.iloc[0]["sayt_str"]})
+    & (
+        combined_df[f"sa_final_codes_closed_q_{digits}_digit"]
+        == {aggr.iloc[0]["sa_str"]}
+    )
+]
+examples[
+    [
+        "SOC_2020_pt1",
+        "SOC_2020_pt2",
+        "SAYT_selection",
+        "sayt_codes",
+        "job_title",
+        "job_description",
+        "org_description",
+        "survey_assist_closed_question_response",
+        "sa_final_codes_closed_q",
+        "clerical_code_initial",
+    ]
+].head(5)
+
+# %%
+combined_df[
+    [
+        "UAC",
+        "user",
+        "SAYT_code",
+        "sayt_codes",
+        "sa_initial_codes",
+        "cc_initial_codes",
+        "sa_final_codes_open_q",
+        "cc_final_codes_open_q",
+        "sa_final_codes_closed_q",
+        "sayt_codes_0_digit",
+        "sa_final_codes_closed_q_0_digit",
+        "both_codable_0_digit",
+        "cc_codes_0_digit",
+        "sayt_closed_match_0_digit",
+        "sayt_in_cc_0_digit",
+        "closed_in_cc_0_digit",
+        "sayt_codes_2_digit",
+        "sa_final_codes_closed_q_2_digit",
+        "both_codable_2_digit",
+        "cc_codes_2_digit",
+        "sayt_closed_match_2_digit",
+        "sayt_in_cc_2_digit",
+        "closed_in_cc_2_digit",
+        "sayt_codes_5_digit",
+        "sa_final_codes_closed_q_5_digit",
+        "both_codable_5_digit",
+        "cc_codes_5_digit",
+        "sayt_closed_match_5_digit",
+        "sayt_in_cc_5_digit",
+        "closed_in_cc_5_digit",
+    ]
+].to_csv(work_dir + "/SAYT/sayt_sa_comparison.csv", index=False)
 # %%
