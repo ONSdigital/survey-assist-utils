@@ -1,14 +1,15 @@
 # %%
 """Work in progess.
 
-Initial analysis of survey responses, focusing on Closed Follow up questions.
+Initial analysis of survey responses, focusing on Closed Follow up questions
+and Clerical Coder agreement.
 
-Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
-and ANALYSIS_BUCKET similarly.
+Create .env file with bucket variables, such as
+PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
 """
 
 # %%
-# pylint: disable=C0103, C0116, C0301, C0114, R0801
+# pylint: disable=C0103, C0301
 # ruff: noqa: PLR2004
 
 # %%
@@ -19,21 +20,18 @@ import pandas as pd
 from scipy.stats import chi2_contingency
 
 # %%
-evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not evaluation_bucket:
-    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
-if not analysis_bucket:
+preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
+if not preprod_bucket:
     raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
 # %%
 # data = pd.read_parquet(
-#     f"{analysis_bucket}analysis-interim-results/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
+#     f"{preprod_bucket}analysis-interim-results/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
 # )
 
 # %%
 # sa_data = pd.read_parquet(
-#     f"{analysis_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
+#     f"{preprod_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
 # )
 
 # %%
@@ -61,18 +59,18 @@ closed_question_selected_cols = closed_question_data[
 ]
 
 # %%
-closed_question_selected_cols[question_column].value_counts()
+closed_question_data[question_column].value_counts()
 
 # %%
-closed_question_selected_cols[question_column] = closed_question_selected_cols[
-    question_column
-].apply(lambda x: x.lower() if isinstance(x, str) else "-9")
-closed_question_selected_cols[question_column] = closed_question_selected_cols[
-    question_column
-].apply(lambda x: x if len(x) < 3 else x[0])
+closed_question_data[question_column] = closed_question_data[question_column].apply(
+    lambda x: x.lower() if isinstance(x, str) else "-9"
+)
+closed_question_data[question_column] = closed_question_data[question_column].apply(
+    lambda x: x if len(x) < 3 else x[0]
+)
 
 # %%
-closed_question_selected_cols[question_column].value_counts()
+closed_question_data[question_column].value_counts()
 
 # %% [markdown]
 # 122 CCs did not provide their opinion whether they think it is possible to get a single SIC code based on the initial TLFS responses
@@ -80,9 +78,7 @@ closed_question_selected_cols[question_column].value_counts()
 # check if there is a correlation between CCs saying "no" and respondents selecting "None of the above".
 
 # %%
-cc_opinion_given = closed_question_selected_cols[
-    closed_question_selected_cols[question_column] != "-9"
-]
+cc_opinion_given = closed_question_data[closed_question_data[question_column] != "-9"]
 
 # %%
 nota_y = cc_opinion_given[cc_opinion_given["sa_final_codes_closed_q"].str.len() == 0][
@@ -135,11 +131,6 @@ print((selected_n + selected_y) / (selected_n + selected_y + nota_n + nota_y) * 
 
 # %% [markdown]
 # 80.5% of respondents selected one of the codes.
-
-# %%
-full_data = pd.read_parquet(
-    "/home/user/survey-assist-utils/notebooks/november_test/data/figures/cc_sa_combined.parquet"
-)
 
 # %%
 # final_codability_sa_cc = full_data[full_data.survey_assist_open_question.notna()].groupby(['cc_final_codability_level_open_q', 'sa_final_codability_level_closed_q']).size().unstack()
@@ -243,3 +234,81 @@ print(adj_residuals)
 
 # %%
 print(adj_residuals > 1.96)
+
+# %% [markdown]
+# ## CQ - CC disagreement
+
+# %%
+cc_final_5dig = full_data[
+    full_data["cc_final_codability_level_open_q"] == "Sub-class (5-digits)"
+]
+
+# %%
+cc_5dig_open_question = cc_final_5dig[
+    ~(cc_final_5dig["survey_assist_open_question"].isna())
+]
+
+# %%
+columns_to_investigate = [
+    "job_title",
+    "job_description",
+    "org_description",
+    "survey_assist_open_question",
+    "survey_assist_open_question_response",
+    "survey_assist_closed_question_response",
+    "sa_initial_codes",
+    "sa_initial_codability_level",
+    "sa_final_codes_open_q",
+    "sa_final_codability_level_open_q",
+    "sa_final_codability_level_closed_q",
+    "sa_codability_gain_closed_q",
+    "most_likely_sic_section",
+    "SIC Section",
+    "clerical_code_initial",
+    "clerical_code_final",
+    "cc_initial_codes",
+    "cc_initial_codability_level",
+    "cc_final_codes_open_q",
+    "cc_final_codability_level_open_q",
+    "sa_final_codes_closed_q",
+    "cc_final_codes_open_q_vs_selected_by_user_in_closed",
+]
+
+# %%
+cc_5dig_only_columns = cc_5dig_open_question[
+    cc_5dig_open_question["cc_final_codes_open_q_vs_selected_by_user_in_closed"]
+    == "different selected"
+][columns_to_investigate].copy()
+
+# %%
+cc_resp_disagreemnet = cc_5dig_only_columns[
+    cc_5dig_only_columns.apply(
+        lambda row: row["sa_initial_codes"] in row["cc_final_codes_open_q"], axis=1
+    )
+]
+
+# %%
+print(cc_resp_disagreemnet["cc_final_codes_open_q"].value_counts())
+
+# %%
+columns_to_display = [
+    "job_title",
+    "job_description",
+    "org_description",
+    "survey_assist_open_question",
+    "survey_assist_open_question_response",
+    "survey_assist_closed_question_response",
+    "sa_final_codes_closed_q",
+    "cc_final_codes_open_q",
+    "SIC Section",
+]
+
+# %%
+# conditions for filtering row for analysis
+cc_condition = cc_resp_disagreemnet["cc_final_codes_open_q"] == "88990"
+sa_condition = cc_resp_disagreemnet["sa_final_codes_closed_q"] == "86900"
+
+# %%
+cc_resp_disagreemnet[cc_condition & sa_condition][columns_to_display].reset_index(
+    drop=True
+)
