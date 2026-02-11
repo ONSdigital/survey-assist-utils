@@ -12,7 +12,6 @@ and ANALYSIS_BUCKET similarly.
 # ruff: noqa: PLR2004
 
 # %%
-import os
 
 import dotenv
 import numpy as np
@@ -22,19 +21,11 @@ from scipy.stats import chi2_contingency
 # %%
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 work_dir = data_bucket + "analysis-interim-results"
-out_dir = (
-    "data/figures/"  # needs local folder unfortunately, set to None to skip saving
-)
-if out_dir:
-    os.makedirs(out_dir, exist_ok=True)
 
 full_data = load_data(work_dir)
 
 # %%
-evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
 analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not evaluation_bucket:
-    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
 if not analysis_bucket:
     raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
