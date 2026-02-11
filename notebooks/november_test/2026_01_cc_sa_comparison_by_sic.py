@@ -71,10 +71,26 @@ plot_df = pd.DataFrame(
             "Precision": v.ambiguity_metrics.precision,
             "Recall": v.ambiguity_metrics.recall,
             "Accuracy": v.ambiguity_metrics.accuracy,
-            "OO Accuracy": v.initial_accuracy_metrics.accuracy_oo_unambiguous,
-            "OM Accuracy": v.initial_accuracy_metrics.accuracy_om_unambiguous,
-            "MO Accuracy": v.initial_accuracy_metrics.accuracy_mo_unambiguous,
-            "MM Accuracy": v.initial_accuracy_metrics.accuracy_mm_total,
+            "OO Accuracy": (
+                v.initial_accuracy_metrics.accuracy_oo_unambiguous,
+                v.initial_accuracy_metrics.matches_oo,
+                v.ambiguity_metrics.TN,
+            ),
+            "OM Accuracy": (
+                v.initial_accuracy_metrics.accuracy_om_unambiguous,
+                v.initial_accuracy_metrics.matches_om,
+                v.ambiguity_metrics.FP + v.ambiguity_metrics.TN,
+            ),
+            "MO Accuracy": (
+                v.initial_accuracy_metrics.accuracy_mo_unambiguous,
+                v.initial_accuracy_metrics.matches_mo,
+                v.ambiguity_metrics.FN + v.ambiguity_metrics.TN,
+            ),
+            "MM Accuracy": (
+                v.initial_accuracy_metrics.accuracy_mm_total,
+                v.initial_accuracy_metrics.matches_mm,
+                v.initial_accuracy_metrics.total_records,
+            ),
         }
         for k, v in eval_metrics.items()
     ]
@@ -112,7 +128,15 @@ def create_codability_by_section_figure(
         id_vars=[group_col, "num_responses", "Stage"],
         value_vars=metrics,
         var_name="Metrics",
+        value_name="accu_value",
     ).reset_index(drop=True)
+    hoverdata: dict[str, str | bool] = {"accu_value": ":.2%"}
+    if plot_df_melted["accu_value"].dtype == "object":
+        plot_df_melted[["accu_value", "matches", "total"]] = pd.DataFrame(
+            plot_df_melted["accu_value"].tolist(), index=plot_df_melted.index
+        )
+        hoverdata = {"matches": True, "total": True, "accu_value": ":.2%"}
+
     plot_df_melted["metrics_ord"] = plot_df_melted["Metrics"].apply(metrics.index)
 
     plot_df_melted = plot_df_melted.sort_values(
@@ -121,13 +145,14 @@ def create_codability_by_section_figure(
 
     fig = px.scatter(
         plot_df_melted,
-        x="value",
+        x="accu_value",
         y=group_col,
         color="Stage",
         symbol="Stage",
         template="plotly_white",
         facet_col="Metrics",
         title=title,
+        hover_data=hoverdata,
     )
     fig.update_traces(
         marker={"size": 10, "opacity": 0.8},

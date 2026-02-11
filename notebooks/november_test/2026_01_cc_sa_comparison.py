@@ -144,10 +144,26 @@ plot_df_accu = pd.DataFrame(
         {
             "digits": str(k[0]) if k[0] > 0 else "S",
             "Stage": k[1],
-            "OO Accuracy": v.initial_accuracy_metrics.accuracy_oo_unambiguous,
-            "OM Accuracy": v.initial_accuracy_metrics.accuracy_om_unambiguous,
-            "MO Accuracy": v.initial_accuracy_metrics.accuracy_mo_unambiguous,
-            "MM Accuracy": v.initial_accuracy_metrics.accuracy_mm_total,
+            "OO Accuracy": (
+                v.initial_accuracy_metrics.accuracy_oo_unambiguous,
+                v.initial_accuracy_metrics.matches_oo,
+                v.ambiguity_metrics.TN,
+            ),
+            "OM Accuracy": (
+                v.initial_accuracy_metrics.accuracy_om_unambiguous,
+                v.initial_accuracy_metrics.matches_om,
+                v.ambiguity_metrics.FP + v.ambiguity_metrics.TN,
+            ),
+            "MO Accuracy": (
+                v.initial_accuracy_metrics.accuracy_mo_unambiguous,
+                v.initial_accuracy_metrics.matches_mo,
+                v.ambiguity_metrics.FN + v.ambiguity_metrics.TN,
+            ),
+            "MM Accuracy": (
+                v.initial_accuracy_metrics.accuracy_mm_total,
+                v.initial_accuracy_metrics.matches_mm,
+                v.initial_accuracy_metrics.total_records,
+            ),
         }
         for k, v in eval_metrics.items()
         if k[2] == "sa_cc"
@@ -159,17 +175,23 @@ plot_df_accu = plot_df_accu.melt(
     id_vars=["digits", "Stage"],
     value_vars=["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"],
     var_name="metrics",
-    value_name="value",
+    value_name="value_tuple",
 )
+# unwrap tuple into three columns
+plot_df_accu[["accu_value", "matches", "total"]] = pd.DataFrame(
+    plot_df_accu["value_tuple"].tolist(), index=plot_df_accu.index
+)
+
 fig = px.line(
     plot_df_accu,
     x="digits",
-    y="value",
+    y="accu_value",
     color="Stage",
     facet_col="metrics",
     title="Classification Accuracy Metrics by Number of Digits and Stage",
     markers=True,
     template="simple_white",
+    hover_data={"matches": True, "total": True, "accu_value": ":.2%"},
 )
 # drop first part of facet annotation
 for i in fig.layout.annotations:
