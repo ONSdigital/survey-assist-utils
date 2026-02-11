@@ -12,7 +12,6 @@ and ANALYSIS_BUCKET similarly.
 # ruff: noqa: PLR2004
 
 # %%
-
 import dotenv
 import numpy as np
 from helper_load_data import load_data
@@ -28,7 +27,6 @@ full_data = load_data(work_dir)
 analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
 if not analysis_bucket:
     raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
-
 
 # %%
 closed_question_data = full_data[
@@ -53,12 +51,16 @@ closed_question_selected_cols = closed_question_data[
 closed_question_data[question_column].value_counts()
 
 # %%
-closed_question_data[question_column] = closed_question_data[question_column].apply(
+lower_case = closed_question_data[question_column].apply(
     lambda x: x.lower() if isinstance(x, str) else "-9"
 )
-closed_question_data[question_column] = closed_question_data[question_column].apply(
+closed_question_data.loc[:, question_column] = lower_case
+
+convert_yes_to_y = closed_question_data[question_column].apply(
     lambda x: x if len(x) < 3 else x[0]
 )
+
+closed_question_data.loc[:, question_column] = convert_yes_to_y
 
 # %%
 closed_question_data[question_column].value_counts()
