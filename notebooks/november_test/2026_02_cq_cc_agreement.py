@@ -1,43 +1,43 @@
 # %%
 """Work in progess.
 
-Initial analysis of survey responses, focusing on Closed Follow up questions
-and Clerical Coder agreement.
+Initial analysis of survey responses, focusing on Closed Follow up questions.
 
-Create .env file with bucket variables, such as
-PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
+Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
+and ANALYSIS_BUCKET similarly.
 """
 
 # %%
-# pylint: disable=C0103, C0301
+# pylint: disable=C0103, C0116, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
 # %%
+import os
 
 import dotenv
 import numpy as np
-import pandas as pd
+from helper_load_data import load_data
 from scipy.stats import chi2_contingency
 
 # %%
-preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not preprod_bucket:
+data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+work_dir = data_bucket + "analysis-interim-results"
+out_dir = (
+    "data/figures/"  # needs local folder unfortunately, set to None to skip saving
+)
+if out_dir:
+    os.makedirs(out_dir, exist_ok=True)
+
+full_data = load_data(work_dir)
+
+# %%
+evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
+analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
+if not evaluation_bucket:
+    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
+if not analysis_bucket:
     raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
-# %%
-# data = pd.read_parquet(
-#     f"{preprod_bucket}analysis-interim-results/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
-# )
-
-# %%
-# sa_data = pd.read_parquet(
-#     f"{preprod_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
-# )
-
-# %%
-full_data = pd.read_parquet(
-    "/home/user/survey-assist-utils/notebooks/november_test/data/figures/cc_sa_combined.parquet"
-)
 
 # %%
 closed_question_data = full_data[
@@ -133,7 +133,6 @@ print((selected_n + selected_y) / (selected_n + selected_y + nota_n + nota_y) * 
 # 80.5% of respondents selected one of the codes.
 
 # %%
-# final_codability_sa_cc = full_data[full_data.survey_assist_open_question.notna()].groupby(['cc_final_codability_level_open_q', 'sa_final_codability_level_closed_q']).size().unstack()
 final_codability_sa_cc = (
     full_data[full_data.survey_assist_open_question.notna()]
     .groupby(["cc_initial_codability_level", "sa_final_codability_level_closed_q"])
@@ -239,6 +238,63 @@ print(adj_residuals > 1.96)
 # ## CQ - CC disagreement
 
 # %%
+method = "cc"
+msk = (
+    full_data[f"{method}_final_codability_level_open_q"] == "Sub-class (5-digits)"
+) & ~full_data["survey_assist_open_question"].isna()
+full_data[f"{method}_final_codes_open_q_within_offered_options"] = full_data.apply(
+    lambda row: row[f"{method}_final_codes_open_q"].issubset(row["sa_initial_codes"]),
+    axis=1,
+)
+full_data[f"{method}_final_codes_open_q_vs_selected_by_user_in_closed"] = (
+    full_data.apply(
+        lambda row: (
+            "none of the above"
+            if len(row["sa_final_codes_closed_q"]) == 0
+            else (
+                "same code selected"
+                if row[f"{method}_final_codes_open_q"].issubset(
+                    row["sa_final_codes_closed_q"]
+                )
+                else "different selected"
+            )
+        ),
+        axis=1,
+    )
+)
+full_data[msk].groupby(
+    [
+        f"{method}_final_codes_open_q_vs_selected_by_user_in_closed",
+        f"{method}_final_codes_open_q_within_offered_options",
+    ]
+).size().unstack(fill_value=0)
+
+# %%
+full_data["both_final_codes_open_q_vs_selected_by_user_in_closed"] = full_data.apply(
+    lambda row: (
+        "none of the above"
+        if len(row["sa_final_codes_closed_q"]) == 0
+        else (
+            "same code selected"
+            if row["cc_final_codes_open_q"].issubset(row["sa_final_codes_closed_q"])
+            and row["sa_final_codes_open_q"].issubset(row["sa_final_codes_closed_q"])
+            else (
+                "sa_code selected"
+                if row["sa_final_codes_open_q"].issubset(row["sa_final_codes_closed_q"])
+                else (
+                    "cc_code selected"
+                    if row["cc_final_codes_open_q"].issubset(
+                        row["sa_final_codes_closed_q"]
+                    )
+                    else "different selected"
+                )
+            )
+        )
+    ),
+    axis=1,
+)
+
+# %%
 cc_final_5dig = full_data[
     full_data["cc_final_codability_level_open_q"] == "Sub-class (5-digits)"
 ]
@@ -283,7 +339,8 @@ cc_5dig_only_columns = cc_5dig_open_question[
 # %%
 cc_resp_disagreemnet = cc_5dig_only_columns[
     cc_5dig_only_columns.apply(
-        lambda row: row["sa_initial_codes"] in row["cc_final_codes_open_q"], axis=1
+        lambda row: row["cc_final_codes_open_q"].issubset(row["sa_initial_codes"]),
+        axis=1,
     )
 ]
 
@@ -304,9 +361,9 @@ columns_to_display = [
 ]
 
 # %%
-# conditions for filtering row for analysis
-cc_condition = cc_resp_disagreemnet["cc_final_codes_open_q"] == "88990"
-sa_condition = cc_resp_disagreemnet["sa_final_codes_closed_q"] == "86900"
+# conditions for filtering row for analysis, provide codes to investigate the disagreement between
+cc_condition = cc_resp_disagreemnet["cc_final_codes_open_q"] == {"88990"}
+sa_condition = cc_resp_disagreemnet["sa_final_codes_closed_q"] == {"86900"}
 
 # %%
 cc_resp_disagreemnet[cc_condition & sa_condition][columns_to_display].reset_index(
