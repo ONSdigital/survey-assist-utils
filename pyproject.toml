@@ -46,6 +46,7 @@ pre-commit = "^4.2.0"
 types-toml = "^0.10.8.20240310"
 jupytext = "^1.17.1"
 plotly = "^6.3.0"
+scipy = "^1.16.3"
 kaleido = "^1.2.0"
 
 [tool.isort]
