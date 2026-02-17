@@ -65,9 +65,13 @@ closed_question_data.loc[:, question_column] = convert_yes_to_y
 # %%
 closed_question_data[question_column].value_counts()
 
+# %%
+print(
+    f"{closed_question_data[question_column].value_counts()['-9']} CCs did not provide their opinion whether they think it is possible to get a single SIC code based on the initial TLFS responses"
+)
+
+
 # %% [markdown]
-# 122 CCs did not provide their opinion whether they think it is possible to get a single SIC code based on the initial TLFS responses
-#
 # check if there is a correlation between CCs saying "no" and respondents selecting "None of the above".
 
 # %%
@@ -93,11 +97,15 @@ selected_n = cc_opinion_given[
 print(nota_n, selected_n)
 print(nota_y, selected_y)
 
-# %% [markdown]
-# When looking at rows, where CC provided their opinion (yes or no), there is 86 respondents who selected NOTA.
+# %%
+print(
+    f"When looking at rows, where CC provided their opinion (yes or no), there is {nota_n + nota_y} respondents who selected NOTA."
+)
 
-# %% [markdown]
-# When looking at rows, where CC provided their opinion (yes or no), there is 355 respondents who selected one of the answers.
+# %%
+print(
+    f"When looking at rows, where CC provided their opinion (yes or no), there is {selected_n + selected_y} respondents who selected one of the answers."
+)
 
 # %% [markdown]
 # null: there is no differenece between the CCs opinion and the respondent selecting NOTA.
@@ -114,16 +122,14 @@ print(contingency_table)
 chi_square_p = chi2_contingency(contingency_table).pvalue
 
 # %%
-print(chi_square_p)
-
-# %% [markdown]
-# With p-value at 0.84, we reject null hypothesis, suggesting that there is no evidence of a relationship between CCs opinion and respondent selecting NOTA.
+print(
+    f"With p-value at {round(chi_square_p, 2)}, we reject null hypothesis, suggesting that there is no evidence of a relationship between CCs opinion and respondent selecting NOTA."
+)
 
 # %%
-print((selected_n + selected_y) / (selected_n + selected_y + nota_n + nota_y) * 100)
-
-# %% [markdown]
-# 80.5% of respondents selected one of the codes.
+print(
+    f"{round((selected_n + selected_y) / (selected_n + selected_y + nota_n + nota_y) * 100,1)}% of respondents selected one of the codes."
+)
 
 # %%
 final_codability_sa_cc = (
@@ -134,7 +140,7 @@ final_codability_sa_cc = (
 )
 
 # %% [markdown]
-# Comparing CCs' final codability with SA final codability.
+# # Comparing CCs' final codability with SA final codability.
 
 # %%
 print(final_codability_sa_cc)
@@ -176,10 +182,9 @@ p_value = chi2_contingency(table).pvalue
 expected = chi2_contingency(table).expected_freq
 
 # %%
-print(p_value)
-
-# %% [markdown]
-# The p-value is very low (4.7852e-20). This allows to reject the null hypothesis. There is a differnece between successes found by cc and sa.
+print(
+    f"The p-value is very low ({p_value}). This allows to reject the null hypothesis. There is a differnece between successes found by cc and sa."
+)
 
 # %%
 sr_cl = round(cl[0] / sum(cl) * 100, 2)
