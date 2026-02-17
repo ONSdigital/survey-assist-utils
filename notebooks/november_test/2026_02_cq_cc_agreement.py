@@ -14,8 +14,12 @@ and ANALYSIS_BUCKET similarly.
 # %%
 import dotenv
 import numpy as np
+import pandas as pd
 from helper_load_data import load_data
 from scipy.stats import chi2_contingency
+
+# %%
+significance_threshold = 0.05
 
 # %%
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
@@ -94,8 +98,28 @@ selected_n = cc_opinion_given[
 ][question_column].value_counts()["n"]
 
 # %%
-print(nota_n, selected_n)
-print(nota_y, selected_y)
+# counts and total percentages of answers grouped by
+# CC: "Is it possible to code based on initial TLFS reponses?" and the NOTA/code selected by the user
+
+cc_opinion_given.loc[:, ["sa_codability"]] = cc_opinion_given[
+    "sa_final_codes_closed_q"
+].apply(lambda x: "code selected" if len(str(x)) == 5 else "NOTA")
+
+print("Total count")
+print(pd.crosstab(cc_opinion_given[question_column], cc_opinion_given["sa_codability"]))
+
+print("\nPercentage of all")
+print(
+    round(
+        pd.crosstab(
+            cc_opinion_given[question_column],
+            cc_opinion_given["sa_codability"],
+            normalize="all",
+        )
+        * 100,
+        1,
+    )
+)
 
 # %%
 print(
@@ -116,19 +140,21 @@ row_yes = [nota_y, selected_y]
 contingency_table = [row_no, row_yes]
 
 # %%
-print(contingency_table)
-
-# %%
 chi_square_p = chi2_contingency(contingency_table).pvalue
 
 # %%
-print(
-    f"With p-value at {round(chi_square_p, 2)}, we reject null hypothesis, suggesting that there is no evidence of a relationship between CCs opinion and respondent selecting NOTA."
-)
+if chi_square_p > significance_threshold:
+    print(
+        f"With p-value at {round(chi_square_p, 2)}, we reject null hypothesis, suggesting that there is no evidence of a relationship between CCs opinion and respondent selecting NOTA."
+    )
+else:
+    print(
+        f"With p-value at {round(chi_square_p, 2)}, we accept null hypothesis, suggesting that there is evidence of a relationship between CCs opinion and respondent selecting NOTA."
+    )
 
 # %%
 print(
-    f"{round((selected_n + selected_y) / (selected_n + selected_y + nota_n + nota_y) * 100,1)}% of respondents selected one of the codes."
+    f"{(selected_n + selected_y) / (selected_n + selected_y + nota_n + nota_y) * 100:.2f}% of respondents selected one of the codes."
 )
 
 # %%
@@ -146,9 +172,9 @@ final_codability_sa_cc = (
 print(final_codability_sa_cc)
 
 # %%
-cl = [
-    final_codability_sa_cc["Sub-class (5-digits)"]["Class (4-digits)"],
-    final_codability_sa_cc["Uncodable"]["Class (4-digits)"],
+se = [
+    final_codability_sa_cc["Sub-class (5-digits)"]["Section (letter)"],
+    final_codability_sa_cc["Uncodable"]["Section (letter)"],
 ]
 di = [
     final_codability_sa_cc["Sub-class (5-digits)"]["Division (2-digits)"],
@@ -158,9 +184,9 @@ gr = [
     final_codability_sa_cc["Sub-class (5-digits)"]["Group (3-digits)"],
     final_codability_sa_cc["Uncodable"]["Group (3-digits)"],
 ]
-se = [
-    final_codability_sa_cc["Sub-class (5-digits)"]["Section (letter)"],
-    final_codability_sa_cc["Uncodable"]["Section (letter)"],
+cl = [
+    final_codability_sa_cc["Sub-class (5-digits)"]["Class (4-digits)"],
+    final_codability_sa_cc["Uncodable"]["Class (4-digits)"],
 ]
 su = [
     final_codability_sa_cc["Sub-class (5-digits)"]["Sub-class (5-digits)"],
@@ -172,7 +198,7 @@ un = [
 ]
 
 # %%
-table = np.array([cl, di, gr, se, su, un])
+table = np.array([se, di, gr, cl, su, un])
 
 # %% [markdown]
 # null hypothesis: there is no differenece between likelihoods of success between rows (there is no difference between cc and sa successes).
@@ -182,20 +208,27 @@ p_value = chi2_contingency(table).pvalue
 expected = chi2_contingency(table).expected_freq
 
 # %%
-print(
-    f"The p-value is very low ({p_value}). This allows to reject the null hypothesis. There is a differnece between successes found by cc and sa."
-)
+if p_value < significance_threshold:
+    print(
+        f"The p-value is very low ({p_value}). This allows to reject the null hypothesis. There is a differnece between successes found by cc and sa."
+    )
+else:
+    print(
+        f"The p-value ({p_value}) does not allow to reject the null hypothesis. There is no differnece between successes found by cc and sa."
+    )
 
 # %%
-sr_cl = round(cl[0] / sum(cl) * 100, 2)
+sr_se = round(su[0] / sum(su) * 100, 2)
 sr_di = round(di[0] / sum(di) * 100, 2)
 sr_gr = round(gr[0] / sum(gr) * 100, 2)
-sr_se = round(se[0] / sum(se) * 100, 2)
-sr_su = round(su[0] / sum(su) * 100, 2)
+sr_cl = round(cl[0] / sum(cl) * 100, 2)
+sr_su = round(se[0] / sum(se) * 100, 2)
 sr_un = round(un[0] / sum(un) * 100, 2)
 
 # %%
-print(sr_cl, sr_di, sr_gr, sr_se, sr_su, sr_un)
+print(
+    f"""Success ratio for:\nSection: {sr_se}\nDivision: {sr_di}\nGroup: {sr_gr}\nClass: {sr_cl}\nSub-Class: {sr_su}\nUncodable: {sr_un}"""
+)
 
 # %%
 sr_all = round(
