@@ -16,6 +16,9 @@ import dotenv
 import numpy as np
 import pandas as pd
 from helper_load_data import load_data
+
+# %%
+from IPython.display import display
 from scipy.stats import chi2_contingency
 
 # %%
@@ -73,7 +76,6 @@ closed_question_data[question_column].value_counts()
 print(
     f"{closed_question_data[question_column].value_counts()['-9']} CCs did not provide their opinion whether they think it is possible to get a single SIC code based on the initial TLFS responses"
 )
-
 
 # %% [markdown]
 # check if there is a correlation between CCs saying "no" and respondents selecting "None of the above".
@@ -244,6 +246,13 @@ sr_all = round(
 # %%
 print(sr_all)
 
+# %% [markdown]
+# Calculate adjusted residual for success ratios.
+#
+# variance = expected * (1 - row total proportion) * (1 - column total proportion)
+#
+# adjusted residual = (observed - expected) / sqrt (variance)
+
 # %%
 obs_sum = table.sum()
 
@@ -263,6 +272,7 @@ adj_residuals = (table - expected) / variance**0.5
 print(adj_residuals)
 
 # %%
+# True when the diffetence between observed and expected is statistically significant at 95% confidence.
 print(adj_residuals > 1.96)
 
 # %% [markdown]
@@ -375,8 +385,16 @@ cc_resp_disagreemnet = cc_5dig_only_columns[
     )
 ]
 
+# %% [markdown]
+# Manual check for surveys where the final code selected by the CC was present in the options presented, but the respondent selected alternative option.
+#
+# Compare by changing codes in the filtering variables ('cc_condition' and 'sa_condition')
+
 # %%
-print(cc_resp_disagreemnet["cc_final_codes_open_q"].value_counts())
+# final codes selected by CC and their frequency - use those for filtering variables
+print(
+    f"Final codes selected by CC and their frequency\n{cc_resp_disagreemnet["cc_final_codes_open_q"].value_counts()}"
+)
 
 # %%
 columns_to_display = [
@@ -397,6 +415,8 @@ cc_condition = cc_resp_disagreemnet["cc_final_codes_open_q"] == {"88990"}
 sa_condition = cc_resp_disagreemnet["sa_final_codes_closed_q"] == {"86900"}
 
 # %%
-cc_resp_disagreemnet[cc_condition & sa_condition][columns_to_display].reset_index(
-    drop=True
+display(
+    cc_resp_disagreemnet[cc_condition & sa_condition][columns_to_display].reset_index(
+        drop=True
+    )
 )
