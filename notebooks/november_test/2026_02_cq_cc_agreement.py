@@ -55,9 +55,6 @@ closed_question_selected_cols = closed_question_data[
 ]
 
 # %%
-closed_question_data[question_column].value_counts()
-
-# %%
 lower_case = closed_question_data[question_column].apply(
     lambda x: x.lower() if isinstance(x, str) else "-9"
 )
@@ -74,7 +71,7 @@ closed_question_data[question_column].value_counts()
 
 # %%
 print(
-    f"{closed_question_data[question_column].value_counts()['-9']} CCs did not provide their opinion whether they think it is possible to get a single SIC code based on the initial TLFS responses"
+    f"{closed_question_data[question_column].value_counts()['-9']} survey responses ({100*closed_question_data[question_column].value_counts()['-9']/len(closed_question_data):.1f}%) CCs did not provide their opinion whether they think it is possible to get a single SIC code based on the initial TLFS responses"
 )
 
 # %% [markdown]
@@ -272,7 +269,9 @@ adj_residuals = (table - expected) / variance**0.5
 print(adj_residuals)
 
 # %%
-# True when the diffetence between observed and expected is statistically significant at 95% confidence.
+print(
+    "True when the diffetence between observed and expected is statistically significant at 95% confidence."
+)
 print(adj_residuals > 1.96)
 
 # %% [markdown]
