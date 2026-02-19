@@ -40,7 +40,7 @@ out_folder = (
 )  # set to None to skip saving
 out_folder = None  # type: ignore[assignment]
 
-figures_output_folder = "data/figures/quantitative_feedback_analysis"
+figures_output_folder = "data/figures/quantitative_feedback_analysis/"
 makedirs(figures_output_folder, exist_ok=True)
 
 # %%
