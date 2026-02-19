@@ -2,10 +2,13 @@
 """Notebook to analyse feedback responses.
 
 Note: ### = commented out to pass linting
+
+Using 'type: ignore' to satisfy mypy checks.
 """
 
 # pylint: disable=C0301,C0103,R0801,C0302,C0121
 
+from os import makedirs
 from textwrap import wrap
 
 import dotenv
@@ -23,7 +26,7 @@ from survey_assist_utils.data_cleaning.sic_codes import (
 
 # %%
 # Load environmental variables & set data input/output locations:
-### %matplotlib inline
+## %matplotlib inline
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 
@@ -36,6 +39,9 @@ out_folder = (
     data_bucket + "analysis-interim-results/feedback-analysis"
 )  # set to None to skip saving
 out_folder = None  # type: ignore[assignment]
+
+figures_output_folder = "data/figures/quantitative_feedback_analysis"
+makedirs(figures_output_folder, exist_ok=True)
 
 # %%
 # Read data exported from firesore
@@ -153,7 +159,6 @@ for col in feedback_score_cols:
         f"{col}: -ve = {100*len(feedback_given_df[feedback_given_df[col] < midpt_score])/len(feedback_given_df):.3f}%"
     )
 
-
 # %%
 
 # Identify responses where dynamic questions were used:
@@ -251,7 +256,7 @@ ax.set_title(
 )
 
 plt.tight_layout()
-plt.savefig("quant_feedback_distributions_concise.png", dpi=275)
+plt.savefig(f"{figures_output_folder}quant_feedback_distributions_concise.png", dpi=275)
 
 # %%
 
@@ -322,7 +327,9 @@ ax.set_title(
     fontsize=20,
 )
 plt.tight_layout()
-plt.savefig("quant_feedback_distributions_dynamic_only.png", dpi=275)
+plt.savefig(
+    f"{figures_output_folder}quant_feedback_distributions_dynamic_only.png", dpi=275
+)
 
 # %%
 
@@ -384,7 +391,11 @@ cbar.set_label(
     + "(95% confidence intervals stated)"
 )
 plt.tight_layout()
-plt.savefig("corr_mat_feedback_kendall_CI.png", dpi=275, transparent=True)
+plt.savefig(
+    f"{figures_output_folder}corr_mat_feedback_kendall_CI.png",
+    dpi=275,
+    transparent=True,
+)
 
 # %%
 # Visulaise impact of dynamic questions on feedback:
@@ -482,6 +493,7 @@ ordered_SIC_sections = [
 
 section_counts = feedback_given_df_SIC_dummies[ordered_SIC_sections].sum()
 print(section_counts)
+
 # %%
 key_variables_SIC = feedback_score_cols.copy()
 key_variables_SIC.extend([f"{sec}" for sec in ordered_SIC_sections])
@@ -647,7 +659,9 @@ ax2.set_yticks([])
 section_cbar.set_label("Obs.")
 section_cbar.set_ticks([50, 100, 150], labels=["50", "100", "150"], fontsize=7)
 plt.savefig(
-    "section_level_feedback_correlations_concise.png", dpi=275, transparent=True
+    f"{figures_output_folder}section_level_feedback_correlations_concise.png",
+    dpi=275,
+    transparent=True,
 )
 
 # %%
@@ -749,7 +763,11 @@ ax.set_yticks(
 )
 cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.65, aspect=7, pad=0.01)
 cbar.set_label("Kendall correlation\ncoefficient " + r"($\tau$)")
-plt.savefig("corr_mat_feedback_LLM_waittime_kendall.png", dpi=275, transparent=True)
+plt.savefig(
+    f"{figures_output_folder}corr_mat_feedback_LLM_waittime_kendall.png",
+    dpi=275,
+    transparent=True,
+)
 
 # %%
 # Visualise distributions of LLM wait time / dynamic question completion time (not for feedback)
@@ -760,7 +778,7 @@ time_plot = feedback_given_llm_waittime_df["time_to_show_dynamic_question"].plot
 )
 time_plot.set_xlabel("Dynamic Question Generation Time (s)")
 time_plot.set_ylabel("Number of Respondents")
-plt.savefig("LLM_waittime_hist.png", dpi=275, transparent=True)
+plt.savefig(f"{figures_output_folder}LLM_waittime_hist.png", dpi=275, transparent=True)
 
 wait_cutoff = 600
 plt.figure()
@@ -769,7 +787,9 @@ time_plot = feedback_given_llm_waittime_df[
 ]["time_in_seconds"].plot(kind="hist", bins=25)
 time_plot.set_xlabel("Time taken complete the dynamic questions (s)")
 time_plot.set_ylabel("Number of Respondents")
-plt.savefig("survey_completion_time_hist.png", dpi=275, transparent=True)
+plt.savefig(
+    f"{figures_output_folder}survey_completion_time_hist.png", dpi=275, transparent=True
+)
 
 # %%
 # Analysis of User Path on Feedback
@@ -870,7 +890,11 @@ ax.set_yticks(
 cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.62, aspect=7, pad=0.01)
 cbar.set_label("Effect Size (CLES)")
 plt.tight_layout()
-plt.savefig("corr_mat_feedback_dynamic_MW_CLES.png", dpi=275, transparent=True)
+plt.savefig(
+    f"{figures_output_folder}corr_mat_feedback_dynamic_MW_CLES.png",
+    dpi=275,
+    transparent=True,
+)
 
 # %%
 ### Age-related analysis:
@@ -989,7 +1013,9 @@ ax2.set_xticks(range(len(age_counts)), labels=[""] * len(age_counts))
 ax2.set_yticks([])
 age_cbar.set_label("Obs.\n\n")
 plt.tight_layout()
-plt.savefig("age_feedback_correlations.png", dpi=275, transparent=True)
+plt.savefig(
+    f"{figures_output_folder}age_feedback_correlations.png", dpi=275, transparent=True
+)
 
 # %%
 # Age vs Feedback analysis (v2)
@@ -1081,7 +1107,11 @@ ax.set_yticks(range(1), labels=["Age\nRange"], rotation=0, fontsize=12)
 cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.62, aspect=7, pad=0.01)
 cbar.set_label(r"Effect Size $(\eta^2)$")
 plt.tight_layout()
-plt.savefig("corr_mat_feedback_age_KW_eta2.png", dpi=275, transparent=True)
+plt.savefig(
+    f"{figures_output_folder}corr_mat_feedback_age_KW_eta2.png",
+    dpi=275,
+    transparent=True,
+)
 
 # %%
 # Comparison of expected/observed age distributions with general working population:
@@ -1111,7 +1141,6 @@ print(
 65+:     {100*employed_65_plus/employed_total:4.1f}% - expectation {877*employed_65_plus/employed_total:5.1f} responses
 """
 )
-
 
 # %%
 # General / Specific Open Question Impact Analysis:
@@ -1144,6 +1173,7 @@ print(
 print(
     f"feedback-given generic open questions: {feedback_given_dynamic_df['generic_open_q'].value_counts()}, {feedback_given_dynamic_df['generic_open_q'].value_counts()/len(feedback_given_dynamic_df)}"
 )
+
 # %%
 # General / Specific Open Question Impact Analysis:
 # (this cell - statistical tests & heatmap visualisation)
@@ -1269,5 +1299,7 @@ cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.62, aspect=7, pad=0.01)
 cbar.set_label("Effect Size (CLES)")
 plt.tight_layout()
 plt.savefig(
-    "corr_mat_feedback_generic_or_specific_Q_MW_CLES.png", dpi=275, transparent=True
+    f"{figures_output_folder}corr_mat_feedback_generic_or_specific_Q_MW_CLES.png",
+    dpi=275,
+    transparent=True,
 )
