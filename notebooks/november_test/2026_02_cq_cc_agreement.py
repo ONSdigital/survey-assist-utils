@@ -37,7 +37,7 @@ if not analysis_bucket:
 
 # %%
 closed_question_data = full_data[
-    ~full_data["survey_assist_closed_question_response"].isna()
+    full_data["survey_assist_closed_question_response"].notna()
 ]
 
 # %%
@@ -144,17 +144,20 @@ chi_square_p = chi2_contingency(contingency_table).pvalue
 # %%
 if chi_square_p > significance_threshold:
     print(
-        f"With p-value at {round(chi_square_p, 2)}, we reject null hypothesis, suggesting that there is no evidence of a relationship between CCs opinion and respondent selecting NOTA."
+        f"With p-value at {chi_square_p:.2f}, we fail to reject null hypothesis - there is no evidence of a relationship between CCs opinion and respondent selecting NOTA."
     )
 else:
     print(
-        f"With p-value at {round(chi_square_p, 2)}, we accept null hypothesis, suggesting that there is evidence of a relationship between CCs opinion and respondent selecting NOTA."
+        f"With p-value at {chi_square_p:.2f}, we reject the null hypothesis - there is evidence of a relationship between CCs opinion and respondent selecting NOTA."
     )
 
 # %%
 print(
     f"{(selected_n + selected_y) / (selected_n + selected_y + nota_n + nota_y) * 100:.2f}% of respondents selected one of the codes."
 )
+
+# %% [markdown]
+# # Comparing CCs' final codability with SA final codability.
 
 # %%
 final_codability_sa_cc = (
@@ -163,9 +166,6 @@ final_codability_sa_cc = (
     .size()
     .unstack()
 )
-
-# %% [markdown]
-# # Comparing CCs' final codability with SA final codability.
 
 # %%
 print(final_codability_sa_cc)
@@ -207,13 +207,13 @@ p_value = chi2_contingency(table).pvalue
 expected = chi2_contingency(table).expected_freq
 
 # %%
-if p_value < significance_threshold:
+if p_value > significance_threshold:
     print(
-        f"The p-value is very low ({p_value}). This allows to reject the null hypothesis. There is a differnece between successes found by cc and sa."
+        f"With the p-value ({p_value:.2f}), we fail to reject the null hypothesis. There is no differnece between successes found by cc and sa."
     )
 else:
     print(
-        f"The p-value ({p_value}) does not allow to reject the null hypothesis. There is no differnece between successes found by cc and sa."
+        f"The p-value ({p_value:.2f}), we reject the null hypothesis. There is a differnece between successes found by cc and sa."
     )
 
 # %%
@@ -281,7 +281,7 @@ print(adj_residuals > 1.96)
 method = "cc"
 msk = (
     full_data[f"{method}_final_codability_level_open_q"] == "Sub-class (5-digits)"
-) & ~full_data["survey_assist_open_question"].isna()
+) & full_data["survey_assist_open_question"].notna()
 full_data[f"{method}_final_codes_open_q_within_offered_options"] = full_data.apply(
     lambda row: row[f"{method}_final_codes_open_q"].issubset(row["sa_initial_codes"]),
     axis=1,
@@ -341,7 +341,7 @@ cc_final_5dig = full_data[
 
 # %%
 cc_5dig_open_question = cc_final_5dig[
-    ~(cc_final_5dig["survey_assist_open_question"].isna())
+    (cc_final_5dig["survey_assist_open_question"].notna())
 ]
 
 # %%
