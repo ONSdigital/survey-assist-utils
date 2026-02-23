@@ -145,7 +145,7 @@ def create_sankey_codability_gain_loss(
 # create sankey diagram for CC codes
 subset_msk = {
     "": cc_coded_df["batch_num"].isin([1, 2, 3]),  # clerical coding now finished
-    "(follow-up)": cc_coded_df["survey_assist_open_question"].notna(),
+    "(follow-up subset)": cc_coded_df["survey_assist_open_question"].notna(),
 }
 for subset_name, msk in subset_msk.items():
     temp_df = (
@@ -174,12 +174,8 @@ for subset_name, msk in subset_msk.items():
     )
     fig.show()
     if out_dir:
-        fig.write_image(
-            f"{out_dir}/cc_codability_gain_sankey_followup_{subset_name}_q.png"
-        )
-        fig.write_html(
-            f"{out_dir}/cc_codability_gain_sankey_followup_{subset_name}_q.html"
-        )
+        fig.write_image(f"{out_dir}/cc_codability_gain_sankey_{subset_name}.png")
+        fig.write_html(f"{out_dir}/cc_codability_gain_sankey_{subset_name}.html")
 
 # %%
 # create sankey diagram for SA codes
@@ -210,12 +206,8 @@ for question_type in ["open", "closed"]:
     )
     fig.show()
     if out_dir:
-        fig.write_image(
-            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.png"
-        )
-        fig.write_html(
-            f"{out_dir}/sa_codability_gain_sankey_followup_{question_type}_q.html"
-        )
+        fig.write_image(f"{out_dir}/sa_codability_gain_sankey_{question_type}_q.png")
+        fig.write_html(f"{out_dir}/sa_codability_gain_sankey_{question_type}_q.html")
 
 
 # %%
@@ -297,5 +289,48 @@ if "time_start" in sa_coded_df.columns:
     if out_dir:
         fig.write_image(f"{out_dir}/user_numbers_vs_time_start.png")
         fig.write_html(f"{out_dir}/user_numbers_vs_time_start.html")
+
+
+# %%
+# extract specific proportions for the report
+msk = sa_coded_df["survey_assist_open_question"].notna()
+diff_df = sa_coded_df[msk].merge(cc_coded_df, on=["user"]).reset_index()
+
+diff_df["cc_initial_coded"] = diff_df["cc_initial_codes"].apply(len) == 1
+diff_df["cc_changed"] = diff_df["cc_initial_codes"].map(set) != diff_df[
+    "cc_final_codes_open_q"
+].map(set)
+diff_df["sa_changed"] = diff_df["sa_initial_codes"].map(set) != diff_df[
+    "sa_final_codes_open_q"
+].map(set)
+
+print("Overall SA codes change stats:")
+print(diff_df["sa_changed"].aggregate(["mean", "sum", "count"]))
+
+print(
+    "SA codability gain > 0 proportion on whole dataset: ",
+    (sa_coded_df["sa_codability_gain_open_q"] > 0).aggregate(["mean", "sum", "count"]),
+)
+print(
+    "SA codability gain > 0 proportion on open q answered dataset: ",
+    (diff_df["sa_codability_gain_open_q"] > 0).aggregate(["mean", "sum", "count"]),
+)
+
+print("\n Overall clerical codes change stats:")
+print(diff_df["cc_changed"].aggregate(["mean", "sum", "count"]))
+print(
+    diff_df.groupby("cc_initial_coded")["cc_changed"].aggregate(
+        ["mean", "sum", "count"]
+    )
+)
+
+print(
+    "CC codability gain > 0 proportion on whole dataset: ",
+    (cc_coded_df["cc_codability_gain_open_q"] > 0).aggregate(["mean", "sum", "count"]),
+)
+print(
+    "CC codability gain > 0 proportion on open q answered dataset: ",
+    (diff_df["cc_codability_gain_open_q"] > 0).aggregate(["mean", "sum", "count"]),
+)
 
 # %%

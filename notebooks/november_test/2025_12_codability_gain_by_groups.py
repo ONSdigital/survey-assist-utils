@@ -16,6 +16,7 @@ import pandas as pd
 import plotly.express as px
 from scipy.stats import binomtest
 
+from notebooks.november_test.helper_load_data import combine_small_groups
 from survey_assist_utils.data_cleaning.sic_codes import (
     CODABILITY_LEVELS,
     get_clean_n_digit_codes,
@@ -134,46 +135,11 @@ def add_proportion_confint(prop: float, nobs: int, alpha=0.05):
     return ci.low, ci.high, prop - ci.low, ci.high - prop
 
 
-def combine_small_groups(
-    input_df: pd.DataFrame,
-    group_col: str = "SIC Section",
-    group_size_threshold: int = 10,
-    add_total: bool = True,
-) -> pd.DataFrame:
-    """Combine small groups in the specified column into an 'Other' category.
-
-    Args:
-        input_df: DataFrame containing the groups.
-        group_col: Name of the column representing groups.
-        group_size_threshold: Minimum size of group to be shown separately. Groups smaller than this will be combined.
-        add_total: Whether to add a 'Total' group aggregating all data.
-
-    Returns:
-        DataFrame with small groups combined into 'Other'.
-    """
-    temp_df = input_df.copy()
-    section_sizes = temp_df[group_col].value_counts(dropna=False)
-    temp_df1 = temp_df.copy()
-    too_small = sorted(
-        section_sizes[section_sizes < group_size_threshold].index.tolist()
-    )
-    msk_small = temp_df1[group_col].isin(too_small)
-    temp_df1.loc[msk_small, group_col] = "+".join(too_small)
-    if not add_total:
-        return temp_df1
-
-    temp_df2 = temp_df.copy()
-    temp_df2[group_col] = "Total"
-    temp_df = pd.concat([temp_df1, temp_df2], axis=0, ignore_index=True)
-
-    return temp_df
-
-
 def create_codability_by_section_figure(
     input_df: pd.DataFrame,
     coding_method: str,
     num_digits: int,
-    group_size_threshold: int = 10,
+    group_size_threshold: int = 30,
     group_col: str = "SIC Section",
 ):
     """Create a figure visualising codability by SIC sections.
@@ -336,7 +302,7 @@ def create_codability_by_section_figure(
         xref="paper",
     )
     fig.add_annotation(
-        x=0.01,
+        x=0,
         y=len(plot_df[group_col]) + 0.5,
         text=group_col,
         showarrow=False,
@@ -384,6 +350,7 @@ for classification_method in ["sa", "cc"]:
             ),
             group_col="Most Likely<br>SIC Section",
             coding_method=classification_method,
+            group_size_threshold=30,
             num_digits=num_dig,
         )
 

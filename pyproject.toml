@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "survey-assist-utils"
-version = "0.0.6"
+version = "0.0.7"
 description = "Utility module for Survey Assist"
 authors = ["Steve Gibbard <steve.gibbard@ons.gov.uk>"]
 license = "MIT"
@@ -22,9 +22,8 @@ toml = "^0.10.2"
 google-cloud-storage = "^2.0.0"
 fsspec = "^2025.3.2"
 gcsfs = "^2025.3.2"
-langchain-google-vertexai = "^2.0.27"
+langchain-google-vertexai = "^2.1.2"
 google-cloud-iam = "^2.19.1"
-pyarrow = ">=19.0.1,<20.0.0"
 langchain = "^0.3.0"
 pandas-gbq = "^0.26.1"
 numpy = "^2.3.3"
@@ -46,6 +45,7 @@ pre-commit = "^4.2.0"
 types-toml = "^0.10.8.20240310"
 jupytext = "^1.17.1"
 plotly = "^6.3.0"
+scipy = "^1.16.3"
 kaleido = "^1.2.0"
 
 [tool.isort]
