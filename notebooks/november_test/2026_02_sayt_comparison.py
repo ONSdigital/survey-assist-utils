@@ -42,7 +42,7 @@ if out_dir:
 sa_combined_df = load_data(work_dir)
 
 # %%
-# get sheet names
+# The linkage of IDs between the Survey Assist and SAYT datasets requertes two lookups.
 id1_df = pd.read_excel(
     work_dir + "/SAYT/PFR-Crossover IDs.xlsx", sheet_name="Matched Crossover IDs"
 )
@@ -75,8 +75,9 @@ print(combined_df.shape)
 
 # %%
 #####################
-# initial the lines were misaligned so the linkage was wrong, and we used semantic best matching to find the best pairs,
-# and then check how many of them are correct based on the true pairs from the combined_df.
+# Initially the lines in the lookup were misaligned so the linkage was wrong, and we used semantic best matching
+# The current lookup in the bucket is correct so we can directly use the matched IDs (and skip next 5 cells)
+# The semantic matching is kept here for reference, and its accuracy is checked against the lookup (the updated version)
 ######################
 # %%
 vectoriser = genai.Client(vertexai=True, project=project_id, location="europe-west1")
@@ -189,7 +190,8 @@ matched_df.loc[
 
 # %%
 ###############
-# after update, we got the corrected matching IDs, so use the from now on
+# After update, we got the corrected matching IDs, so use them from now on
+# The following analysis looks at the agreement between SAYT and SA codings, and their overlap with clerical coding, at different SIC levels (0, 2, 5 digits)
 ###############
 # %%
 def get_sayt_codes(input_str):
