@@ -9,7 +9,6 @@ from os import makedirs
 from textwrap import wrap
 
 import dotenv
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -24,6 +23,8 @@ if not project_id:
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 work_dir = data_bucket + "analysis-interim-results"
+# out_dir = work_dir + "/CC_SocSurveys_feedback"
+out_dir = None
 
 figures_output_folder = "data/figures/cc_feedback_analysis/"
 makedirs(figures_output_folder, exist_ok=True)
@@ -58,10 +59,11 @@ export_cols = [
     "is_there_an_alternative_question_you_would_ask?__ y/n",
     "if_yes:_what_question_should_be_asked?",
 ]
-export_df[export_cols].to_csv(
-    f"{work_dir}/CC_SocSurveys_feedback/CC_coded_public_test_responses_with_comments.csv",
-    index=False,
-)
+if out_dir:
+    export_df[export_cols].to_csv(
+        f"{out_dir}/CC_coded_public_test_responses_with_comments.csv",
+        index=False,
+    )
 # %%
 # RAG Status Distributions
 
@@ -86,10 +88,6 @@ cleaned_evaluation_with_cc_openQs = cleaned_evaluation_df[
 cleaned_evaluation_with_cc_openQs["aligned_rag_status"].value_counts(dropna=False)
 
 # %%
-
-### cleaned_evaluation_with_cc_openQs.columns
-
-# %%
 # Clerical Coder Comments Summary Statistics
 
 comments_cols = [
@@ -103,13 +101,15 @@ comments_cols = [
 print("total responses: ", len(cleaned_evaluation_df))
 for c in comments_cols:
     count = cleaned_evaluation_df[c].notna().sum()
-    print(c, count, f"{100*count/len(cleaned_evaluation_df):.0f}%")
+    print(c, count, f"({100*count/len(cleaned_evaluation_df):.0f}% of total)")
 
 
 print("\nreceived dynamic questions: ", len(cleaned_evaluation_with_cc_openQs))
 for c in comments_cols:
     count = cleaned_evaluation_with_cc_openQs[c].notna().sum()
-    print(c, count, f"{100*count/len(cleaned_evaluation_with_cc_openQs):.0f}%")
+    print(
+        c, count, f"({100*count/len(cleaned_evaluation_with_cc_openQs):.0f}% of total)"
+    )
 
 # %%
 
@@ -171,118 +171,11 @@ for c in requires_dyn_yes_no_cols:
     N: {nays.sum()} ({nays.sum()/len(cleaned_evaluation_with_cc_openQs)*100:.0f}% of responses who received dynamic questions)"""
     )
 
-fig, (ax1, ax2) = plt.subplots(
-    ncols=1, nrows=2, figsize=(10, 10), constrained_layout=True, sharex=True
-)
-
 
 def make_label_tidy(colname: str):
     """Makes a column name readable."""
     return "\n".join(wrap(colname.replace("_", " "), width=15))
 
-
-# General subplot
-bar1 = ax1.bar(
-    [i - 0.125 for i in range(1, 4)],
-    general_yn_responses[general_yes_no_cols[0]],
-    color="#12436D",  # "#12436D",
-    width=0.25,
-)
-bar2 = ax1.bar(
-    [i + 0.125 for i in range(1, 4)],
-    general_yn_responses[general_yes_no_cols[1]],
-    color="#801650",
-    width=0.25,
-)
-for bar_choice in [bar1, bar2]:
-    for bar in bar_choice:
-        ax1.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height(),
-            f"{bar.get_height()}",
-            ha="center",
-            va="bottom",
-            fontsize=14,
-        )
-
-ax1.legend(
-    handles=[
-        mpatches.Patch(color="#12436D", label=make_label_tidy(general_yes_no_cols[0])),
-        mpatches.Patch(color="#801650", label=make_label_tidy(general_yes_no_cols[1])),
-    ],
-    ncols=2,
-)
-
-ax1.spines["right"].set_visible(False)
-ax1.spines["top"].set_visible(False)
-
-ax1.set_ylabel("Number of Questions", fontsize=18)
-ax1.set_yticks([0, 100, 200, 300, 400, 500])
-ax1.set_yticklabels([0, 100, 200, 300, 400, 500], size=14)  # type: ignore[list-item]
-
-# Requires Dynamic Questions subplot
-bar3 = ax2.bar(
-    [i - 0.25 for i in range(1, 4)],  # pylint: disable=unnecessary-comprehension
-    requires_dyn_yn_responses[requires_dyn_yes_no_cols[0]],
-    color="#28A197",  # "#12436D",
-    width=0.25,
-)
-bar4 = ax2.bar(
-    [i for i in range(1, 4)],  # noqa:C416  # pylint: disable=unnecessary-comprehension
-    requires_dyn_yn_responses[requires_dyn_yes_no_cols[1]],
-    color="#F46A25",
-    width=0.25,
-)
-bar5 = ax2.bar(
-    [i + 0.25 for i in range(1, 4)],
-    requires_dyn_yn_responses[requires_dyn_yes_no_cols[2]],
-    color="#A285D1",
-    width=0.25,
-)
-for bar_choice in [bar3, bar4, bar5]:
-    for bar in bar_choice:
-        ax2.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height(),
-            f"{bar.get_height()}",
-            ha="center",
-            va="bottom",
-            fontsize=14,
-        )
-
-ax2.legend(
-    handles=[
-        mpatches.Patch(
-            color="#28A197", label=make_label_tidy(requires_dyn_yes_no_cols[0])
-        ),
-        mpatches.Patch(
-            color="#F46A25", label=make_label_tidy(requires_dyn_yes_no_cols[1])
-        ),
-        mpatches.Patch(
-            color="#A285D1", label=make_label_tidy(requires_dyn_yes_no_cols[2])
-        ),
-    ],
-    ncols=3,
-)
-
-ax2.spines["right"].set_visible(False)
-ax2.spines["top"].set_visible(False)
-
-ax2.set_ylabel("Number of Questions", fontsize=18)
-ax2.set_yticks([0, 100, 200, 300, 400, 500])
-ax2.set_yticklabels([0, 100, 200, 300, 400, 500], size=14)  # type: ignore[list-item]
-
-ax2.set_xticks(
-    range(1, 4),
-    labels=["Yes", "No", "Missing"],
-    rotation=0,
-    fontsize=18,
-)
-
-plt.tight_layout()
-plt.savefig(
-    f"{figures_output_folder}cc_yn_distributions.png", dpi=275, transparent=True
-)
 
 # %%
 # Combined Yes/No/Missing stacked bar plot
@@ -569,13 +462,6 @@ print(
 df_soc_surv = pd.read_csv(
     f"{work_dir}/CC_SocSurveys_feedback/Survey_Assist_Qu_Eval_V2_Beth.csv"
 )
-### df_soc_surv.head(n=2).T
-
-# %%
-### dynamic_qs_df.sample(n=2).T
-
-# %%
-### dynamic_qs_df.columns
 
 # %%
 merged_df_export = df_soc_surv.merge(
@@ -586,8 +472,6 @@ merged_df_export = df_soc_surv.merge(
     how="inner",
 )
 
-### merged_df_export.sample(n=2).T
-# %%
 merged_df_export.rename(
     columns={
         "aligned_rag_status": "CC RAG Status",
@@ -602,11 +486,11 @@ merged_df_export["CC RAG Status"] = merged_df_export["CC RAG Status"].apply(
 
 
 # %%
-### merged_df_export.sample(n=2).T
-merged_df_export.to_csv(
-    f"{work_dir}/CC_SocSurveys_feedback/Quality_and_CC_RAG_Statuses_SurveyAssist_OpenQs.csv",
-    index=False,
-)
+if out_dir:
+    merged_df_export.to_csv(
+        f"{out_dir}/Quality_and_CC_RAG_Statuses_SurveyAssist_OpenQs.csv",
+        index=False,
+    )
 
 # %%
 merged_df = dynamic_qs_df.merge(
@@ -631,16 +515,26 @@ merged_df["Quality_CC_agree"] = merged_df.apply(
 )
 
 # %%
-### merged_df.sample(n=2).T
-
-# %%
 # Check what % of questions CC and MQD agree on RAG status
 ### merged_df["Quality_CC_agree"].value_counts() * 100 / len(merged_df)
 
 # %%
 # Check what % of questions CC and MQD agree on RAG status *for each colour*
 
-print("Splitting based on CC RAG Status:\n")
+print(
+    """
+    The dynamic (open) questions were assessed using a Red/Amber/Green/[Unnecessary]
+    (RAG) system by a) the Clerical Coding team (CC) and b) the Social Surveys team.
+    The CC team assessment was based on question 'usefulness' or 'insight', while
+    the Soc. Sur. assessment was based on question 'quality'.
+
+    In this section, we compare the two RAG assessments in an attempt to identify
+    areas of overlap, which would indicate especially good or bad patterns among
+    questions.
+
+    Splitting based on CC RAG Status:
+"""
+)
 
 # Green
 print(
@@ -684,8 +578,6 @@ merged_df_RAG_dummies = pd.get_dummies(
     prefix="Quality",
     prefix_sep="_",
 )
-
-### merged_df_RAG_dummies.sample(n=2).T
 
 # %%
 RAG_cols = [
