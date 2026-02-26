@@ -10,6 +10,7 @@ Using 'type: ignore' to satisfy mypy checks.
 
 from os import makedirs
 from textwrap import wrap
+from typing import Any
 
 import dotenv
 import matplotlib.pyplot as plt
@@ -409,7 +410,7 @@ responses_by_path = [
     ],
 ]
 
-statistic, p_value = kruskal(*responses_by_path)
+statistic, p_value = kruskal(*responses_by_path)  # type: Any, Any
 
 eta_squared = (statistic - 6 + 1) / (len(feedback_given_df) - 6)
 
@@ -552,7 +553,7 @@ effect_strength_ease = [
     for res, sec in zip(results_ease, ordered_SIC_sections)
 ]
 
-effect_strength_relevance = [
+effect_strength_relevance: Any = [
     res.statistic
     / (
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
@@ -561,7 +562,7 @@ effect_strength_relevance = [
     for res, sec in zip(results_relevance, ordered_SIC_sections)
 ]
 
-effect_strength_comfort = [
+effect_strength_comfort: Any = [
     res.statistic
     / (
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
@@ -574,7 +575,7 @@ effect_strengths_SIC = np.array(
     [effect_strength_ease, effect_strength_relevance, effect_strength_comfort]
 )
 
-p_values = np.array(
+p_values: Any = np.array(
     [
         [mw.pvalue for mw in fb]
         for fb in [results_ease, results_relevance, results_comfort]
@@ -799,7 +800,7 @@ bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 key_variables = ["additional_questions_asked", *feedback_score_cols]
 feedback_dynamic_df = feedback_given_df[key_variables].copy()
 feedback_dynamic_df = feedback_dynamic_df[feedback_dynamic_df.notnull()]
-result_ease = mannwhitneyu(
+result_ease: Any = mannwhitneyu(
     feedback_dynamic_df[feedback_dynamic_df["additional_questions_asked"]][
         "ease_score"
     ],
@@ -808,7 +809,7 @@ result_ease = mannwhitneyu(
     ],
     alternative="two-sided",
 )
-result_relevance = mannwhitneyu(
+result_relevance: Any = mannwhitneyu(
     feedback_dynamic_df[feedback_dynamic_df["additional_questions_asked"]][
         "relevance_score"
     ],
@@ -817,7 +818,7 @@ result_relevance = mannwhitneyu(
     ],
     alternative="two-sided",
 )
-result_comfort = mannwhitneyu(
+result_comfort: Any = mannwhitneyu(
     feedback_dynamic_df[feedback_dynamic_df["additional_questions_asked"]][
         "comfort_score"
     ],
