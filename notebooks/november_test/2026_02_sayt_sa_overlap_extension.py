@@ -8,6 +8,7 @@ Disabled:
 """
 
 # pylint: disable= C0103, C0301
+
 # %%
 import dotenv
 import pandas as pd
@@ -102,28 +103,26 @@ for i in digits:
     )
 
 # %%
-# SA codable, SAYT has multiple codes at 5 digit level
+# SA codable, SAYT has multiple codes at 5 digit level (i.e. respondent selected division)
+msk = data["sayt_codes_5_digit"].str.len() > 1
+sa_final = data["sa_final_codes_closed_q_5_digit"].str.len() == 1
 
-for i in digits:
-    msk = data[f"sayt_codes_{i}_digit"].str.len() > 1
-    sa_final = data[f"sa_final_codes_closed_q_{i}_digit"].str.len() == 1
+sa_codable_sayt_not_codable = len(data[msk & sa_final])
 
-    sa_codable_sayt_not_codable = len(data[msk & sa_final])
+sa_codable_sayt_not_codable_percentage = (
+    sa_codable_sayt_not_codable / sayt_sa_codable * 100
+)
 
-    sa_codable_sayt_not_codable_percentage = (
-        sa_codable_sayt_not_codable / sayt_sa_codable * 100
-    )
-
-    print(f"SA codable, SAYT not codable at {i}-digits: {sa_codable_sayt_not_codable}")
+print(f"SA codable, SAYT not codable at 5-digits: {sa_codable_sayt_not_codable}")
 
 # %%
-# SAYT and closed match
+# SAYT and closed match (same code or both not codable)
 
 for i in digits:
     column = f"sayt_closed_match_{i}_digit"
     sayt_respondent_agreement = data[column].value_counts()[True]
     print(
-        f"SAYT and Respondent agreement at {i}-digit level {sayt_respondent_agreement} ({sayt_respondent_agreement / len_data * 100:.1f}%)"
+        f"SAYT and SA matches at {i}-digit level {sayt_respondent_agreement} ({sayt_respondent_agreement / len_data * 100:.1f}% of all responses)"
     )
 
 # %%
@@ -154,7 +153,7 @@ for i in digits:
     )
 
     print(
-        f"Respondent and CC agreement on {i}-digit level: {cc_respondent_agreement} ({cc_respondent_agreement/ len_data * 100:.1f}%)"
+        f"Respondent (SA) and CC agreement on {i}-digit level: {cc_respondent_agreement} ({cc_respondent_agreement/ len_data * 100:.1f}%)"
     )
 
 # %%
@@ -164,11 +163,11 @@ for i in digits:
     column_closed_in_cc = f"closed_in_cc_{i}_digit"
     closed_in_cc = data[column_closed_in_cc].value_counts()[True]
     print(
-        f"Respondents selection within CC shortlist at {i}-digit level: {closed_in_cc} ({closed_in_cc / len_data * 100:.1f}%)"
+        f"Respondent (SA) selection within CC shortlist at {i}-digit level: {closed_in_cc} ({closed_in_cc / len_data * 100:.1f}%)"
     )
 
 # %%
-# SAYT in CC shrtlist
+# SAYT in CC shortlist
 
 for i in digits:
     column_sayt_in_cc = f"sayt_in_cc_{i}_digit"
@@ -195,72 +194,98 @@ for i in digits:
     )
 
     print(
-        f"SAYT, CC and Respondent agreement at {i}-digit level: {sayt_cc_respondent_agreemnt} ({sayt_cc_respondent_agreemnt / len_data * 100:.1f}%)"
+        f"SAYT, CC and Respondent (SA) agreement at {i}-digit level: {sayt_cc_respondent_agreemnt} ({sayt_cc_respondent_agreemnt / len_data * 100:.1f}%)"
     )
-
-# %% [markdown]
-# # wip - negatives
-
-# %%
-cols = [
-    "SAYT_selection",
-    "job_title",
-    "job_description",
-    "org_description",
-    "survey_assist_open_question",
-    "survey_assist_open_question_response",
-    "sayt_codes",
-    "sa_initial_codes",
-    "sa_final_codes_open_q",
-    "sa_final_codes_closed_q",
-    "sayt_codes_0_digit",
-    "sa_final_codes_closed_q_0_digit",
-    "both_codable_0_digit",
-    "sayt_closed_match_0_digit",
-    "sayt_codes_2_digit",
-    "sa_final_codes_closed_q_2_digit",
-    "both_codable_2_digit",
-    "sayt_closed_match_2_digit",
-    "sayt_codes_5_digit",
-    "sa_final_codes_closed_q_5_digit",
-    "both_codable_5_digit",
-    "sayt_closed_match_5_digit",
-]
-
-# %%
-data_copy = data[cols]
 
 # %%
 # Neither SA or SAYT returned any codes
 for i in digits:
-    sa_not_codable = data_copy[f"sa_final_codes_closed_q_{i}_digit"] == set()
-    sayt_not_codable = data_copy[f"sayt_codes_{i}_digit"] == set()
-    msk_not_codable = data_copy[sa_not_codable & sayt_not_codable]
+    sa_not_codable = data[f"sa_final_codes_closed_q_{i}_digit"] == set()
+    sayt_not_codable = data[f"sayt_codes_{i}_digit"] == set()
+    msk_not_codable = data[sa_not_codable & sayt_not_codable]
     not_codable_count = len(msk_not_codable)
     print(
-        f"Respondent did not selected a code, nor SAYT: {not_codable_count} ({round(not_codable_count/len_data * 100,1)}%)"
+        f"Respondent (SA) did not selected a code, nor SAYT: {not_codable_count} ({round(not_codable_count/len_data * 100,1)}%)"
     )
 
 # %%
 # SA respondent is not codable, SAYT is codable
 
 for i in digits:
-    sa_not_codable = data_copy[f"sa_final_codes_closed_q_{i}_digit"] == set()
-    sayt_codable = data_copy[f"sayt_codes_{i}_digit"].str.len() == 1
-    msk_sa_not_codable = data_copy[sa_not_codable & sayt_codable]
+    sa_not_codable = data[f"sa_final_codes_closed_q_{i}_digit"] == set()
+    sayt_codable = data[f"sayt_codes_{i}_digit"].str.len() == 1
+    msk_sa_not_codable = data[sa_not_codable & sayt_codable]
     sa_not_codable = len(msk_sa_not_codable)
     print(
-        f"Respondent did not selected a code, but SAYT: {sa_not_codable} ({round(sa_not_codable/len_data * 100,1)}%)"
+        f"Respondent (SA) did not selected a code, but SAYT: {sa_not_codable} ({round(sa_not_codable/len_data * 100,1)}%)"
     )
 
 # %%
 # SA respondent selected a code, SAYT is not codable
 
 for i in digits:
-    sa_codable = data_copy[f"sa_final_codes_closed_q_{i}_digit"].str.len() == 1
-    sayt_not_codable = data_copy[f"sayt_codes_{i}_digit"] == set()
-    msk_sayt_not_codable = data_copy[sa_codable & sayt_not_codable]
+    sa_codable = data[f"sa_final_codes_closed_q_{i}_digit"].str.len() == 1
+    sayt_not_codable = data[f"sayt_codes_{i}_digit"] == set()
+    msk_sayt_not_codable = data[sa_codable & sayt_not_codable]
     sayt_not_codable = len(msk_sayt_not_codable)
     print(
         f"Respondent selected a code, but not SAYT: {sayt_not_codable} ({round(sayt_not_codable/len_data * 100,1)}%)"
     )
+
+# %%
+# Most likely SIC section for those that SA and SAYT are uncodable
+
+sa_not_codable = data["sa_final_codes_closed_q_5_digit"] == set()
+sayt_not_codable = data["sayt_codes_5_digit"].str.len() != 1
+
+sections_not_codable = data[sa_not_codable & sayt_not_codable][
+    "most_likely_sic_section"
+]
+
+print(
+    f"Most likely SIC section when SA and SAYT not codable at 5-digit\n{sections_not_codable.value_counts()}"
+)
+
+
+# %%
+def sa_sayt_codable(row: pd.Series):
+    """Check if is codable to a single code.
+
+    Args:
+        row (pd.Series): row with set of codes selected.
+
+    Return:
+        bool: True when codable, False when not codable to single code.
+    """
+    return row != set()
+
+
+# %%
+# Prepare data for creating a confusion matrix for the final codability of SA and SAYT
+
+data.loc[:, "sa_final_5_digit_codable"] = data["sa_final_codes_closed_q_5_digit"].apply(
+    sa_sayt_codable
+)
+data.loc[:, "sayt_final_5_digit_codable"] = data["sayt_codes_5_digit"].apply(
+    sa_sayt_codable
+)
+
+# %%
+final_sa_sayt_confusion_matrix = pd.crosstab(
+    data["sayt_final_5_digit_codable"],
+    data["sa_final_5_digit_codable"],
+    rownames=["SAYT"],
+    colnames=["SA"],
+)
+
+# %%
+print(f"Final codability\n{final_sa_sayt_confusion_matrix}")
+
+# %% [markdown]
+# In 13 cases both SA ans SAYT are not codable to final code.
+#
+# 184 are codable: This includes selecting different codes and SAYT codable to multiple codes.
+#
+# 26 respondents selected one of the titles (including 2- and 5-digit codes), but selected "None of the above " in Closed Quesiton.
+#
+# 28 respondents were able to find final 5-digit code in Closde Question, but didn't select any in SAYT.
