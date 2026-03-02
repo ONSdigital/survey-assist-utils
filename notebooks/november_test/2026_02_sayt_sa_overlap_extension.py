@@ -1,6 +1,5 @@
 # %%
-"""Work in progress.
-Additional checks for SAYT, SA and CC overlap and lack of overlap.
+"""Additional checks for SAYT, SA and CC overlap and lack of overlap.
 
 Disabled:
     - Line too long: print statements.
