@@ -47,6 +47,8 @@ jupytext = "^1.17.1"
 plotly = "^6.3.0"
 scipy = "^1.16.3"
 kaleido = "^1.2.0"
+matplotlib-venn = "^1.1.2"
+scikit-learn = "^1.8.0"
 
 [tool.isort]
 profile = "black"
