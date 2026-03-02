@@ -1,3 +1,4 @@
+# %%
 """Notebook to compare SAYT vs SurveyAssist on the small sample overlap.
 
 Loads preprocessed data with both clerical and SA codings,
@@ -19,10 +20,10 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from google import genai
+from helper_load_data import load_data
 from matplotlib_venn import venn3
 from sklearn.metrics.pairwise import cosine_similarity
 
-from notebooks.november_test.helper_load_data import load_data
 from survey_assist_utils.data_cleaning.sic_codes import (
     get_clean_n_digit_codes,
     get_codability_level,
@@ -42,7 +43,7 @@ if out_dir:
 sa_combined_df = load_data(work_dir)
 
 # %%
-# The linkage of IDs between the Survey Assist and SAYT datasets requertes two lookups.
+# get sheet names
 id1_df = pd.read_excel(
     work_dir + "/SAYT/PFR-Crossover IDs.xlsx", sheet_name="Matched Crossover IDs"
 )
@@ -75,10 +76,10 @@ print(combined_df.shape)
 
 # %%
 #####################
-# Initially the lines in the lookup were misaligned so the linkage was wrong, and we used semantic best matching
-# The current lookup in the bucket is correct so we can directly use the matched IDs (and skip next 5 cells)
-# The semantic matching is kept here for reference, and its accuracy is checked against the lookup (the updated version)
+# initial the lines were misaligned so the linkage was wrong, and we used semantic best matching to find the best pairs,
+# and then check how many of them are correct based on the true pairs from the combined_df.
 ######################
+
 # %%
 vectoriser = genai.Client(vertexai=True, project=project_id, location="europe-west1")
 
@@ -187,12 +188,12 @@ matched_df.loc[
     ["job_title", "SOC_2020_pt1", "job_description", "SOC_2020_pt2", "matching_score"],
 ].head()
 
-
 # %%
 ###############
-# After update, we got the corrected matching IDs, so use them from now on
-# The following analysis looks at the agreement between SAYT and SA codings, and their overlap with clerical coding, at different SIC levels (0, 2, 5 digits)
+# after update, we got the corrected matching IDs, so use the from now on
 ###############
+
+
 # %%
 def get_sayt_codes(input_str):
     """Get SAYT codes from input string."""
@@ -208,6 +209,7 @@ def get_sayt_codes(input_str):
 
 
 combined_df["sayt_codes"] = combined_df["SAYT_code"].apply(get_sayt_codes)
+
 # %%
 combined_df["SAYT_code"].apply(lambda x: len(x) if pd.notna(x) else 0).value_counts()
 combined_df["sayt_codability_level"] = combined_df["sayt_codes"].apply(
@@ -365,38 +367,43 @@ examples[
 ].head(5)
 
 # %%
-combined_df[
-    [
-        "UAC",
-        "user",
-        "SAYT_code",
-        "sayt_codes",
-        "sa_initial_codes",
-        "cc_initial_codes",
-        "sa_final_codes_open_q",
-        "cc_final_codes_open_q",
-        "sa_final_codes_closed_q",
-        "sayt_codes_0_digit",
-        "sa_final_codes_closed_q_0_digit",
-        "both_codable_0_digit",
-        "cc_codes_0_digit",
-        "sayt_closed_match_0_digit",
-        "sayt_in_cc_0_digit",
-        "closed_in_cc_0_digit",
-        "sayt_codes_2_digit",
-        "sa_final_codes_closed_q_2_digit",
-        "both_codable_2_digit",
-        "cc_codes_2_digit",
-        "sayt_closed_match_2_digit",
-        "sayt_in_cc_2_digit",
-        "closed_in_cc_2_digit",
-        "sayt_codes_5_digit",
-        "sa_final_codes_closed_q_5_digit",
-        "both_codable_5_digit",
-        "cc_codes_5_digit",
-        "sayt_closed_match_5_digit",
-        "sayt_in_cc_5_digit",
-        "closed_in_cc_5_digit",
-    ]
-].to_csv(work_dir + "/SAYT/sayt_sa_comparison.csv", index=False)
+combined_df["SAYT_selection"] = combined_df["SAYT_selection"].astype(str)
+
 # %%
+# combined_df.to_parquet(work_dir + "/SAYT/sayt_sa_comparison_all_columns.parquet")
+
+# %%
+# combined_df[
+#     [
+#         "UAC",
+#         "user",
+#         "SAYT_code",
+#         "sayt_codes",
+#         "sa_initial_codes",
+#         "cc_initial_codes",
+#         "sa_final_codes_open_q",
+#         "cc_final_codes_open_q",
+#         "sa_final_codes_closed_q",
+#         "sayt_codes_0_digit",
+#         "sa_final_codes_closed_q_0_digit",
+#         "both_codable_0_digit",
+#         "cc_codes_0_digit",
+#         "sayt_closed_match_0_digit",
+#         "sayt_in_cc_0_digit",
+#         "closed_in_cc_0_digit",
+#         "sayt_codes_2_digit",
+#         "sa_final_codes_closed_q_2_digit",
+#         "both_codable_2_digit",
+#         "cc_codes_2_digit",
+#         "sayt_closed_match_2_digit",
+#         "sayt_in_cc_2_digit",
+#         "closed_in_cc_2_digit",
+#         "sayt_codes_5_digit",
+#         "sa_final_codes_closed_q_5_digit",
+#         "both_codable_5_digit",
+#         "cc_codes_5_digit",
+#         "sayt_closed_match_5_digit",
+#         "sayt_in_cc_5_digit",
+#         "closed_in_cc_5_digit",
+#     ]
+# ].to_csv(work_dir + "/SAYT/sayt_sa_comparison.csv", index=False)
