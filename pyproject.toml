@@ -49,6 +49,7 @@ scipy = "^1.16.3"
 kaleido = "^1.2.0"
 matplotlib-venn = "^1.1.2"
 scikit-learn = "^1.8.0"
+openpyxl = "^3.1.5"
 
 [tool.isort]
 profile = "black"
