@@ -12,14 +12,14 @@ packages = [{ include = "survey_assist_utils", from = "src" }]
 generate-api-token = "survey_assist_utils.api_token.jwt_utils:main"
 
 [tool.poetry.dependencies]
-python = "^3.12"
 google-auth = "^2.36.0"
 google-cloud-logging = "^3.9.0"
-toml = "^0.10.2"
-google-cloud-storage = "^2.0.0"
 google-cloud-iam = "^2.19.1"
-pandas-gbq = "^0.26.1"
+google-cloud-storage = "^2.0.0"
 numpy = "^2.3.3"
+pandas = "^2.3.3"
+python = "^3.12"
+toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.8.3"
@@ -35,6 +35,7 @@ matplotlib-venn = "^1.1.2"
 mkdocs-material = "^9.6.7"
 mypy = "^1.15.0"
 openpyxl = "^3.1.5"
+pandas-gbq = "^0.26.1"
 plotly = "^6.3.0"
 pre-commit = "^4.2.0"
 pydantic = "^2.12.5"
@@ -43,9 +44,9 @@ pytest = "^8.3.5"
 pytest-cov = "^6.0.0"
 python-dotenv = "^1.1.0"
 ruff = "^0.9.10"
-types-toml = "^0.10.8.20240310"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
+types-toml = "^0.10.8.20240310"
 
 [tool.isort]
 profile = "black"
