@@ -15,7 +15,7 @@ generate-api-token = "survey_assist_utils.api_token.jwt_utils:main"
 google-auth = "^2.36.0"
 google-cloud-logging = "^3.9.0"
 google-cloud-iam = "^2.19.1"
-google-cloud-storage = "^2.0.0"
+google-cloud-storage = "^3.9.0"
 python = "^3.12"
 
 [tool.poetry.group.dev.dependencies]
